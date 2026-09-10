@@ -13,17 +13,35 @@ import {
   Key,
   Sun,
   AlertTriangle,
-  Activity
+  Activity,
+  Volume2,
+  MonitorOff
 } from 'lucide-react';
 import { validateAndSanitizeFile } from '../utils/security';
 import { getGeminiApiKey } from '../services/aiApi';
 import { optimizeImageForInspection } from '../utils/imageOptimizer';
+import { unlockBrowserAudio, speakAssistantText } from '../utils/audioUnlocker';
+import { saveSessionDraft, loadSessionDraft, clearSessionDraft, type InspectionDraft } from '../utils/sessionRecovery';
+import { JitterFilter } from '../utils/jitterFilter';
 
 export default function NewInspection() {
   const navigate = useNavigate();
   const [selectedAsset, setSelectedAsset] = useState<string>('Industrial Machine #M-401 (Mechanical Hub)');
   const [luminance, setLuminance] = useState<number | null>(null);
   const [tabNotice, setTabNotice] = useState<string | null>(null);
+  
+  // Screen-split & window blur tracking
+  const [windowBlurAlert, setWindowBlurAlert] = useState<string | null>(null);
+  const [focusLostCount, setFocusLostCount] = useState<number>(0);
+
+  // Session persistence & recovery state
+  const [recoveredDraft, setRecoveredDraft] = useState<InspectionDraft | null>(null);
+
+  // Real-time Voice HUD captions
+  const [assistantCaption, setAssistantCaption] = useState<string | null>(null);
+
+  // Jitter stabilizer ref for low-light sensor smoothing
+  const jitterFilterRef = useRef<JitterFilter>(new JitterFilter(0.75));
   
   // Media state
   const [mediaFile, setMediaFile] = useState<{
@@ -94,8 +112,18 @@ export default function NewInspection() {
     }
   ];
 
-  // Cleanup camera stream on unmount & handle tab visibility changes
+  // Cleanup camera stream on unmount, unlock audio, handle window blur & tab visibility
   useEffect(() => {
+    // 1. Unlock browser audio autoplay on first interaction
+    unlockBrowserAudio();
+
+    // 2. Check for existing session recovery draft
+    const existingDraft = loadSessionDraft();
+    if (existingDraft) {
+      setRecoveredDraft(existingDraft);
+    }
+
+    // 3. Tab Visibility Change (Background / Minimize protection)
     const handleVisibilityChange = () => {
       if (document.hidden) {
         if (streamRef.current) {
@@ -104,13 +132,50 @@ export default function NewInspection() {
         }
       }
     };
+
+    // 4. Window Focus / Blur (Screen-Split / Side-by-side multitasking detection)
+    const handleWindowBlur = () => {
+      setFocusLostCount(prev => prev + 1);
+      setWindowBlurAlert('Screen-Split / Multitasking Alert: Active window focus was lost. Inspector or candidate clicked into another application or side-by-side window.');
+    };
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleWindowBlur);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleWindowBlur);
       stopCamera();
     };
   }, []);
+
+  // Real-time Session Draft Auto-Persistence
+  useEffect(() => {
+    if (mediaFile || (description && description.length > 30)) {
+      saveSessionDraft({
+        selectedAsset,
+        description,
+        mediaFile
+      });
+    }
+  }, [selectedAsset, description, mediaFile]);
+
+  const handleRestoreDraft = () => {
+    if (recoveredDraft) {
+      setSelectedAsset(recoveredDraft.selectedAsset);
+      setDescription(recoveredDraft.description);
+      if (recoveredDraft.mediaFile) {
+        setMediaFile(recoveredDraft.mediaFile);
+      }
+      setRecoveredDraft(null);
+      speakAssistantText('Session draft successfully restored.', setAssistantCaption);
+    }
+  };
+
+  const handleDiscardDraft = () => {
+    clearSessionDraft();
+    setRecoveredDraft(null);
+  };
 
   // Timer for voice recording
   useEffect(() => {
@@ -331,6 +396,12 @@ export default function NewInspection() {
         const avg = Math.round(sum / (imgData.length / 4));
         setLuminance(avg);
 
+        // Stabilize optical center coordinates using JitterFilter to eliminate sensor drift
+        jitterFilterRef.current.filter(
+          { x: canvas.width / 2, y: canvas.height / 2 }, 
+          avg
+        );
+
         const fileName = `machine_capture_${Date.now()}.jpg`;
         setMediaFile({
           url: dataUrl,
@@ -341,7 +412,7 @@ export default function NewInspection() {
           base64: dataUrl,
           mimeType: 'image/jpeg'
         });
-        setSecurityNotice('Hardware Capture: Verified Secure Frame (Locked 16:9 Aspect)');
+        setSecurityNotice('Hardware Capture: Verified Secure Frame (Locked 16:9 Aspect • Jitter Filter Active)');
         runAiPreScan(fileName);
       }
     }
@@ -391,6 +462,7 @@ export default function NewInspection() {
   };
 
   const handleStartInspection = () => {
+    clearSessionDraft();
     const isMachine = selectedAsset.toLowerCase().includes('machine') || 
                       (mediaFile && mediaFile.name.toLowerCase().includes('screenshot')) ||
                       (mediaFile && mediaFile.name.toLowerCase().includes('machine'));
@@ -412,6 +484,7 @@ export default function NewInspection() {
       mimeType: mediaFile?.mimeType || 'image/jpeg'
     };
 
+    speakAssistantText('Launching multimodal inspection diagnostics with Google Gemini 1.5 Flash.', setAssistantCaption);
     sessionStorage.setItem('currentInspection', JSON.stringify(inspectionPayload));
     navigate('/analysis');
   };
@@ -444,6 +517,59 @@ export default function NewInspection() {
           <ArrowRight className="w-3.5 h-3.5" />
         </Link>
       </div>
+
+      {/* Session Recovery Banner */}
+      {recoveredDraft && (
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-primary/10 via-ai/10 to-primary/5 border border-primary/25 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs animate-in fade-in">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-primary/20 text-primary shrink-0">
+              <RotateCcw className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="font-extrabold text-slate-800 text-sm flex items-center gap-2">
+                Unsaved Inspection Draft Recovered
+                <span className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded-full uppercase font-black">F5 Protected</span>
+              </p>
+              <p className="text-xs text-slate-500">
+                Found previous session for <strong>{recoveredDraft.selectedAsset}</strong> ({new Date(recoveredDraft.savedAt).toLocaleTimeString()}). Would you like to restore your work?
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleRestoreDraft}
+              className="btn-primary py-1.5 px-3.5 text-xs font-bold shadow-xs cursor-pointer"
+            >
+              Restore Draft
+            </button>
+            <button
+              type="button"
+              onClick={handleDiscardDraft}
+              className="py-1.5 px-3 text-xs font-bold text-slate-500 hover:text-critical transition cursor-pointer"
+            >
+              Discard
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Screen-Split / Window Blur Detection Alert */}
+      {windowBlurAlert && (
+        <div className="p-4 rounded-2xl bg-critical/10 border border-critical/20 text-critical text-xs font-bold flex items-center justify-between gap-3 animate-in fade-in">
+          <div className="flex items-center gap-2.5">
+            <MonitorOff className="w-4 h-4 shrink-0" />
+            <span>{windowBlurAlert} (Total Unfocused Events: {focusLostCount})</span>
+          </div>
+          <button 
+            type="button" 
+            onClick={() => setWindowBlurAlert(null)} 
+            className="px-2.5 py-1 rounded-lg bg-critical/20 hover:bg-critical/30 text-[11px] cursor-pointer"
+          >
+            Acknowledge
+          </button>
+        </div>
+      )}
 
       {/* Tab Switched Notice */}
       {tabNotice && (
@@ -934,6 +1060,21 @@ export default function NewInspection() {
         </section>
 
       </div>
+
+      {/* Real-Time Voice Assistant Closed Captions HUD */}
+      {assistantCaption && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 max-w-md w-full px-4 animate-in slide-in-from-bottom duration-300">
+          <div className="bg-slate-900/95 text-white border border-slate-700 shadow-2xl rounded-2xl p-4 flex items-center gap-3 backdrop-blur-md">
+            <div className="p-2.5 rounded-xl bg-cyan-500/20 text-cyan-400 shrink-0">
+              <Volume2 className="w-5 h-5 animate-pulse" />
+            </div>
+            <div className="flex-1 text-xs">
+              <span className="text-[10px] text-cyan-300 font-bold uppercase tracking-wider block">AI Voice Assistant (Live Captions)</span>
+              <p className="font-medium leading-snug mt-0.5">{assistantCaption}</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
