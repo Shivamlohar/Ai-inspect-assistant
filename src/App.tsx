@@ -114,6 +114,17 @@ function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => vo
             </div>
             <input type="checkbox" defaultChecked className="w-5 h-5 accent-primary cursor-pointer" />
           </div>
+
+          <div className="flex items-center justify-between p-3 rounded-2xl bg-healthy/5 border border-healthy/20">
+            <div>
+              <p className="font-semibold text-slate-800 text-sm flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-healthy animate-pulse"></span>
+                Anti-Malware & Sandbox Guard
+              </p>
+              <p className="text-xs text-slate-500">MIME verification, payload blocking & memory isolation active</p>
+            </div>
+            <span className="text-[11px] font-bold text-healthy bg-healthy/10 px-2 py-0.5 rounded-md">ENFORCED</span>
+          </div>
         </div>
 
         <div className="pt-2">

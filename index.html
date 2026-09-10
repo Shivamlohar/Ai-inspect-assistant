@@ -6,13 +6,19 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
     
+    <!-- Robust Content Security Policy to prevent malware, XSS, and unauthorized external connections -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://images.unsplash.com https://*.unsplash.com; media-src 'self' blob: data:; connect-src 'self' https:; object-src 'none'; base-uri 'self';" />
+    
+    <!-- Permissions Policy to prevent camera/microphone hijacking by third parties -->
+    <meta http-equiv="Permissions-Policy" content="camera=(self), microphone=(self), geolocation=(), interest-cohort=()" />
+
     <!-- Title & SEO Branding -->
-    <title>AI Asset Inspection Assistant | Real-Time Infrastructure & Machine Diagnostics</title>
-    <meta name="description" content="AI-Powered Real-Time Asset Inspection Assistant for field inspectors, engineers, and maintenance teams. Inspect Smarter, Detect Earlier, Maintain Better." />
+    <title>AI Inspection Assistance | Real-Time Infrastructure & Machine Diagnostics</title>
+    <meta name="description" content="AI-Powered Real-Time Asset Inspection Assistance for field inspectors, engineers, and maintenance teams. Inspect Smarter, Detect Earlier, Maintain Better." />
     <meta name="theme-color" content="#0ea5e9" />
 
     <!-- Open Graph for Social Previews -->
-    <meta property="og:title" content="AI Asset Inspection Assistant" />
+    <meta property="og:title" content="AI Inspection Assistance" />
     <meta property="og:description" content="Inspect Smarter. Detect Earlier. Maintain Better. AI-powered real-time asset & infrastructure inspection software." />
     <meta property="og:type" content="website" />
 
