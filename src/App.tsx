@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -22,12 +22,23 @@ import {
 import { getGeminiApiKey, setGeminiApiKey, clearGeminiApiKey, testGeminiApiKey } from './services/aiApi';
 import type { ThemeMode } from './utils/theme';
 import { getStoredTheme, applyTheme } from './utils/theme';
-import Dashboard from './pages/Dashboard';
-import NewInspection from './pages/NewInspection';
-import AiAnalysis from './pages/AiAnalysis';
-import InspectionResult from './pages/InspectionResult';
-import Report from './pages/Report';
-import Assets from './pages/Assets';
+import { ErrorBoundary } from './components/ErrorBoundary';
+
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const NewInspection = lazy(() => import('./pages/NewInspection'));
+const AiAnalysis = lazy(() => import('./pages/AiAnalysis'));
+const InspectionResult = lazy(() => import('./pages/InspectionResult'));
+const Report = lazy(() => import('./pages/Report'));
+const Assets = lazy(() => import('./pages/Assets'));
+
+function PageLoader() {
+  return (
+    <div className="min-h-[50vh] flex flex-col items-center justify-center p-8 space-y-3">
+      <div className="w-10 h-10 rounded-full border-3 border-primary border-t-transparent animate-spin"></div>
+      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Optimizing Diagnostics...</p>
+    </div>
+  );
+}
 
 function AlertsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   if (!isOpen) return null;
@@ -622,43 +633,47 @@ function App() {
   };
 
   return (
-    <Router>
-      <div className="flex flex-col min-h-screen bg-background text-slate-800">
-        <TopNav 
-          onOpenAlerts={() => setIsAlertsOpen(true)} 
-          onOpenSettings={() => setIsSettingsOpen(true)} 
-          currentTheme={currentTheme}
-          onToggleTheme={handleToggleTheme}
-        />
-        <div className="flex flex-1">
-          <Sidebar 
+    <ErrorBoundary>
+      <Router>
+        <div className="flex flex-col min-h-screen bg-background text-slate-800">
+          <TopNav 
             onOpenAlerts={() => setIsAlertsOpen(true)} 
             onOpenSettings={() => setIsSettingsOpen(true)} 
             currentTheme={currentTheme}
             onToggleTheme={handleToggleTheme}
           />
-          <main className="flex-1 md:ml-64 pb-24 md:pb-12 w-full">
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/assets" element={<Assets />} />
-              <Route path="/inspect" element={<NewInspection />} />
-              <Route path="/analysis" element={<AiAnalysis />} />
-              <Route path="/result" element={<InspectionResult />} />
-              <Route path="/report" element={<Report />} />
-            </Routes>
-          </main>
-        </div>
-        <MobileNav />
+          <div className="flex flex-1">
+            <Sidebar 
+              onOpenAlerts={() => setIsAlertsOpen(true)} 
+              onOpenSettings={() => setIsSettingsOpen(true)} 
+              currentTheme={currentTheme}
+              onToggleTheme={handleToggleTheme}
+            />
+            <main className="flex-1 md:ml-64 pb-24 md:pb-12 w-full">
+              <Suspense fallback={<PageLoader />}>
+                <Routes>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/assets" element={<Assets />} />
+                  <Route path="/inspect" element={<NewInspection />} />
+                  <Route path="/analysis" element={<AiAnalysis />} />
+                  <Route path="/result" element={<InspectionResult />} />
+                  <Route path="/report" element={<Report />} />
+                </Routes>
+              </Suspense>
+            </main>
+          </div>
+          <MobileNav />
 
-        <AlertsModal isOpen={isAlertsOpen} onClose={() => setIsAlertsOpen(false)} />
-        <SettingsModal 
-          isOpen={isSettingsOpen} 
-          onClose={() => setIsSettingsOpen(false)} 
-          currentTheme={currentTheme}
-          onSetTheme={handleSetTheme}
-        />
-      </div>
-    </Router>
+          <AlertsModal isOpen={isAlertsOpen} onClose={() => setIsAlertsOpen(false)} />
+          <SettingsModal 
+            isOpen={isSettingsOpen} 
+            onClose={() => setIsSettingsOpen(false)} 
+            currentTheme={currentTheme}
+            onSetTheme={handleSetTheme}
+          />
+        </div>
+      </Router>
+    </ErrorBoundary>
   );
 }
 

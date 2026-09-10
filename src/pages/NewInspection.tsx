@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Camera, Image as ImageIcon, Video, Mic, Sparkles, AlertCircle, RotateCcw, ArrowRight, ShieldCheck, Key } from 'lucide-react';
 import { validateAndSanitizeFile } from '../utils/security';
 import { getGeminiApiKey } from '../services/aiApi';
+import { optimizeImageForInspection } from '../utils/imageOptimizer';
 
 export default function NewInspection() {
   const navigate = useNavigate();
@@ -148,27 +149,44 @@ export default function NewInspection() {
     }
 
     const isVid = file.type.startsWith('video/');
-    const url = URL.createObjectURL(file);
-    const sizeInMb = (file.size / (1024 * 1024)).toFixed(1) + ' MB';
 
-    // Asynchronously convert image to base64 for Gemini Vision API
     if (!isVid) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const b64 = reader.result as string;
-        setMediaFile(prev => prev ? { ...prev, base64: b64, mimeType: file.type } : null);
-      };
-      reader.readAsDataURL(file);
+      optimizeImageForInspection(file)
+        .then((optimized) => {
+          setMediaFile({
+            url: optimized.dataUrl,
+            type: 'image',
+            name: secResult.sanitizedName,
+            size: optimized.sizeInMb,
+            securityHash: secResult.securityHash,
+            base64: optimized.dataUrl,
+            mimeType: 'image/jpeg'
+          });
+        })
+        .catch(() => {
+          const url = URL.createObjectURL(file);
+          const sizeInMb = (file.size / (1024 * 1024)).toFixed(1) + ' MB';
+          setMediaFile({
+            url,
+            type: 'image',
+            name: secResult.sanitizedName,
+            size: sizeInMb,
+            securityHash: secResult.securityHash,
+            mimeType: file.type
+          });
+        });
+    } else {
+      const url = URL.createObjectURL(file);
+      const sizeInMb = (file.size / (1024 * 1024)).toFixed(1) + ' MB';
+      setMediaFile({
+        url,
+        type: 'video',
+        name: secResult.sanitizedName,
+        size: sizeInMb,
+        securityHash: secResult.securityHash,
+        mimeType: file.type
+      });
     }
-
-    setMediaFile({
-      url,
-      type: isVid ? 'video' : 'image',
-      name: secResult.sanitizedName,
-      size: sizeInMb,
-      securityHash: secResult.securityHash,
-      mimeType: file.type
-    });
 
     setSecurityNotice('Anti-Malware Sandbox: Clean File • 0 Threat Signatures • Integrity Verified');
     stopCamera();
