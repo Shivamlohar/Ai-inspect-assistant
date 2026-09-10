@@ -1,7 +1,27 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Building2, Camera, FileText, Bell, Settings, ShieldCheck, X, Eye, EyeOff, Key, Sparkles, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { 
+  LayoutDashboard, 
+  Building2, 
+  Camera, 
+  FileText, 
+  Bell, 
+  Settings, 
+  ShieldCheck, 
+  X, 
+  Eye, 
+  EyeOff, 
+  Key, 
+  Sparkles, 
+  AlertCircle, 
+  CheckCircle2, 
+  Sun, 
+  Moon, 
+  Laptop 
+} from 'lucide-react';
 import { getGeminiApiKey, setGeminiApiKey, clearGeminiApiKey, testGeminiApiKey } from './services/aiApi';
+import type { ThemeMode } from './utils/theme';
+import { getStoredTheme, applyTheme } from './utils/theme';
 import Dashboard from './pages/Dashboard';
 import NewInspection from './pages/NewInspection';
 import AiAnalysis from './pages/AiAnalysis';
@@ -71,7 +91,17 @@ function AlertsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
   );
 }
 
-function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+function SettingsModal({ 
+  isOpen, 
+  onClose,
+  currentTheme,
+  onSetTheme
+}: { 
+  isOpen: boolean; 
+  onClose: () => void;
+  currentTheme: ThemeMode;
+  onSetTheme: (theme: ThemeMode) => void;
+}) {
   const [apiKey, setApiKey] = useState<string>(() => getGeminiApiKey());
   const [showKey, setShowKey] = useState<boolean>(false);
   const [isTesting, setIsTesting] = useState<boolean>(false);
@@ -216,6 +246,60 @@ function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => vo
           </div>
         </div>
 
+        {/* Theme Appearance Setting Card */}
+        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
+              <Sun className="w-4 h-4 text-amber-500" />
+              <span>Theme Appearance</span>
+            </div>
+            <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider bg-slate-200/80 text-slate-700">
+              {currentTheme === 'dark' ? '🌙 Dark Active' : currentTheme === 'light' ? '☀️ Light Active' : '💻 System Match'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              onClick={() => onSetTheme('light')}
+              className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition cursor-pointer ${
+                currentTheme === 'light'
+                  ? 'bg-white border-primary shadow-sm text-primary font-black ring-2 ring-primary/20'
+                  : 'bg-white/70 border-slate-200 text-slate-600 hover:bg-white hover:text-slate-900'
+              }`}
+            >
+              <Sun className="w-5 h-5 text-amber-500" />
+              <span className="text-xs font-bold">Light</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSetTheme('dark')}
+              className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition cursor-pointer ${
+                currentTheme === 'dark'
+                  ? 'bg-slate-900 border-primary shadow-sm text-white font-black ring-2 ring-primary/20'
+                  : 'bg-white/70 border-slate-200 text-slate-600 hover:bg-white hover:text-slate-900'
+              }`}
+            >
+              <Moon className="w-5 h-5 text-cyan-400" />
+              <span className="text-xs font-bold">Dark</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSetTheme('system')}
+              className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition cursor-pointer ${
+                currentTheme === 'system'
+                  ? 'bg-primary/10 border-primary shadow-sm text-primary font-black ring-2 ring-primary/20'
+                  : 'bg-white/70 border-slate-200 text-slate-600 hover:bg-white hover:text-slate-900'
+              }`}
+            >
+              <Laptop className="w-5 h-5 text-slate-500" />
+              <span className="text-xs font-bold">System</span>
+            </button>
+          </div>
+        </div>
+
         {/* Other Inspection Options */}
         <div className="space-y-3">
           <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50">
@@ -259,7 +343,17 @@ function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => vo
   );
 }
 
-function TopNav({ onOpenAlerts, onOpenSettings }: { onOpenAlerts: () => void; onOpenSettings: () => void }) {
+function TopNav({ 
+  onOpenAlerts, 
+  onOpenSettings,
+  currentTheme,
+  onToggleTheme
+}: { 
+  onOpenAlerts: () => void; 
+  onOpenSettings: () => void;
+  currentTheme: ThemeMode;
+  onToggleTheme: () => void;
+}) {
   const location = useLocation();
   const navItems = [
     { path: '/', label: 'Dashboard' },
@@ -286,7 +380,7 @@ function TopNav({ onOpenAlerts, onOpenSettings }: { onOpenAlerts: () => void; on
       </div>
       
       {/* Desktop Top Nav Links */}
-      <nav className="hidden md:flex items-center gap-6">
+      <nav className="hidden md:flex items-center gap-5">
         {navItems.map((item) => (
           <Link
             key={item.label}
@@ -314,9 +408,22 @@ function TopNav({ onOpenAlerts, onOpenSettings }: { onOpenAlerts: () => void; on
           <span className="hidden lg:inline">{getGeminiApiKey() ? 'Gemini Active' : 'Connect API Key'}</span>
         </button>
 
+        {/* 1-Click Dark/Light Theme Quick Toggle */}
+        <button
+          onClick={onToggleTheme}
+          className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-xl transition cursor-pointer"
+          title={currentTheme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+        >
+          {currentTheme === 'dark' ? (
+            <Sun className="w-5 h-5 text-amber-400" />
+          ) : (
+            <Moon className="w-5 h-5 text-slate-600" />
+          )}
+        </button>
+
         <button 
           onClick={onOpenAlerts}
-          className="relative p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-xl transition"
+          className="relative p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-xl transition cursor-pointer"
           title="View Alerts"
         >
           <Bell className="w-5 h-5" />
@@ -325,7 +432,7 @@ function TopNav({ onOpenAlerts, onOpenSettings }: { onOpenAlerts: () => void; on
 
         <button 
           onClick={onOpenSettings}
-          className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-xl transition"
+          className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-xl transition cursor-pointer"
           title="Settings"
         >
           <Settings className="w-5 h-5" />
@@ -344,10 +451,22 @@ function TopNav({ onOpenAlerts, onOpenSettings }: { onOpenAlerts: () => void; on
       </nav>
 
       {/* Mobile Top Actions */}
-      <div className="md:hidden flex items-center gap-2">
+      <div className="md:hidden flex items-center gap-1.5">
+        <button
+          onClick={onToggleTheme}
+          className="p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+          title="Toggle Theme"
+        >
+          {currentTheme === 'dark' ? (
+            <Sun className="w-5 h-5 text-amber-400" />
+          ) : (
+            <Moon className="w-5 h-5 text-slate-600" />
+          )}
+        </button>
+
         <button 
           onClick={onOpenAlerts}
-          className="relative p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition"
+          className="relative p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
         >
           <Bell className="w-5 h-5" />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-critical rounded-full"></span>
@@ -357,7 +476,17 @@ function TopNav({ onOpenAlerts, onOpenSettings }: { onOpenAlerts: () => void; on
   );
 }
 
-function Sidebar({ onOpenAlerts, onOpenSettings }: { onOpenAlerts: () => void; onOpenSettings: () => void }) {
+function Sidebar({ 
+  onOpenAlerts, 
+  onOpenSettings,
+  currentTheme,
+  onToggleTheme
+}: { 
+  onOpenAlerts: () => void; 
+  onOpenSettings: () => void;
+  currentTheme: ThemeMode;
+  onToggleTheme: () => void;
+}) {
   const location = useLocation();
   
   const navItems = [
@@ -390,6 +519,24 @@ function Sidebar({ onOpenAlerts, onOpenSettings }: { onOpenAlerts: () => void; o
         })}
 
         <div className="pt-4 mt-4 border-t border-slate-100 space-y-1.5">
+          {/* Theme Mode Toggle in Sidebar */}
+          <button
+            onClick={onToggleTheme}
+            className="w-full flex items-center justify-between px-4 py-3 rounded-2xl transition-all font-semibold text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-800 cursor-pointer"
+          >
+            <div className="flex items-center gap-3.5">
+              {currentTheme === 'dark' ? (
+                <Sun className="w-5 h-5 text-amber-400" />
+              ) : (
+                <Moon className="w-5 h-5 text-slate-500" />
+              )}
+              <span>{currentTheme === 'dark' ? 'Light Theme' : 'Dark Theme'}</span>
+            </div>
+            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-slate-100 text-slate-500">
+              {currentTheme}
+            </span>
+          </button>
+
           <button
             onClick={onOpenAlerts}
             className="w-full flex items-center justify-between px-4 py-3 rounded-2xl transition-all font-semibold text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-800 cursor-pointer"
@@ -457,18 +604,38 @@ function MobileNav() {
 function App() {
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [currentTheme, setCurrentTheme] = useState<ThemeMode>(() => getStoredTheme());
+
+  useEffect(() => {
+    applyTheme(currentTheme);
+  }, [currentTheme]);
+
+  const handleToggleTheme = () => {
+    const next: ThemeMode = currentTheme === 'dark' ? 'light' : 'dark';
+    setCurrentTheme(next);
+    applyTheme(next);
+  };
+
+  const handleSetTheme = (theme: ThemeMode) => {
+    setCurrentTheme(theme);
+    applyTheme(theme);
+  };
 
   return (
     <Router>
-      <div className="flex flex-col min-h-screen bg-background">
+      <div className="flex flex-col min-h-screen bg-background text-slate-800">
         <TopNav 
           onOpenAlerts={() => setIsAlertsOpen(true)} 
           onOpenSettings={() => setIsSettingsOpen(true)} 
+          currentTheme={currentTheme}
+          onToggleTheme={handleToggleTheme}
         />
         <div className="flex flex-1">
           <Sidebar 
             onOpenAlerts={() => setIsAlertsOpen(true)} 
             onOpenSettings={() => setIsSettingsOpen(true)} 
+            currentTheme={currentTheme}
+            onToggleTheme={handleToggleTheme}
           />
           <main className="flex-1 md:ml-64 pb-24 md:pb-12 w-full">
             <Routes>
@@ -484,7 +651,12 @@ function App() {
         <MobileNav />
 
         <AlertsModal isOpen={isAlertsOpen} onClose={() => setIsAlertsOpen(false)} />
-        <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+        <SettingsModal 
+          isOpen={isSettingsOpen} 
+          onClose={() => setIsSettingsOpen(false)} 
+          currentTheme={currentTheme}
+          onSetTheme={handleSetTheme}
+        />
       </div>
     </Router>
   );

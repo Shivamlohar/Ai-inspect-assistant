@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-primary: #0ea5e9;
   --color-background: #f8fafc;
@@ -12,12 +14,30 @@
   --color-ai: #a855f7;
 }
 
+:root {
+  --color-background: #f8fafc;
+  --color-surface: #ffffff;
+  color-scheme: light;
+}
+
+:root.dark {
+  --color-background: #090d16;
+  --color-surface: #111827;
+  color-scheme: dark;
+}
+
 @layer base {
   body {
     background-color: var(--color-background);
     color: #1e293b;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.25s ease, color 0.25s ease;
+  }
+
+  .dark body {
+    background-color: #090d16;
+    color: #f1f5f9;
   }
 }
 
@@ -25,41 +45,46 @@
   .btn-primary {
     background-color: var(--color-primary);
     color: white;
-    font-weight: 500;
+    font-weight: 600;
     padding: 0.75rem 1.5rem;
     border-radius: 0.75rem;
-    box-shadow: 0 4px 6px -1px rgb(14 165 233 / 0.2), 0 2px 4px -2px rgb(14 165 233 / 0.2);
+    box-shadow: 0 4px 6px -1px rgb(14 165 233 / 0.25), 0 2px 4px -2px rgb(14 165 233 / 0.2);
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    transition: background-color 0.2s;
+    transition: all 0.2s;
   }
   .btn-primary:hover {
     background-color: rgb(12 148 209);
+    transform: translateY(-1px);
   }
+  
   .btn-secondary {
     background-color: white;
     border: 1px solid #e2e8f0;
     color: #334155;
-    font-weight: 500;
+    font-weight: 600;
     padding: 0.75rem 1.5rem;
     border-radius: 0.75rem;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    transition: background-color 0.2s;
+    transition: all 0.2s;
   }
   .btn-secondary:hover {
     background-color: #f8fafc;
   }
+  
   .card {
     background-color: var(--color-surface);
     border-radius: 1.25rem;
     box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
     border: 1px solid #f1f5f9;
+    transition: background-color 0.25s ease, border-color 0.25s ease;
   }
+
   .badge-healthy {
     background-color: rgb(34 197 94 / 0.1);
     color: var(--color-healthy);
@@ -67,7 +92,7 @@
     padding: 0.25rem 0.75rem;
     border-radius: 9999px;
     font-size: 0.875rem;
-    font-weight: 500;
+    font-weight: 600;
     display: flex;
     align-items: center;
     gap: 0.375rem;
@@ -80,7 +105,7 @@
     padding: 0.25rem 0.75rem;
     border-radius: 9999px;
     font-size: 0.875rem;
-    font-weight: 500;
+    font-weight: 600;
     display: flex;
     align-items: center;
     gap: 0.375rem;
@@ -93,7 +118,7 @@
     padding: 0.25rem 0.75rem;
     border-radius: 9999px;
     font-size: 0.875rem;
-    font-weight: 500;
+    font-weight: 600;
     display: flex;
     align-items: center;
     gap: 0.375rem;
@@ -106,10 +131,115 @@
     padding: 0.25rem 0.75rem;
     border-radius: 9999px;
     font-size: 0.875rem;
-    font-weight: 500;
+    font-weight: 600;
     display: flex;
     align-items: center;
     gap: 0.375rem;
     width: fit-content;
   }
+}
+
+/* ==========================================================
+   GLOBAL DARK MODE THEME RULES
+   Seamlessly transforms elements into high-contrast dark mode
+========================================================== */
+.dark body {
+  background-color: #090d16;
+  color: #f1f5f9;
+}
+
+.dark .card {
+  background-color: #111827;
+  border-color: #1f2937;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
+}
+
+.dark .btn-secondary {
+  background-color: #1e293b;
+  border-color: #334155;
+  color: #f1f5f9;
+}
+
+.dark .btn-secondary:hover {
+  background-color: #334155;
+}
+
+.dark header {
+  background-color: #0f172a !important;
+  border-color: #1e293b !important;
+}
+
+.dark aside {
+  background-color: #0f172a !important;
+  border-color: #1e293b !important;
+}
+
+/* Dark mode typography and surfaces */
+.dark .text-slate-800 {
+  color: #f8fafc !important;
+}
+
+.dark .text-slate-700 {
+  color: #e2e8f0 !important;
+}
+
+.dark .text-slate-600 {
+  color: #cbd5e1 !important;
+}
+
+.dark .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+.dark .bg-white {
+  background-color: #111827 !important;
+}
+
+.dark .bg-surface {
+  background-color: #0f172a !important;
+}
+
+.dark .bg-slate-50 {
+  background-color: #1e293b !important;
+}
+
+.dark .bg-slate-100 {
+  background-color: #1e293b !important;
+  color: #e2e8f0 !important;
+}
+
+.dark .border-slate-100,
+.dark .border-slate-200 {
+  border-color: #1f2937 !important;
+}
+
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #64748b !important;
+}
+
+.dark table thead {
+  background-color: #1e293b !important;
+  color: #cbd5e1 !important;
+}
+
+.dark table tr.bg-white {
+  background-color: #111827 !important;
+}
+
+.dark table tr.bg-slate-50\/50 {
+  background-color: #162032 !important;
+}
+
+.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #1f2937 !important;
 }
