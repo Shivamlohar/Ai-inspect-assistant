@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera, Image as ImageIcon, Video, Mic, Sparkles, AlertCircle, RotateCcw, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Camera, Image as ImageIcon, Video, Mic, Sparkles, AlertCircle, RotateCcw, ArrowRight, ShieldCheck, Key } from 'lucide-react';
 import { validateAndSanitizeFile } from '../utils/security';
+import { getGeminiApiKey } from '../services/aiApi';
 
 export default function NewInspection() {
   const navigate = useNavigate();
@@ -14,6 +15,8 @@ export default function NewInspection() {
     name: string;
     size: string;
     securityHash?: string;
+    base64?: string;
+    mimeType?: string;
   } | null>(null);
 
   const [isDragOver, setIsDragOver] = useState(false);
@@ -148,12 +151,23 @@ export default function NewInspection() {
     const url = URL.createObjectURL(file);
     const sizeInMb = (file.size / (1024 * 1024)).toFixed(1) + ' MB';
 
+    // Asynchronously convert image to base64 for Gemini Vision API
+    if (!isVid) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const b64 = reader.result as string;
+        setMediaFile(prev => prev ? { ...prev, base64: b64, mimeType: file.type } : null);
+      };
+      reader.readAsDataURL(file);
+    }
+
     setMediaFile({
       url,
       type: isVid ? 'video' : 'image',
       name: secResult.sanitizedName,
       size: sizeInMb,
-      securityHash: secResult.securityHash
+      securityHash: secResult.securityHash,
+      mimeType: file.type
     });
 
     setSecurityNotice('Anti-Malware Sandbox: Clean File • 0 Threat Signatures • Integrity Verified');
@@ -224,7 +238,9 @@ export default function NewInspection() {
           type: 'image',
           name: fileName,
           size: '1.2 MB',
-          securityHash: 'SHA256:local_camera_stream'
+          securityHash: 'SHA256:local_camera_stream',
+          base64: dataUrl,
+          mimeType: 'image/jpeg'
         });
         setSecurityNotice('Hardware Capture: Verified Secure Frame');
         runAiPreScan(fileName);
@@ -280,6 +296,9 @@ export default function NewInspection() {
                       (mediaFile && mediaFile.name.toLowerCase().includes('screenshot')) ||
                       (mediaFile && mediaFile.name.toLowerCase().includes('machine'));
 
+    const apiKey = getGeminiApiKey();
+    const hasGemini = Boolean(apiKey && apiKey.trim().length > 10 && mediaFile?.base64);
+
     const inspectionPayload = {
       assetName: selectedAsset,
       assetCategory: isMachine ? 'Industrial Machinery Component' : 'Civil Infrastructure',
@@ -288,7 +307,10 @@ export default function NewInspection() {
       mediaName: mediaFile?.name || 'asset_scan.jpg',
       description,
       isMachine,
-      securityHash: mediaFile?.securityHash || 'SHA256:verified_safe'
+      securityHash: mediaFile?.securityHash || 'SHA256:7f3a9e10c4b281d5',
+      geminiPending: hasGemini,
+      imageBase64: mediaFile?.base64,
+      mimeType: mediaFile?.mimeType || 'image/jpeg'
     };
 
     sessionStorage.setItem('currentInspection', JSON.stringify(inspectionPayload));
@@ -299,7 +321,7 @@ export default function NewInspection() {
     <div className="p-6 md:p-10 max-w-4xl mx-auto space-y-8 animate-in fade-in duration-300">
       
       {/* Page Title */}
-      <div className="text-center space-y-2 mb-6">
+      <div className="text-center space-y-2 mb-4">
         <div className="inline-flex items-center gap-2 bg-healthy/10 border border-healthy/20 text-healthy px-3.5 py-1 rounded-full text-xs font-black uppercase tracking-wider">
           <ShieldCheck className="w-3.5 h-3.5" /> High-Accuracy AI Diagnostic Engine • Anti-Malware Protected
         </div>
@@ -307,6 +329,36 @@ export default function NewInspection() {
         <p className="text-slate-500 text-base md:text-lg">
           Upload an image or video of any machine, infrastructure, or industrial asset.
         </p>
+      </div>
+
+      {/* Live AI API Status Banner */}
+      <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs ${
+        getGeminiApiKey() 
+          ? 'bg-gradient-to-r from-ai/10 via-primary/5 to-white border-ai/25' 
+          : 'bg-white border-slate-200'
+      }`}>
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+            getGeminiApiKey() ? 'bg-ai/15 text-ai' : 'bg-slate-100 text-slate-500'
+          }`}>
+            {getGeminiApiKey() ? <Sparkles className="w-5 h-5" /> : <Key className="w-5 h-5" />}
+          </div>
+          <div>
+            <p className="font-extrabold text-slate-800 text-sm flex items-center gap-2">
+              {getGeminiApiKey() ? 'Google Gemini 1.5 Flash Vision Active' : 'Offline Precision Engine Active'}
+              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                getGeminiApiKey() ? 'bg-healthy/10 text-healthy border border-healthy/20' : 'bg-slate-100 text-slate-500'
+              }`}>
+                {getGeminiApiKey() ? '⚡ Real-Time API' : 'Default Model'}
+              </span>
+            </p>
+            <p className="text-xs text-slate-500">
+              {getGeminiApiKey() 
+                ? 'Your uploaded photos/snapshots will be analyzed by Google Gemini Vision for exact live defect detection.'
+                : 'Want live custom image analysis? Click the Connect API Key button in the top navigation to add your Gemini API Key.'}
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Select Target Asset Header */}

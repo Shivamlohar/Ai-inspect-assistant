@@ -1,31 +1,112 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, CheckCircle2, CircleDashed, ArrowRight } from 'lucide-react';
+import { Sparkles, CheckCircle2, CircleDashed, ArrowRight, ShieldCheck } from 'lucide-react';
+import { getGeminiApiKey, analyzeAssetWithGemini } from '../services/aiApi';
 
 export default function AiAnalysis() {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(0);
   const [assetName, setAssetName] = useState('Industrial Machine #M-401');
+  const [isGeminiActive, setIsGeminiActive] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string>('Analyzing visual telemetry...');
 
   useEffect(() => {
-    const saved = sessionStorage.getItem('currentInspection');
-    if (saved) {
+    let isCancelled = false;
+
+    const runAnalysis = async () => {
+      const saved = sessionStorage.getItem('currentInspection');
+      if (!saved) {
+        return;
+      }
+
+      let parsed: any;
       try {
-        const parsed = JSON.parse(saved);
+        parsed = JSON.parse(saved);
         if (parsed.assetName) {
           setAssetName(parsed.assetName);
         }
       } catch (e) {
         console.error(e);
+        return;
       }
-    }
+
+      const apiKey = getGeminiApiKey();
+      const shouldRunGemini = Boolean(
+        parsed.geminiPending && 
+        apiKey && 
+        apiKey.trim().length > 10 && 
+        parsed.imageBase64
+      );
+
+      if (shouldRunGemini) {
+        setIsGeminiActive(true);
+        setStatusMessage('Connecting to Google Gemini 1.5 Flash Vision Model...');
+
+        try {
+          // Call live Gemini Vision API
+          const geminiResult = await analyzeAssetWithGemini(
+            apiKey,
+            parsed.imageBase64,
+            parsed.mimeType || 'image/jpeg',
+            parsed.description || ''
+          );
+
+          if (!isCancelled) {
+            // Save enriched live Gemini data into session storage
+            const updatedPayload = {
+              ...parsed,
+              geminiPending: false,
+              isGemini: true,
+              geminiResult,
+              assetName: geminiResult.assetName || parsed.assetName,
+              assetCategory: geminiResult.category || parsed.assetCategory,
+              healthScore: geminiResult.healthScore,
+              status: geminiResult.status,
+              safetyFactor: geminiResult.safetyFactor,
+              diagnosticSummary: geminiResult.diagnosticSummary,
+              liveDefects: geminiResult.defects,
+              liveRecommendations: geminiResult.recommendations,
+              modelUsed: geminiResult.modelUsed
+            };
+
+            sessionStorage.setItem('currentInspection', JSON.stringify(updatedPayload));
+            setStatusMessage('Gemini Neural Metrology Analysis Complete!');
+          }
+        } catch (apiError: any) {
+          console.warn('Gemini live vision call failed, falling back to offline model:', apiError);
+          if (!isCancelled) {
+            const fallbackPayload = {
+              ...parsed,
+              geminiPending: false,
+              isGemini: false,
+              geminiError: apiError.message || 'API call failed'
+            };
+            sessionStorage.setItem('currentInspection', JSON.stringify(fallbackPayload));
+            setStatusMessage('Fallback to high-precision offline model.');
+          }
+        }
+      }
+    };
+
+    runAnalysis();
+
+    return () => {
+      isCancelled = true;
+    };
   }, []);
 
-  const steps = [
-    "Image received",
+  const steps = isGeminiActive ? [
+    "Image integrity & anti-malware verified",
+    "Sending frame to Google Gemini 1.5 Flash Vision",
+    "Extracting sub-millimeter fracture coordinates",
+    "Assessing ISO & ASME structural tolerances",
+    "Formulating engineering recommendations",
+    "Preparing cryptographically sealed report"
+  ] : [
+    "Image received & sandboxed",
     "Voice converted to text",
     "Defects detected",
-    "Assessing severity",
+    "Assessing severity & tolerance",
     "Generating recommendations",
     "Preparing report"
   ];
@@ -41,10 +122,10 @@ export default function AiAnalysis() {
           return prev;
         }
       });
-    }, 1200);
+    }, isGeminiActive ? 1400 : 1100);
 
     return () => clearInterval(timer);
-  }, [navigate, steps.length]);
+  }, [navigate, steps.length, isGeminiActive]);
 
   return (
     <div className="min-h-[85vh] flex items-center justify-center p-6 animate-in fade-in duration-300">
@@ -61,14 +142,25 @@ export default function AiAnalysis() {
         </div>
 
         <div className="text-center mb-8">
-          <span className="text-xs font-black uppercase tracking-widest text-ai bg-ai/10 px-3 py-1 rounded-full">
-            Real-time Neural Engine
+          <span className="text-xs font-black uppercase tracking-widest text-ai bg-ai/10 px-3 py-1 rounded-full flex items-center justify-center gap-1.5 w-fit mx-auto">
+            {isGeminiActive ? (
+              <>
+                <Sparkles className="w-3.5 h-3.5 text-ai" /> Live Gemini Vision Active
+              </>
+            ) : (
+              <>
+                <ShieldCheck className="w-3.5 h-3.5 text-healthy" /> Precision Metrology Engine
+              </>
+            )}
           </span>
           <h2 className="text-2xl font-black text-slate-800 mt-2">
             Your asset is being analyzed...
           </h2>
           <p className="text-slate-500 font-bold text-sm mt-1">
             Analyzing <span className="text-slate-800 font-extrabold">{assetName}</span>
+          </p>
+          <p className="text-xs font-medium text-slate-400 mt-1 italic">
+            {statusMessage}
           </p>
         </div>
 

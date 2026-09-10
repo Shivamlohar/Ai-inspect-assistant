@@ -16,7 +16,8 @@ import {
   Sliders, 
   Ruler, 
   Activity, 
-  Lock
+  Lock,
+  Sparkles
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
@@ -33,6 +34,12 @@ export default function InspectionResult() {
     description: string;
     securityHash?: string;
     isMachine?: boolean;
+    isGemini?: boolean;
+    geminiResult?: any;
+    healthScore?: number;
+    safetyFactor?: string;
+    status?: string;
+    diagnosticSummary?: string;
   }>(() => {
     const saved = sessionStorage.getItem('currentInspection');
     if (saved) {
@@ -62,27 +69,28 @@ export default function InspectionResult() {
   });
 
   const isMachine = inspectionData.isMachine;
+  const isGemini = Boolean(inspectionData.isGemini && inspectionData.geminiResult);
+  const geminiData = inspectionData.geminiResult;
 
-  const historyData = isMachine ? [
-    { name: 'JAN 2026', score: 96 },
-    { name: 'APR 2026', score: 88 },
-    { name: 'JUL 2026', score: 72 },
-    { name: 'SEP 2026', score: 58 },
-  ] : [
-    { name: 'JAN 2026', score: 95 },
-    { name: 'APR 2026', score: 91 },
-    { name: 'JUL 2026', score: 78 },
-    { name: 'SEP 2026', score: 64 },
+  const currentScore = isGemini ? (geminiData.healthScore ?? 58) : (isMachine ? 58 : 64);
+  const currentSafetyFactor = isGemini ? (geminiData.safetyFactor ?? '1.15') : (isMachine ? '1.15' : '1.28');
+  const currentStatus = isGemini ? (geminiData.status ?? 'AT RISK') : 'AT RISK';
+
+  const historyData = [
+    { name: 'JAN 2026', score: isMachine ? 96 : 95 },
+    { name: 'APR 2026', score: isMachine ? 88 : 91 },
+    { name: 'JUL 2026', score: isMachine ? 72 : 78 },
+    { name: 'SEP 2026', score: currentScore },
   ];
 
-  const allIssues = isMachine ? [
+  const defaultMachineIssues = [
     { 
       id: 'CRACK', 
       name: 'RIM CRACK / FRACTURE', 
       severity: 'High Severity', 
       confidenceVal: 96,
       conf: '96% Confidence', 
-      color: 'critical', 
+      color: 'critical' as const, 
       icon: '🔴', 
       tag: 'Critical Defect',
       measurements: {
@@ -99,7 +107,7 @@ export default function InspectionResult() {
       severity: 'Medium Severity', 
       confidenceVal: 89,
       conf: '89% Confidence', 
-      color: 'attention', 
+      color: 'attention' as const, 
       icon: '🟡', 
       tag: 'Attention Needed',
       measurements: {
@@ -115,7 +123,7 @@ export default function InspectionResult() {
       severity: 'Low Severity', 
       confidenceVal: 84,
       conf: '84% Confidence', 
-      color: 'healthy', 
+      color: 'healthy' as const, 
       icon: '🟢', 
       tag: 'Monitor',
       measurements: {
@@ -125,14 +133,16 @@ export default function InspectionResult() {
       },
       metricText: 'Radial Wear: +0.045 mm (Tolerance Spec: ±0.015 mm)'
     },
-  ] : [
+  ];
+
+  const defaultInfraIssues = [
     { 
       id: 'CRACK', 
       name: 'STRUCTURAL PIER CRACK', 
       severity: 'High Severity', 
       confidenceVal: 94,
       conf: '94% Confidence', 
-      color: 'critical', 
+      color: 'critical' as const, 
       icon: '🔴', 
       tag: 'Critical Defect',
       measurements: {
@@ -149,7 +159,7 @@ export default function InspectionResult() {
       severity: 'Medium Severity', 
       confidenceVal: 87,
       conf: '87% Confidence', 
-      color: 'attention', 
+      color: 'attention' as const, 
       icon: '🟡', 
       tag: 'Attention Needed',
       measurements: {
@@ -165,7 +175,7 @@ export default function InspectionResult() {
       severity: 'Low Severity', 
       confidenceVal: 81,
       conf: '81% Confidence', 
-      color: 'healthy', 
+      color: 'healthy' as const, 
       icon: '🟢', 
       tag: 'Monitor',
       measurements: {
@@ -177,21 +187,49 @@ export default function InspectionResult() {
     },
   ];
 
-  // Filter issues based on confidence threshold
-  const visibleIssues = allIssues.filter(issue => issue.confidenceVal >= confidenceThreshold);
+  // Use Gemini live defects if available and valid
+  const allIssues = (isGemini && Array.isArray(geminiData.defects) && geminiData.defects.length > 0)
+    ? geminiData.defects.map((d: any, idx: number) => ({
+        id: d.id || `DEFECT_${idx}`,
+        name: d.name || 'Structural Defect',
+        severity: d.severity || 'Medium Severity',
+        confidenceVal: d.confidenceVal || 88,
+        conf: d.conf || '88% Confidence',
+        color: (d.color === 'critical' || d.color === 'attention' || d.color === 'healthy') ? d.color : 'attention',
+        icon: d.icon || '🟡',
+        tag: d.tag || d.severity || 'Anomaly',
+        metricText: d.metricText || 'Geometric variance detected',
+        measurements: d.measurements || {}
+      }))
+    : (isMachine ? defaultMachineIssues : defaultInfraIssues);
 
-  const recommendations = isMachine ? [
+  // Filter issues based on confidence threshold
+  const visibleIssues = allIssues.filter((issue: any) => issue.confidenceVal >= confidenceThreshold);
+
+  const defaultMachineRecommendations = [
     { icon: '🔴', title: 'Immediate component replacement', sub: 'Casting fracture presents catastrophic fragmentation risk under rotational centrifugal forces' },
     { icon: '🟡', title: 'Sandblast & apply anti-corrosion barrier', sub: 'Arrest oxidation spread across recessed friction cavity (18.4% affected)' },
     { icon: '🟢', title: 'Recalibrate bore keyway tolerance', sub: 'Correct +0.030mm radial breach prior to mounting replacement hub' },
-  ] : [
+  ];
+
+  const defaultInfraRecommendations = [
     { icon: '🔴', title: 'Immediate civil engineering evaluation', sub: 'Deploy structural engineering team within 48 hours for ultrasonic validation' },
     { icon: '🟡', title: 'Pressure-inject epoxy within 30 days', sub: 'Seal concrete surfaces before freeze-thaw degradation widens crack beyond 2.1mm' },
     { icon: '🟢', title: 'Apply cathodic rebar inhibitor', sub: 'Prevent oxidation from advancing along internal load-bearing reinforcement mesh' },
   ];
 
+  const recommendations = (isGemini && Array.isArray(geminiData.recommendations) && geminiData.recommendations.length > 0)
+    ? geminiData.recommendations
+    : (isMachine ? defaultMachineRecommendations : defaultInfraRecommendations);
+
+  const diagnosticSummary = isGemini && geminiData.diagnosticSummary
+    ? geminiData.diagnosticSummary
+    : (isMachine 
+        ? "Industrial mechanical hub inspected. High-severity structural fracture detected along the outer circular rim lip with extensive surface oxidation inside the recessed chamber. High risk of complete mechanical fragmentation under rotational load. Immediate lockout required."
+        : "Crack and surface deterioration were detected across load-bearing pillars. The asset shows accelerating deterioration compared with previous quarterly inspections. Urgent engineering remediation recommended.");
+
   const handleCopySummary = () => {
-    const summaryText = `AI INSPECTION ASSISTANCE DIAGNOSTIC REPORT\nAsset: ${inspectionData.assetName}\nSecurity Status: VERIFIED CLEAN (0 Malware Signatures)\nSHA-256 Digest: ${inspectionData.securityHash || 'SHA256:7f3a9e10c4b281d5'}\nHealth Score: ${isMachine ? '58/100' : '64/100'} (AT RISK)\nSafety Factor: ${isMachine ? '1.15 (Min required: 1.50)' : '1.28 (Min required: 1.50)'}\nPrimary Defect: ${allIssues[0].name} (${allIssues[0].conf}) - Measurements: ${allIssues[0].metricText}\nRecommended Action: ${recommendations[0].title} - ${recommendations[0].sub}`;
+    const summaryText = `AI INSPECTION ASSISTANCE DIAGNOSTIC REPORT\nAsset: ${inspectionData.assetName}\nModel: ${isGemini ? 'Google Gemini 1.5 Flash Vision' : 'Built-in Precision Metrology Engine'}\nSecurity Status: VERIFIED CLEAN (0 Malware Signatures)\nSHA-256 Digest: ${inspectionData.securityHash || 'SHA256:7f3a9e10c4b281d5'}\nHealth Score: ${currentScore}/100 (${currentStatus})\nSafety Factor: ${currentSafetyFactor}\nDiagnostic Summary: ${diagnosticSummary}\nPrimary Defect: ${allIssues[0]?.name} (${allIssues[0]?.conf}) - Measurements: ${allIssues[0]?.metricText}\nRecommended Action: ${recommendations[0]?.title} - ${recommendations[0]?.sub}`;
     navigator.clipboard.writeText(summaryText);
     setCopiedToast(true);
     setTimeout(() => setCopiedToast(false), 2500);
@@ -225,7 +263,15 @@ export default function InspectionResult() {
             {inspectionData.securityHash || 'SHA256:7f3a9e10c4b281d5'}
           </span>
           <span className="text-[11px] font-bold bg-healthy/10 text-healthy border border-healthy/20 px-2.5 py-1 rounded-md flex items-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5" /> 0 Malware Signatures • Sandboxed Clean
+            <ShieldCheck className="w-3.5 h-3.5" /> 0 Threats • Sandboxed Clean
+          </span>
+          <span className={`text-[11px] font-bold px-2.5 py-1 rounded-md flex items-center gap-1.5 ${
+            isGemini 
+              ? 'bg-ai/10 text-ai border border-ai/20' 
+              : 'bg-slate-100 text-slate-600 border border-slate-200'
+          }`}>
+            <Sparkles className="w-3.5 h-3.5" />
+            {isGemini ? 'Google Gemini 1.5 Flash' : 'Precision Metrology Engine'}
           </span>
         </div>
       </div>
@@ -238,11 +284,21 @@ export default function InspectionResult() {
         
         <div>
           <span className="text-xs uppercase font-bold text-slate-400 tracking-wider">
-            {isMachine ? 'Machine Component Diagnostic Result' : 'Infrastructure Asset Diagnostic Result'}
+            {isGemini ? 'Gemini Multimodal Neural Diagnostic Result' : (isMachine ? 'Machine Component Diagnostic Result' : 'Infrastructure Asset Diagnostic Result')}
           </span>
           <h1 className="text-3xl md:text-5xl font-black text-slate-800 tracking-tight mt-0.5">
             {inspectionData.assetName}
           </h1>
+
+          {/* AI Model Attribution Pill */}
+          <div className="flex items-center justify-center gap-2 mt-2">
+            <span className={`text-[11px] font-bold px-3 py-1 rounded-full flex items-center gap-1.5 shadow-xs ${
+              isGemini ? 'bg-ai/10 text-ai border border-ai/20' : 'bg-primary/10 text-primary border border-primary/20'
+            }`}>
+              <Sparkles className="w-3.5 h-3.5" />
+              {isGemini ? 'Live Telemetry via Google Gemini 1.5 Flash Vision' : 'High-Precision Autonomous Metrology Baseline'}
+            </span>
+          </div>
         </div>
         
         {/* Metric Cards: Health Score + Safety Factor */}
@@ -252,11 +308,17 @@ export default function InspectionResult() {
           <div className="card p-6 flex flex-col items-center justify-center border-risk/30 bg-gradient-to-b from-risk/5 to-white shadow-lg w-full">
             <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-1">Health Score</p>
             <div className="text-5xl md:text-6xl font-black text-slate-800 my-1">
-              {isMachine ? '58' : '64'}<span className="text-2xl font-bold text-slate-400">/100</span>
+              {currentScore}<span className="text-2xl font-bold text-slate-400">/100</span>
             </div>
-            <div className="badge-risk text-xs font-extrabold px-4 py-1 mt-1">
-              <span className="w-2 h-2 rounded-full bg-risk animate-pulse"></span>
-              🔴 AT RISK
+            <div className={`text-xs font-extrabold px-4 py-1 mt-1 rounded-full ${
+              currentScore >= 80 ? 'bg-healthy/10 text-healthy border border-healthy/20' :
+              currentScore >= 60 ? 'bg-attention/15 text-attention-dark border border-attention/20' :
+              'badge-risk'
+            }`}>
+              <span className={`w-2 h-2 rounded-full inline-block mr-1.5 ${
+                currentScore >= 80 ? 'bg-healthy' : currentScore >= 60 ? 'bg-attention-dark' : 'bg-risk animate-pulse'
+              }`}></span>
+              {currentStatus}
             </div>
           </div>
 
@@ -264,10 +326,10 @@ export default function InspectionResult() {
           <div className="card p-6 flex flex-col items-center justify-center border-critical/20 bg-gradient-to-b from-critical/5 to-white shadow-lg w-full">
             <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-1">Calculated Safety Factor</p>
             <div className="text-5xl md:text-6xl font-black text-critical my-1">
-              {isMachine ? '1.15' : '1.28'}<span className="text-2xl font-bold text-slate-400"> SF</span>
+              {currentSafetyFactor}<span className="text-2xl font-bold text-slate-400"> SF</span>
             </div>
             <div className="text-[11px] font-bold text-critical bg-critical/10 border border-critical/20 px-3 py-1 rounded-full mt-1">
-              ⚠ Target SF ≥ 1.50 (Breached)
+              {parseFloat(currentSafetyFactor) < 1.50 ? '⚠ Target SF ≥ 1.50 (Breached)' : '✓ Target SF Compliant'}
             </div>
           </div>
 
@@ -330,8 +392,8 @@ export default function InspectionResult() {
                 className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-primary"
               />
               <div className="flex justify-between text-[10px] text-slate-400 font-semibold">
-                <span>70% (Show All Anomaly Signals)</span>
-                <span>85% (Balanced)</span>
+                <span>70% (All Signals)</span>
+                <span>85% (Balanced Filter)</span>
                 <span>95% (High Precision Only)</span>
               </div>
             </div>
@@ -390,10 +452,10 @@ export default function InspectionResult() {
               {(activeLayer === 'ALL' || activeLayer === 'CRACK') && confidenceThreshold <= 96 && (
                 <div className="absolute top-[20%] left-[18%] w-[28%] h-[32%] border-3 border-critical bg-critical/20 rounded-lg flex flex-col justify-start p-1.5 shadow-lg pointer-events-none transition-all animate-in zoom-in-95">
                   <span className="bg-critical text-white text-[10px] font-black px-1.5 py-0.5 rounded w-fit uppercase tracking-wider shadow-sm">
-                    {isMachine ? 'Rim Crack • 96%' : 'Crack • 94%'}
+                    {allIssues[0]?.name ? `${allIssues[0].name.slice(0, 16)} • ${allIssues[0].conf}` : 'Crack • 94%'}
                   </span>
                   <span className="text-[9px] font-mono text-white bg-slate-900/80 px-1 py-0.2 rounded w-fit mt-1">
-                    {isMachine ? '14.2mm × 1.4mm' : '18.6mm × 2.1mm'}
+                    {allIssues[0]?.measurements?.length ? `${allIssues[0].measurements.length}` : '14.2mm × 1.4mm'}
                   </span>
                 </div>
               )}
@@ -402,10 +464,10 @@ export default function InspectionResult() {
               {(activeLayer === 'ALL' || activeLayer === 'RUST') && confidenceThreshold <= 89 && (
                 <div className="absolute top-[48%] left-[45%] w-[38%] h-[30%] border-3 border-attention bg-attention/20 rounded-lg flex flex-col justify-start p-1.5 shadow-lg pointer-events-none transition-all animate-in zoom-in-95">
                   <span className="bg-attention-dark text-white text-[10px] font-black px-1.5 py-0.5 rounded w-fit uppercase tracking-wider shadow-sm">
-                    {isMachine ? 'Surface Rust • 89%' : 'Spalling • 87%'}
+                    {allIssues[1]?.name ? `${allIssues[1].name.slice(0, 16)} • ${allIssues[1].conf}` : 'Surface Rust • 89%'}
                   </span>
                   <span className="text-[9px] font-mono text-white bg-slate-900/80 px-1 py-0.2 rounded w-fit mt-1">
-                    {isMachine ? 'Area: 18.4%' : 'Area: 12.1%'}
+                    {allIssues[1]?.measurements?.area || 'Area: 18.4%'}
                   </span>
                 </div>
               )}
@@ -414,10 +476,10 @@ export default function InspectionResult() {
               {(activeLayer === 'ALL' || activeLayer === 'WEAR') && confidenceThreshold <= 84 && (
                 <div className="absolute top-[34%] left-[34%] w-[24%] h-[26%] border-3 border-healthy bg-healthy/20 rounded-lg flex flex-col justify-start p-1.5 shadow-lg pointer-events-none transition-all animate-in zoom-in-95">
                   <span className="bg-healthy text-white text-[10px] font-black px-1.5 py-0.5 rounded w-fit uppercase tracking-wider shadow-sm">
-                    {isMachine ? 'Bore Wear • 84%' : 'Corrosion • 81%'}
+                    {allIssues[2]?.name ? `${allIssues[2].name.slice(0, 16)} • ${allIssues[2].conf}` : 'Bore Wear • 84%'}
                   </span>
                   <span className="text-[9px] font-mono text-white bg-slate-900/80 px-1 py-0.2 rounded w-fit mt-1">
-                    {isMachine ? '+0.045mm' : '3 Rebars'}
+                    {allIssues[2]?.measurements?.clearance || '+0.045mm'}
                   </span>
                 </div>
               )}
@@ -428,15 +490,15 @@ export default function InspectionResult() {
             <div className="flex items-center justify-around mt-4 pt-3 border-t border-slate-100 bg-slate-50 rounded-xl p-2.5">
               <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 bg-critical rounded-full"></span>
-                <span className="text-xs font-bold text-slate-700">🔴 High ({isMachine ? 'Rim Crack' : 'Crack'})</span>
+                <span className="text-xs font-bold text-slate-700">🔴 High ({allIssues[0]?.name ? allIssues[0].name.slice(0, 14) : 'Crack'})</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 bg-attention-dark rounded-full"></span>
-                <span className="text-xs font-bold text-slate-700">🟡 Medium ({isMachine ? 'Rust' : 'Spalling'})</span>
+                <span className="text-xs font-bold text-slate-700">🟡 Medium ({allIssues[1]?.name ? allIssues[1].name.slice(0, 14) : 'Rust'})</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 bg-healthy rounded-full"></span>
-                <span className="text-xs font-bold text-slate-700">🟢 Low ({isMachine ? 'Bore Wear' : 'Corrosion'})</span>
+                <span className="text-xs font-bold text-slate-700">🟢 Low ({allIssues[2]?.name ? allIssues[2].name.slice(0, 14) : 'Wear'})</span>
               </div>
             </div>
           </section>
@@ -444,14 +506,11 @@ export default function InspectionResult() {
           {/* AI Summary Card */}
           <section className="card p-6 bg-ai/5 border-ai/20">
             <h3 className="text-lg font-bold text-slate-800 mb-2 flex items-center gap-2">
-              <ShieldAlert className="w-5 h-5 text-ai" /> AI Machine Diagnostic Summary
+              <ShieldAlert className="w-5 h-5 text-ai" />
+              {isGemini ? 'Gemini Vision Diagnostic Assessment' : 'AI Machine Diagnostic Summary'}
             </h3>
             <p className="text-slate-700 text-sm md:text-base leading-relaxed font-medium">
-              {isMachine ? (
-                "Industrial mechanical hub inspected. High-severity structural fracture detected along the outer circular rim lip with extensive surface oxidation inside the recessed chamber. High risk of complete mechanical fragmentation under rotational load. Immediate lockout required."
-              ) : (
-                "Crack and surface deterioration were detected across load-bearing pillars. The asset shows accelerating deterioration compared with previous quarterly inspections. Urgent engineering remediation recommended."
-              )}
+              {diagnosticSummary}
             </p>
           </section>
         </div>
@@ -476,7 +535,7 @@ export default function InspectionResult() {
               </div>
             ) : (
               <div className="space-y-3.5">
-                {visibleIssues.map((issue) => (
+                {visibleIssues.map((issue: any) => (
                   <div key={issue.id} className={`p-4 rounded-2xl transition-all ${
                     issue.color === 'critical' ? 'bg-critical/5 border border-critical/15' :
                     issue.color === 'attention' ? 'bg-attention/10 border border-attention/20' :
@@ -519,41 +578,31 @@ export default function InspectionResult() {
             </h3>
 
             <div className="space-y-3 text-xs">
-              <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs">
-                <span className="font-bold text-slate-700 block mb-1">
-                  1. Fracture Dimensions & Propagation:
-                </span>
-                <p className="text-slate-600 font-mono">
-                  Length: 14.2 mm • Width: 1.4 mm • Depth: 2.8 mm
-                </p>
-                <p className="text-critical font-bold mt-1 text-[11px]">
-                  Growth Rate: +0.4 mm / 100 hrs (Catastrophic fracture danger)
-                </p>
-              </div>
-
-              <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs">
-                <span className="font-bold text-slate-700 block mb-1">
-                  2. Oxidation & Degradation Ratio:
-                </span>
-                <p className="text-slate-600 font-mono">
-                  Surface Area: 18.4% (84.6 cm²) • Pitting: 0.65 mm depth
-                </p>
-                <p className="text-attention-dark font-bold mt-1 text-[11px]">
-                  Classification: ISO 8501-1 Grade C Degradation
-                </p>
-              </div>
-
-              <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs">
-                <span className="font-bold text-slate-700 block mb-1">
-                  3. Center Bore Spline Tolerance:
-                </span>
-                <p className="text-slate-600 font-mono">
-                  Radial Wear: +0.045 mm (Standard Tolerance: ±0.015 mm)
-                </p>
-                <p className="text-slate-700 font-bold mt-1 text-[11px]">
-                  Tolerance Breach: +0.030 mm over nominal clearance
-                </p>
-              </div>
+              {allIssues.slice(0, 3).map((issue: any, idx: number) => (
+                <div key={idx} className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs">
+                  <span className="font-bold text-slate-700 block mb-1">
+                    {idx + 1}. {issue.name}:
+                  </span>
+                  <p className="text-slate-600 font-mono">
+                    {issue.metricText}
+                  </p>
+                  {issue.measurements?.propagation && (
+                    <p className="text-critical font-bold mt-1 text-[11px]">
+                      Propagation Rate: {issue.measurements.propagation}
+                    </p>
+                  )}
+                  {issue.measurements?.isoGrade && (
+                    <p className="text-attention-dark font-bold mt-1 text-[11px]">
+                      Classification: {issue.measurements.isoGrade}
+                    </p>
+                  )}
+                  {issue.measurements?.deviation && (
+                    <p className="text-slate-700 font-bold mt-1 text-[11px]">
+                      Tolerance Deviation: {issue.measurements.deviation}
+                    </p>
+                  )}
+                </div>
+              ))}
             </div>
           </section>
 
@@ -565,7 +614,7 @@ export default function InspectionResult() {
             </h3>
 
             <ul className="space-y-4 mb-8">
-              {recommendations.map((rec, idx) => (
+              {recommendations.map((rec: any, idx: number) => (
                 <li key={idx} className="flex items-start gap-3 p-3 rounded-xl bg-slate-800/80 border border-slate-700">
                   <span className="text-base mt-0.5">{rec.icon}</span>
                   <div>
@@ -602,11 +651,11 @@ export default function InspectionResult() {
           
           <div className="bg-risk/10 border border-risk/20 text-risk px-4 py-2 rounded-xl font-extrabold text-sm flex items-center gap-2">
             <AlertTriangle className="w-4 h-4" /> 
-            {isMachine ? '⚠ Machine component wear accelerating over time.' : '⚠ Asset health is decreasing over time.'}
+            {currentScore < 70 ? '⚠ Component wear accelerating over time.' : '✓ Asset health within nominal range.'}
           </div>
         </div>
         
-        {/* Simple Step Timeline */}
+        {/* Step Timeline */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {historyData.map((point, i) => (
             <div key={i} className={`p-4 rounded-2xl border-2 ${

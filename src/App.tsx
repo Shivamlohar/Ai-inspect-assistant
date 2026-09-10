@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Building2, Camera, FileText, Bell, Settings, ShieldCheck, X } from 'lucide-react';
+import { LayoutDashboard, Building2, Camera, FileText, Bell, Settings, ShieldCheck, X, Eye, EyeOff, Key, Sparkles, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { getGeminiApiKey, setGeminiApiKey, clearGeminiApiKey, testGeminiApiKey } from './services/aiApi';
 import Dashboard from './pages/Dashboard';
 import NewInspection from './pages/NewInspection';
 import AiAnalysis from './pages/AiAnalysis';
@@ -71,46 +72,164 @@ function AlertsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
 }
 
 function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  const [apiKey, setApiKey] = useState<string>(() => getGeminiApiKey());
+  const [showKey, setShowKey] = useState<boolean>(false);
+  const [isTesting, setIsTesting] = useState<boolean>(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
   if (!isOpen) return null;
+
+  const handleTestAndSave = async () => {
+    if (!apiKey.trim()) {
+      clearGeminiApiKey();
+      setTestResult({ success: true, message: 'API Key removed. Using built-in precision metrology engine.' });
+      return;
+    }
+
+    setIsTesting(true);
+    setTestResult(null);
+    try {
+      const res = await testGeminiApiKey(apiKey.trim());
+      setTestResult(res);
+      if (res.success) {
+        setGeminiApiKey(apiKey.trim());
+      }
+    } catch (err: any) {
+      setTestResult({ success: false, message: err.message || 'Verification failed.' });
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  const handleRemoveKey = () => {
+    clearGeminiApiKey();
+    setApiKey('');
+    setTestResult({ success: true, message: 'Reverted to built-in offline precision engine.' });
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl border border-slate-100 space-y-6">
+      <div className="bg-white rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl border border-slate-100 space-y-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
           <div className="flex items-center gap-2">
             <div className="p-2 rounded-xl bg-primary/10 text-primary">
               <Settings className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-slate-800">Inspection Settings</h3>
-              <p className="text-xs text-slate-500">Preferences and AI sensitivity</p>
+              <h3 className="text-xl font-bold text-slate-800">Inspection & AI Settings</h3>
+              <p className="text-xs text-slate-500">Configure real-time Gemini Vision API & preferences</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-slate-600 transition">
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-slate-600 transition cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="space-y-4">
+        {/* Gemini Vision API Key Configuration Card */}
+        <div className="p-4 rounded-2xl bg-gradient-to-br from-ai/5 to-primary/5 border border-ai/20 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
+              <Key className="w-4 h-4 text-ai" />
+              <span>Google Gemini API Key</span>
+            </div>
+            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${
+              apiKey.trim() ? 'bg-healthy/10 text-healthy border border-healthy/20' : 'bg-slate-100 text-slate-500'
+            }`}>
+              {apiKey.trim() ? '⚡ Live Vision Active' : '⚙ Built-in Engine'}
+            </span>
+          </div>
+
+          <p className="text-xs text-slate-600 font-medium leading-relaxed">
+            Enter your free Gemini API key to enable live multimodal vision diagnostics with sub-millimeter defect detection and accurate answers.
+          </p>
+
+          <div className="relative flex items-center">
+            <input
+              type={showKey ? 'text' : 'password'}
+              value={apiKey}
+              onChange={(e) => {
+                setApiKey(e.target.value);
+                setTestResult(null);
+              }}
+              placeholder="Paste AIzaSy... API key here"
+              className="w-full text-xs font-mono bg-white border border-slate-200 rounded-xl py-2.5 pl-3 pr-20 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            />
+            <div className="absolute right-2 flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setShowKey(!showKey)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 transition cursor-pointer"
+                title={showKey ? 'Hide key' : 'Show key'}
+              >
+                {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Test feedback */}
+          {testResult && (
+            <div className={`p-3 rounded-xl text-xs font-semibold flex items-center gap-2 ${
+              testResult.success ? 'bg-healthy/10 text-healthy border border-healthy/20' : 'bg-critical/10 text-critical border border-critical/20'
+            }`}>
+              {testResult.success ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
+              <span>{testResult.message}</span>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between pt-1 gap-2">
+            <a
+              href="https://aistudio.google.com/app/apikey"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1"
+            >
+              Get Free Key from Google AI Studio ↗
+            </a>
+
+            <div className="flex items-center gap-2">
+              {apiKey.trim() && (
+                <button
+                  type="button"
+                  onClick={handleRemoveKey}
+                  className="text-xs font-bold text-slate-500 hover:text-critical transition px-2 py-1 cursor-pointer"
+                >
+                  Clear Key
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleTestAndSave}
+                disabled={isTesting}
+                className="btn-primary py-2 px-3 text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {isTesting ? (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5 animate-spin" /> Verifying...
+                  </>
+                ) : (
+                  <>
+                    <Key className="w-3.5 h-3.5" /> Test & Save Key
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Other Inspection Options */}
+        <div className="space-y-3">
           <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50">
             <div>
-              <p className="font-semibold text-slate-800 text-sm">High-Precision AI Vision</p>
-              <p className="text-xs text-slate-500">Detect sub-millimeter structural fissures</p>
+              <p className="font-semibold text-slate-800 text-sm">High-Precision Vision Metrology</p>
+              <p className="text-xs text-slate-500">Calculate sub-millimeter fracture dimensions & area %</p>
             </div>
             <input type="checkbox" defaultChecked className="w-5 h-5 accent-primary cursor-pointer" />
           </div>
 
           <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50">
             <div>
-              <p className="font-semibold text-slate-800 text-sm">Audio Voice Transcribe</p>
-              <p className="text-xs text-slate-500">Auto-convert spoken notes into report items</p>
-            </div>
-            <input type="checkbox" defaultChecked className="w-5 h-5 accent-primary cursor-pointer" />
-          </div>
-
-          <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50">
-            <div>
-              <p className="font-semibold text-slate-800 text-sm">Offline Field Mode</p>
-              <p className="text-xs text-slate-500">Cache inspections locally until reconnected</p>
+              <p className="font-semibold text-slate-800 text-sm">Voice Dictation Speech-to-Text</p>
+              <p className="text-xs text-slate-500">Auto-transcribe inspector notes during field audits</p>
             </div>
             <input type="checkbox" defaultChecked className="w-5 h-5 accent-primary cursor-pointer" />
           </div>
@@ -130,9 +249,9 @@ function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => vo
         <div className="pt-2">
           <button 
             onClick={onClose}
-            className="w-full py-3 px-4 rounded-xl bg-primary text-white font-semibold hover:bg-primary/90 transition shadow-md shadow-primary/20"
+            className="w-full py-3 px-4 rounded-xl bg-slate-900 text-white font-semibold hover:bg-slate-800 transition shadow-md shadow-slate-900/10 cursor-pointer"
           >
-            Save Preferences
+            Done
           </button>
         </div>
       </div>
@@ -181,6 +300,19 @@ function TopNav({ onOpenAlerts, onOpenSettings }: { onOpenAlerts: () => void; on
             {item.label}
           </Link>
         ))}
+
+        <button
+          onClick={onOpenSettings}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+            getGeminiApiKey() 
+              ? 'bg-ai/10 text-ai border border-ai/25 hover:bg-ai/15' 
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+          title="Configure Gemini API Key"
+        >
+          <Key className="w-3.5 h-3.5" />
+          <span className="hidden lg:inline">{getGeminiApiKey() ? 'Gemini Active' : 'Connect API Key'}</span>
+        </button>
 
         <button 
           onClick={onOpenAlerts}
