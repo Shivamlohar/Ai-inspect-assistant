@@ -17,7 +17,8 @@ import {
   CheckCircle2, 
   Sun, 
   Moon, 
-  Laptop 
+  Laptop,
+  Activity 
 } from 'lucide-react';
 import { getGeminiApiKey, setGeminiApiKey, clearGeminiApiKey, testGeminiApiKey } from './services/aiApi';
 import type { ThemeMode } from './utils/theme';
@@ -30,6 +31,7 @@ const AiAnalysis = lazy(() => import('./pages/AiAnalysis'));
 const InspectionResult = lazy(() => import('./pages/InspectionResult'));
 const Report = lazy(() => import('./pages/Report'));
 const Assets = lazy(() => import('./pages/Assets'));
+const SystemCheck = lazy(() => import('./pages/SystemCheck'));
 
 function PageLoader() {
   return (
@@ -368,6 +370,7 @@ function TopNav({
   const location = useLocation();
   const navItems = [
     { path: '/', label: 'Dashboard' },
+    { path: '/system-check', label: 'System Check' },
     { path: '/assets', label: 'Assets' },
     { path: '/inspect', label: 'Inspections' },
     { path: '/report', label: 'Reports' },
@@ -502,6 +505,7 @@ function Sidebar({
   
   const navItems = [
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
+    { path: '/system-check', icon: Activity, label: 'System Check' },
     { path: '/assets', icon: Building2, label: 'Assets' },
     { path: '/inspect', icon: Camera, label: 'Inspections' },
     { path: '/report', icon: FileText, label: 'Reports' },
@@ -587,8 +591,9 @@ function MobileNav() {
   const location = useLocation();
   const navItems = [
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
-    { path: '/assets', icon: Building2, label: 'Assets' },
+    { path: '/system-check', icon: Activity, label: 'Diagnostics' },
     { path: '/inspect', icon: Camera, label: 'Inspect' },
+    { path: '/assets', icon: Building2, label: 'Assets' },
     { path: '/report', icon: FileText, label: 'Reports' },
   ];
 
@@ -653,6 +658,7 @@ function App() {
               <Suspense fallback={<PageLoader />}>
                 <Routes>
                   <Route path="/" element={<Dashboard />} />
+                  <Route path="/system-check" element={<SystemCheck />} />
                   <Route path="/assets" element={<Assets />} />
                   <Route path="/inspect" element={<NewInspection />} />
                   <Route path="/analysis" element={<AiAnalysis />} />

@@ -1,0 +1,25 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>AI Inspection Assistance - Redirecting...</title>
+    <script type="text/javascript">
+      // GitHub Pages Single Page App Redirect for HashRouter
+      var pathSegmentsToKeep = 1; // repo name segment: /Ai-inspect-assistant/
+      var l = window.location;
+      var pathParts = l.pathname.split('/');
+      var basePath = pathParts.slice(0, 1 + pathSegmentsToKeep).join('/');
+      var targetRoute = pathParts.slice(1 + pathSegmentsToKeep).join('/');
+      var query = l.search ? l.search : '';
+      var cleanHash = l.hash ? l.hash.replace(/^#\/?/, '') : '';
+      var finalHash = '#/' + (targetRoute ? targetRoute : '') + query + (cleanHash ? (targetRoute ? '/' + cleanHash : cleanHash) : '');
+      l.replace(l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') + basePath + '/' + finalHash);
+    </script>
+  </head>
+  <body style="background:#0f172a;color:#f8fafc;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+    <div style="text-align:center;">
+      <h2 style="font-weight:700;">Loading AI Inspection Assistance...</h2>
+      <p style="color:#94a3b8;font-size:14px;">Redirecting route safely...</p>
+    </div>
+  </body>
+</html>
