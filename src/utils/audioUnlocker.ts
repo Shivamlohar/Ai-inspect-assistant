@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Browser Audio Autoplay & Speech Synthesis Unlocker
  * Solves Chrome/Safari/Edge Autoplay restrictions by unlocking AudioContext on user gesture
  * and providing synchronized closed captions so assistant communication is never silent.
@@ -34,9 +34,9 @@ export function unlockBrowserAudio() {
       isAudioUnlocked = true;
     }
 
-    // Warm-up SpeechSynthesis
+    // Ensure SpeechSynthesis is silenced
     if ('speechSynthesis' in window) {
-      window.speechSynthesis.resume();
+      window.speechSynthesis.cancel();
     }
 
     window.removeEventListener('click', unlock, true);
@@ -49,53 +49,18 @@ export function unlockBrowserAudio() {
   window.addEventListener('keydown', unlock, true);
 }
 
-// Speak assistant response with fallback callbacks for closed captioning
+// Voice output disabled - silent inspection mode active
 export function speakAssistantText(
-  text: string, 
+  _text: string, 
   onCaptionUpdate?: (caption: string | null) => void
 ): Promise<boolean> {
   return new Promise((resolve) => {
-    if (typeof window === 'undefined') {
-      resolve(false);
-      return;
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel(); // Immediately cancel any pending speech
     }
-
-    // Always update Closed Captions so assistant is never "mute"
     if (onCaptionUpdate) {
-      onCaptionUpdate(text);
+      onCaptionUpdate(null);
     }
-
-    if (!('speechSynthesis' in window)) {
-      setTimeout(() => {
-        if (onCaptionUpdate) onCaptionUpdate(null);
-        resolve(false);
-      }, 4000);
-      return;
-    }
-
-    try {
-      window.speechSynthesis.cancel(); // cancel pending speech
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 1.0;
-      utterance.pitch = 1.0;
-      utterance.lang = 'en-US';
-
-      utterance.onend = () => {
-        if (onCaptionUpdate) onCaptionUpdate(null);
-        resolve(true);
-      };
-
-      utterance.onerror = () => {
-        if (onCaptionUpdate) onCaptionUpdate(null);
-        resolve(false);
-      };
-
-      window.speechSynthesis.speak(utterance);
-    } catch {
-      setTimeout(() => {
-        if (onCaptionUpdate) onCaptionUpdate(null);
-        resolve(false);
-      }, 4000);
-    }
+    resolve(true);
   });
 }

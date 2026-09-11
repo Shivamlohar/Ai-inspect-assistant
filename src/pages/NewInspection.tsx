@@ -14,13 +14,11 @@ import {
   Sun,
   AlertTriangle,
   Activity,
-  Volume2,
   MonitorOff
 } from 'lucide-react';
 import { validateAndSanitizeFile } from '../utils/security';
 import { getGeminiApiKey } from '../services/aiApi';
 import { optimizeImageForInspection } from '../utils/imageOptimizer';
-import { unlockBrowserAudio, speakAssistantText } from '../utils/audioUnlocker';
 import { saveSessionDraft, loadSessionDraft, clearSessionDraft, type InspectionDraft } from '../utils/sessionRecovery';
 import { JitterFilter } from '../utils/jitterFilter';
 
@@ -36,9 +34,6 @@ export default function NewInspection() {
 
   // Session persistence & recovery state
   const [recoveredDraft, setRecoveredDraft] = useState<InspectionDraft | null>(null);
-
-  // Real-time Voice HUD captions
-  const [assistantCaption, setAssistantCaption] = useState<string | null>(null);
 
   // Jitter stabilizer ref for low-light sensor smoothing
   const jitterFilterRef = useRef<JitterFilter>(new JitterFilter(0.75));
@@ -112,12 +107,9 @@ export default function NewInspection() {
     }
   ];
 
-  // Cleanup camera stream on unmount, unlock audio, handle window blur & tab visibility
+  // Cleanup camera stream on unmount, handle window blur & tab visibility
   useEffect(() => {
-    // 1. Unlock browser audio autoplay on first interaction
-    unlockBrowserAudio();
-
-    // 2. Check for existing session recovery draft
+    // 1. Check for existing session recovery draft
     const existingDraft = loadSessionDraft();
     if (existingDraft) {
       setRecoveredDraft(existingDraft);
@@ -168,7 +160,6 @@ export default function NewInspection() {
         setMediaFile(recoveredDraft.mediaFile);
       }
       setRecoveredDraft(null);
-      speakAssistantText('Session draft successfully restored.', setAssistantCaption);
     }
   };
 
@@ -484,7 +475,6 @@ export default function NewInspection() {
       mimeType: mediaFile?.mimeType || 'image/jpeg'
     };
 
-    speakAssistantText('Launching multimodal inspection diagnostics with Google Gemini 1.5 Flash.', setAssistantCaption);
     sessionStorage.setItem('currentInspection', JSON.stringify(inspectionPayload));
     navigate('/analysis');
   };
@@ -1060,21 +1050,6 @@ export default function NewInspection() {
         </section>
 
       </div>
-
-      {/* Real-Time Voice Assistant Closed Captions HUD */}
-      {assistantCaption && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 max-w-md w-full px-4 animate-in slide-in-from-bottom duration-300">
-          <div className="bg-slate-900/95 text-white border border-slate-700 shadow-2xl rounded-2xl p-4 flex items-center gap-3 backdrop-blur-md">
-            <div className="p-2.5 rounded-xl bg-cyan-500/20 text-cyan-400 shrink-0">
-              <Volume2 className="w-5 h-5 animate-pulse" />
-            </div>
-            <div className="flex-1 text-xs">
-              <span className="text-[10px] text-cyan-300 font-bold uppercase tracking-wider block">AI Voice Assistant (Live Captions)</span>
-              <p className="font-medium leading-snug mt-0.5">{assistantCaption}</p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
