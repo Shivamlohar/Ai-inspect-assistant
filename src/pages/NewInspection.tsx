@@ -10,10 +10,9 @@ import {
   RotateCcw, 
   ArrowRight, 
   ShieldCheck, 
-  Key,
-  Sun,
-  AlertTriangle,
-  Activity,
+  Sun, 
+  AlertTriangle, 
+  Activity, 
   MonitorOff
 } from 'lucide-react';
 import { validateAndSanitizeFile } from '../utils/security';
@@ -638,31 +637,21 @@ export default function NewInspection() {
         </div>
       )}
 
-      {/* Live AI API Status Banner */}
-      <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs ${
-        getGeminiApiKey() 
-          ? 'bg-gradient-to-r from-ai/10 via-primary/5 to-white border-ai/25' 
-          : 'bg-white border-slate-200'
-      }`}>
+      {/* Live AI Engine Status Banner */}
+      <div className="p-4 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs bg-gradient-to-r from-primary/5 via-cyan-500/5 to-white border-primary/20">
         <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-            getGeminiApiKey() ? 'bg-ai/15 text-ai' : 'bg-slate-100 text-slate-500'
-          }`}>
-            {getGeminiApiKey() ? <Sparkles className="w-5 h-5" /> : <Key className="w-5 h-5" />}
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary/10 text-primary">
+            <Sparkles className="w-5 h-5" />
           </div>
           <div>
             <p className="font-extrabold text-slate-800 text-sm flex items-center gap-2">
-              {getGeminiApiKey() ? 'Google Gemini 1.5 Flash Vision Active' : 'Offline Precision Engine Active'}
-              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                getGeminiApiKey() ? 'bg-healthy/10 text-healthy border border-healthy/20' : 'bg-slate-100 text-slate-500'
-              }`}>
-                {getGeminiApiKey() ? '⚡ Real-Time API' : 'Default Model'}
+              <span>Multimodal AI Vision & Precision Metrology Engine</span>
+              <span className="text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider bg-healthy/10 text-healthy border border-healthy/20">
+                ⚡ READY & ACTIVE
               </span>
             </p>
             <p className="text-xs text-slate-500">
-              {getGeminiApiKey() 
-                ? 'Your uploaded photos/snapshots will be analyzed by Google Gemini Vision for exact live defect detection.'
-                : 'Want live custom image analysis? Click the Connect API Key button in the top navigation to add your Gemini API Key.'}
+              Automated high-resolution defect detection, crack segmentation, and quantitative corrosion metrology are active.
             </p>
           </div>
         </div>
