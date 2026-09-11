@@ -398,6 +398,201 @@
 /* =========================================================================
    PRINT STYLES FOR FORMAL ENGINEERING PDF GENERATION (Screenshot 2)
    ========================================================================= */
+/* ==========================================================
+   SMOOTH UX SCROLLBAR & GLOBAL INTERACTIVE PHYSICS
+========================================================== */
+html {
+  scroll-behavior: smooth;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 9999px;
+  transition: background-color 0.2s ease;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(14, 165, 233, 0.7);
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(51, 65, 85, 0.5);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(6, 182, 212, 0.8);
+}
+
+/* Glassmorphic Navigation & Panels */
+.glass-nav {
+  background-color: rgba(255, 255, 255, 0.82) !important;
+  backdrop-filter: blur(14px) saturate(180%);
+  -webkit-backdrop-filter: blur(14px) saturate(180%);
+}
+.dark .glass-nav {
+  background-color: rgba(15, 23, 42, 0.85) !important;
+  backdrop-filter: blur(14px) saturate(180%);
+  -webkit-backdrop-filter: blur(14px) saturate(180%);
+}
+
+/* ==========================================================
+   CONTINUOUS ANIMATED BACKGROUND KEYFRAMES & UTILITIES
+========================================================== */
+.bg-cyber-grid {
+  background-size: 36px 36px;
+  background-image: 
+    linear-gradient(to right, rgba(14, 165, 233, 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(14, 165, 233, 0.07) 1px, transparent 1px);
+}
+.dark .bg-cyber-grid {
+  background-image: 
+    linear-gradient(to right, rgba(6, 182, 212, 0.09) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(6, 182, 212, 0.09) 1px, transparent 1px);
+}
+
+.bg-radial-vignette {
+  background: radial-gradient(circle at 50% 35%, transparent 0%, rgba(248, 250, 252, 0.3) 55%, rgba(248, 250, 252, 0.9) 100%);
+}
+.dark .bg-radial-vignette {
+  background: radial-gradient(circle at 50% 35%, transparent 0%, rgba(9, 13, 22, 0.35) 55%, rgba(9, 13, 22, 0.92) 100%);
+}
+
+/* Continuous Aurora Drift Animations */
+@keyframes aurora1 {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+  }
+  33% {
+    transform: translate3d(60px, 40px, 0) scale(1.15) rotate(15deg);
+  }
+  66% {
+    transform: translate3d(-30px, 60px, 0) scale(0.95) rotate(-10deg);
+  }
+}
+
+@keyframes aurora2 {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+  }
+  33% {
+    transform: translate3d(-50px, 50px, 0) scale(1.12) rotate(-20deg);
+  }
+  66% {
+    transform: translate3d(40px, -30px, 0) scale(0.92) rotate(12deg);
+  }
+}
+
+@keyframes aurora3 {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+  }
+  33% {
+    transform: translate3d(-60px, -40px, 0) scale(1.18) rotate(15deg);
+  }
+  66% {
+    transform: translate3d(50px, 30px, 0) scale(0.9) rotate(-15deg);
+  }
+}
+
+@keyframes aurora4 {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+  }
+  33% {
+    transform: translate3d(40px, -50px, 0) scale(1.1) rotate(-10deg);
+  }
+  66% {
+    transform: translate3d(-40px, -20px, 0) scale(0.96) rotate(18deg);
+  }
+}
+
+/* Continuous LiDAR Scan Sweep */
+@keyframes lidarSweep {
+  0% {
+    top: -5%;
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.85;
+  }
+  85% {
+    opacity: 0.85;
+  }
+  100% {
+    top: 105%;
+    opacity: 0;
+  }
+}
+
+/* Floating Telemetry Micro-Particles */
+@keyframes particleFloat {
+  0% {
+    transform: translateY(0) scale(0.6);
+    opacity: 0;
+  }
+  25% {
+    opacity: 0.8;
+  }
+  75% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateY(-80vh) scale(1.2);
+    opacity: 0;
+  }
+}
+
+.animate-aurora-1 {
+  animation: aurora1 28s ease-in-out infinite;
+}
+.animate-aurora-2 {
+  animation: aurora2 32s ease-in-out infinite;
+}
+.animate-aurora-3 {
+  animation: aurora3 26s ease-in-out infinite;
+}
+.animate-aurora-4 {
+  animation: aurora4 34s ease-in-out infinite;
+}
+
+.animate-lidar-sweep {
+  animation: lidarSweep 9s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.particle {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 9999px;
+  background: #06b6d4;
+  box-shadow: 0 0 10px 2px #06b6d4;
+  animation: particleFloat 16s ease-in-out infinite;
+}
+.p1 { left: 12%; top: 92%; animation-duration: 18s; animation-delay: 0s; }
+.p2 { left: 32%; top: 88%; animation-duration: 22s; animation-delay: 3s; width: 4px; height: 4px; background: #10b981; box-shadow: 0 0 10px 2px #10b981; }
+.p3 { left: 58%; top: 94%; animation-duration: 17s; animation-delay: 5s; }
+.p4 { left: 78%; top: 82%; animation-duration: 21s; animation-delay: 1.5s; width: 4px; height: 4px; background: #8b5cf6; box-shadow: 0 0 12px 2px #8b5cf6; }
+.p5 { left: 44%; top: 90%; animation-duration: 19s; animation-delay: 7s; }
+.p6 { left: 88%; top: 86%; animation-duration: 24s; animation-delay: 4s; }
+
+/* Micro-interaction Spring & Hover Classes */
+.interactive-hover {
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.interactive-hover:hover {
+  transform: translateY(-2px);
+}
+.interactive-hover:active {
+  transform: scale(0.98);
+}
+
+/* =========================================================================
+   PRINT STYLES FOR FORMAL ENGINEERING PDF GENERATION
+   ========================================================================= */
 @media print {
   body {
     background: #ffffff !important;
@@ -420,6 +615,7 @@
     size: A4 portrait;
   }
 }
+
 
 
 

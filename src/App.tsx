@@ -1,6 +1,8 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatedBackground } from './components/AnimatedBackground';
+import { PageTransition } from './components/PageTransition';
 import { 
   LayoutDashboard, 
   Building2, 
@@ -870,7 +872,7 @@ function TopNav({
   }, []);
 
   return (
-    <header className="bg-surface border-b border-slate-100 flex items-center justify-between px-6 py-4 sticky top-0 z-20 shadow-xs">
+    <header className="glass-nav border-b border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between px-6 py-3.5 sticky top-0 z-20 shadow-xs transition-colors">
       <div className="flex items-center gap-3">
         <Link to="/" className="flex items-center gap-3 group">
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-primary to-cyan-400 flex items-center justify-center text-white shadow-md shadow-primary/25 group-hover:scale-105 transition-transform">
@@ -1071,8 +1073,8 @@ function Sidebar({
   ];
 
   return (
-    <aside className="w-64 bg-surface border-r border-slate-100 flex flex-col fixed left-0 top-[73px] bottom-0 hidden md:flex z-10">
-      <nav className="flex-1 p-4 space-y-1.5 mt-3">
+    <aside className="w-64 glass-nav border-r border-slate-200/60 dark:border-slate-800/60 flex flex-col fixed left-0 top-[69px] bottom-0 hidden md:flex z-10 transition-colors">
+      <nav className="flex-1 p-4 space-y-1.5 mt-2">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
@@ -1080,14 +1082,19 @@ function Sidebar({
             <Link
               key={item.label}
               to={item.path}
-              className={`flex items-center gap-3.5 px-4 py-3 rounded-2xl transition-all duration-200 ease-out font-semibold text-sm hover:translate-x-1 ${
+              className={`flex items-center justify-between px-4 py-3 rounded-2xl transition-all duration-200 ease-out font-semibold text-sm ${
                 isActive 
-                  ? 'bg-primary/10 text-primary shadow-xs font-bold' 
-                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+                  ? 'bg-primary/15 text-primary shadow-xs font-bold border border-primary/25 translate-x-1' 
+                  : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100/70 dark:hover:bg-slate-800/70 hover:text-slate-900 dark:hover:text-white hover:translate-x-1'
               }`}
             >
-              <Icon className="w-5 h-5" />
-              {item.label}
+              <div className="flex items-center gap-3">
+                <Icon className="w-5 h-5" />
+                <span>{item.label}</span>
+              </div>
+              {isActive && (
+                <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_1px_rgba(14,165,233,0.8)] animate-pulse" />
+              )}
             </Link>
           );
         })}
@@ -1165,7 +1172,7 @@ function MobileNav() {
   ];
 
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-slate-200 flex justify-around p-2 z-30 shadow-lg">
+    <div className="md:hidden fixed bottom-0 left-0 right-0 glass-nav border-t border-slate-200/60 dark:border-slate-800/60 flex justify-around p-2 z-30 shadow-lg transition-colors">
       {navItems.map(item => {
         const Icon = item.icon;
         const isActive = location.pathname === item.path;
@@ -1173,7 +1180,11 @@ function MobileNav() {
           <Link
             key={item.label}
             to={item.path}
-            className={`flex flex-col items-center py-1.5 px-3 rounded-xl transition-colors ${isActive ? 'text-primary font-bold' : 'text-slate-500'}`}
+            className={`flex flex-col items-center py-1.5 px-3 rounded-xl transition-all duration-200 ${
+              isActive 
+                ? 'text-primary font-bold scale-105' 
+                : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+            }`}
           >
             <Icon className="w-5 h-5 mb-0.5" />
             <span className="text-[11px]">{item.label}</span>
@@ -1207,6 +1218,91 @@ function HashCleaner() {
   }, [location]);
 
   return null;
+}
+
+function AppShell({
+  isAlertsOpen,
+  setIsAlertsOpen,
+  isSettingsOpen,
+  setIsSettingsOpen,
+  currentTheme,
+  handleToggleTheme,
+  handleSetTheme,
+  isOfficerModalOpen,
+  setIsOfficerModalOpen,
+  officer,
+  setOfficer
+}: {
+  isAlertsOpen: boolean;
+  setIsAlertsOpen: (v: boolean) => void;
+  isSettingsOpen: boolean;
+  setIsSettingsOpen: (v: boolean) => void;
+  currentTheme: ThemeMode;
+  handleToggleTheme: () => void;
+  handleSetTheme: (t: ThemeMode) => void;
+  isOfficerModalOpen: boolean;
+  setIsOfficerModalOpen: (v: boolean) => void;
+  officer: OfficerProfile;
+  setOfficer: (p: OfficerProfile) => void;
+}) {
+  const location = useLocation();
+
+  return (
+    <div className="relative flex flex-col min-h-screen bg-background/80 text-slate-800 transition-colors duration-300">
+      {/* Continuous Fluid Animated Industrial Cyber-Grid Background */}
+      <AnimatedBackground />
+
+      <TopNav 
+        onOpenAlerts={() => setIsAlertsOpen(true)} 
+        onOpenSettings={() => setIsSettingsOpen(true)} 
+        currentTheme={currentTheme}
+        onToggleTheme={handleToggleTheme}
+        officer={officer}
+        onOpenOfficerModal={() => setIsOfficerModalOpen(true)}
+      />
+      <div className="flex flex-1">
+        <Sidebar 
+          onOpenAlerts={() => setIsAlertsOpen(true)} 
+          onOpenSettings={() => setIsSettingsOpen(true)} 
+          currentTheme={currentTheme}
+          onToggleTheme={handleToggleTheme}
+          officer={officer}
+          onOpenOfficerModal={() => setIsOfficerModalOpen(true)}
+        />
+        <main className="flex-1 md:ml-64 pb-24 md:pb-12 w-full">
+          <Suspense fallback={<PageLoader />}>
+            <AnimatePresence mode="wait">
+              <Routes location={location} key={location.pathname}>
+                <Route path="/" element={<PageTransition><Dashboard /></PageTransition>} />
+                <Route path="/system-check" element={<PageTransition><SystemCheck /></PageTransition>} />
+                <Route path="/assets" element={<PageTransition><Assets /></PageTransition>} />
+                <Route path="/history" element={<PageTransition><AssetHistory /></PageTransition>} />
+                <Route path="/inspect" element={<PageTransition><NewInspection /></PageTransition>} />
+                <Route path="/analysis" element={<PageTransition><AiAnalysis /></PageTransition>} />
+                <Route path="/result" element={<PageTransition><InspectionResult /></PageTransition>} />
+                <Route path="/report" element={<PageTransition><Report /></PageTransition>} />
+              </Routes>
+            </AnimatePresence>
+          </Suspense>
+        </main>
+      </div>
+      <MobileNav />
+
+      <OfficerModal
+        isOpen={isOfficerModalOpen}
+        onClose={() => setIsOfficerModalOpen(false)}
+        officer={officer}
+        onOfficerUpdated={setOfficer}
+      />
+      <AlertsModal isOpen={isAlertsOpen} onClose={() => setIsAlertsOpen(false)} />
+      <SettingsModal 
+        isOpen={isSettingsOpen} 
+        onClose={() => setIsSettingsOpen(false)} 
+        currentTheme={currentTheme}
+        onSetTheme={handleSetTheme}
+      />
+    </div>
+  );
 }
 
 function App() {
@@ -1244,55 +1340,19 @@ function App() {
     <ErrorBoundary>
       <Router basename={getBasename()}>
         <HashCleaner />
-        <div className="flex flex-col min-h-screen bg-background text-slate-800">
-          <TopNav 
-            onOpenAlerts={() => setIsAlertsOpen(true)} 
-            onOpenSettings={() => setIsSettingsOpen(true)} 
-            currentTheme={currentTheme}
-            onToggleTheme={handleToggleTheme}
-            officer={officer}
-            onOpenOfficerModal={() => setIsOfficerModalOpen(true)}
-          />
-          <div className="flex flex-1">
-            <Sidebar 
-              onOpenAlerts={() => setIsAlertsOpen(true)} 
-              onOpenSettings={() => setIsSettingsOpen(true)} 
-              currentTheme={currentTheme}
-              onToggleTheme={handleToggleTheme}
-              officer={officer}
-              onOpenOfficerModal={() => setIsOfficerModalOpen(true)}
-            />
-            <main className="flex-1 md:ml-64 pb-24 md:pb-12 w-full">
-              <Suspense fallback={<PageLoader />}>
-                <Routes>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/system-check" element={<SystemCheck />} />
-                  <Route path="/assets" element={<Assets />} />
-                  <Route path="/history" element={<AssetHistory />} />
-                  <Route path="/inspect" element={<NewInspection />} />
-                  <Route path="/analysis" element={<AiAnalysis />} />
-                  <Route path="/result" element={<InspectionResult />} />
-                  <Route path="/report" element={<Report />} />
-                </Routes>
-              </Suspense>
-            </main>
-          </div>
-          <MobileNav />
-
-          <OfficerModal
-            isOpen={isOfficerModalOpen}
-            onClose={() => setIsOfficerModalOpen(false)}
-            officer={officer}
-            onOfficerUpdated={setOfficer}
-          />
-          <AlertsModal isOpen={isAlertsOpen} onClose={() => setIsAlertsOpen(false)} />
-          <SettingsModal 
-            isOpen={isSettingsOpen} 
-            onClose={() => setIsSettingsOpen(false)} 
-            currentTheme={currentTheme}
-            onSetTheme={handleSetTheme}
-          />
-        </div>
+        <AppShell
+          isAlertsOpen={isAlertsOpen}
+          setIsAlertsOpen={setIsAlertsOpen}
+          isSettingsOpen={isSettingsOpen}
+          setIsSettingsOpen={setIsSettingsOpen}
+          currentTheme={currentTheme}
+          handleToggleTheme={handleToggleTheme}
+          handleSetTheme={handleSetTheme}
+          isOfficerModalOpen={isOfficerModalOpen}
+          setIsOfficerModalOpen={setIsOfficerModalOpen}
+          officer={officer}
+          setOfficer={setOfficer}
+        />
       </Router>
     </ErrorBoundary>
   );
