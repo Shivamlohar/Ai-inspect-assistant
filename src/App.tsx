@@ -30,7 +30,6 @@ import type { ThemeMode } from './utils/theme';
 import { getStoredTheme, applyTheme } from './utils/theme';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { getActiveOfficer, setActiveOfficer, logoutOfficer, getOfficerInspections, type OfficerProfile } from './utils/officerStore';
-import { BlueTeamFirewallModal } from './components/BlueTeamFirewallModal';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const NewInspection = lazy(() => import('./pages/NewInspection'));
@@ -597,7 +596,6 @@ function OfficerModal({
 function TopNav({ 
   onOpenAlerts, 
   onOpenSettings,
-  onOpenFirewall,
   currentTheme,
   onToggleTheme,
   officer,
@@ -605,7 +603,6 @@ function TopNav({
 }: { 
   onOpenAlerts: () => void; 
   onOpenSettings: () => void; 
-  onOpenFirewall: () => void;
   currentTheme: ThemeMode; 
   onToggleTheme: () => void;
   officer: OfficerProfile;
@@ -641,20 +638,6 @@ function TopNav({
 
       {/* Top Nav Right Action Cluster */}
       <div className="hidden md:flex items-center gap-3">
-        {/* Blue Team Firewall & Active WAF Shield Button */}
-        <button
-          onClick={onOpenFirewall}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-700 dark:text-cyan-300 text-xs font-bold transition cursor-pointer group"
-          title="Blue Team Web Application Firewall (WAF) & Zero-Trust Defense Status"
-        >
-          <ShieldCheck className="w-4 h-4 text-cyan-600 dark:text-cyan-400 group-hover:scale-110 transition-transform" />
-          <span className="hidden lg:inline">Firewall:</span>
-          <span className="text-emerald-600 dark:text-emerald-400 font-extrabold flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            Shielded
-          </span>
-        </button>
-
         {/* Live AI Engine Telemetry Badge */}
         <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold">
           <span className="relative flex h-2 w-2">
@@ -771,7 +754,6 @@ function TopNav({
 function Sidebar({ 
   onOpenAlerts, 
   onOpenSettings,
-  onOpenFirewall,
   currentTheme,
   onToggleTheme,
   officer,
@@ -779,7 +761,6 @@ function Sidebar({
 }: { 
   onOpenAlerts: () => void; 
   onOpenSettings: () => void;
-  onOpenFirewall: () => void;
   currentTheme: ThemeMode;
   onToggleTheme: () => void;
   officer: OfficerProfile;
@@ -818,21 +799,6 @@ function Sidebar({
         })}
 
         <div className="pt-4 mt-4 border-t border-slate-100 space-y-1.5">
-          {/* Blue Team Firewall Quick Status in Sidebar */}
-          <button
-            onClick={onOpenFirewall}
-            className="w-full flex items-center justify-between px-4 py-3 rounded-2xl transition-all font-semibold text-sm text-cyan-700 dark:text-cyan-400 bg-cyan-500/5 hover:bg-cyan-500/10 border border-cyan-500/20 cursor-pointer group"
-            title="Open Blue Team Defense & Firewall Status"
-          >
-            <div className="flex items-center gap-3.5">
-              <ShieldCheck className="w-5 h-5 text-cyan-500 group-hover:scale-110 transition-transform" />
-              <span>Blue Team WAF</span>
-            </div>
-            <span className="text-[10px] uppercase font-black tracking-wider px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-              Active
-            </span>
-          </button>
-
           {/* Theme Mode Toggle in Sidebar */}
           <button
             onClick={onToggleTheme}
@@ -927,7 +893,6 @@ function MobileNav() {
 function App() {
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isFirewallOpen, setIsFirewallOpen] = useState(false);
   const [currentTheme, setCurrentTheme] = useState<ThemeMode>(() => getStoredTheme());
 
   useEffect(() => {
@@ -963,7 +928,6 @@ function App() {
           <TopNav 
             onOpenAlerts={() => setIsAlertsOpen(true)} 
             onOpenSettings={() => setIsSettingsOpen(true)} 
-            onOpenFirewall={() => setIsFirewallOpen(true)}
             currentTheme={currentTheme}
             onToggleTheme={handleToggleTheme}
             officer={officer}
@@ -973,7 +937,6 @@ function App() {
             <Sidebar 
               onOpenAlerts={() => setIsAlertsOpen(true)} 
               onOpenSettings={() => setIsSettingsOpen(true)} 
-              onOpenFirewall={() => setIsFirewallOpen(true)}
               currentTheme={currentTheme}
               onToggleTheme={handleToggleTheme}
               officer={officer}
@@ -1007,10 +970,6 @@ function App() {
             onClose={() => setIsSettingsOpen(false)} 
             currentTheme={currentTheme}
             onSetTheme={handleSetTheme}
-          />
-          <BlueTeamFirewallModal
-            isOpen={isFirewallOpen}
-            onClose={() => setIsFirewallOpen(false)}
           />
         </div>
       </Router>
