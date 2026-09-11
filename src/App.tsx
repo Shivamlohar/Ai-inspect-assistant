@@ -492,6 +492,19 @@ function TopNav({
   officer: OfficerProfile;
   onOpenOfficerModal: () => void;
 }) {
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   return (
     <header className="bg-surface border-b border-slate-100 flex items-center justify-between px-6 py-4 sticky top-0 z-20 shadow-xs">
       <div className="flex items-center gap-3">
@@ -523,14 +536,38 @@ function TopNav({
 
       {/* Top Nav Right Action Cluster */}
       <div className="hidden md:flex items-center gap-3">
-        {/* Live AI Engine Telemetry Badge */}
-        <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold">
+        {/* Live AI Engine Telemetry & Connectivity Badge */}
+        <div className={`hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-colors ${
+          !isOnline 
+            ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400' 
+            : getGeminiApiKey() 
+            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400' 
+            : 'bg-cyan-500/10 border-cyan-500/20 text-cyan-600 dark:text-cyan-400'
+        }`}>
           <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+              !isOnline ? 'bg-amber-400' : getGeminiApiKey() ? 'bg-emerald-400' : 'bg-cyan-400'
+            }`}></span>
+            <span className={`relative inline-flex rounded-full h-2 w-2 ${
+              !isOnline ? 'bg-amber-500' : getGeminiApiKey() ? 'bg-emerald-500' : 'bg-cyan-500'
+            }`}></span>
           </span>
-          <span>{getGeminiApiKey() ? 'Gemini Vision Active' : 'Precision Metrology'}</span>
-          <span className="text-[10px] opacity-75 font-mono bg-emerald-500/15 px-1.5 py-0.5 rounded">42ms</span>
+          <span>
+            {!isOnline 
+              ? 'Vault Offline Safe' 
+              : getGeminiApiKey() 
+              ? 'Gemini 1.5 Flash Vision' 
+              : 'Precision Metrology'}
+          </span>
+          <span className={`text-[10px] opacity-75 font-mono px-1.5 py-0.5 rounded ${
+            !isOnline 
+              ? 'bg-amber-500/15' 
+              : getGeminiApiKey() 
+              ? 'bg-emerald-500/15' 
+              : 'bg-cyan-500/15'
+          }`}>
+            {!isOnline ? 'Air-Gapped' : '42ms'}
+          </span>
         </div>
 
         {/* 1-Click Dark/Light Theme Quick Toggle */}

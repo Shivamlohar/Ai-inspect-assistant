@@ -27,7 +27,11 @@ import {
   Eye,
   CheckSquare,
   XSquare,
-  HelpCircle
+  HelpCircle,
+  Plus,
+  FileSpreadsheet,
+  Database,
+  X
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { getActiveOfficer, saveOfficerInspection } from '../utils/officerStore';
@@ -111,6 +115,67 @@ export default function InspectionResult() {
       }
       return updated;
     });
+  };
+
+  // Inspector Manual Finding State
+  const [customFindings, setCustomFindings] = useState<any[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('currentInspection');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed.customDefects)) return parsed.customDefects;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return [];
+  });
+
+  const [isAddFindingOpen, setIsAddFindingOpen] = useState(false);
+  const [newFindingTitle, setNewFindingTitle] = useState('');
+  const [newFindingSeverity, setNewFindingSeverity] = useState<'High Severity' | 'Medium Severity' | 'Low Severity'>('Medium Severity');
+  const [newFindingMetric, setNewFindingMetric] = useState('');
+  const [cmmsToast, setCmmsToast] = useState<string | null>(null);
+
+  const handleAddFinding = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFindingTitle.trim()) return;
+    const newFinding = {
+      id: `INSPECTOR_${Date.now()}`,
+      name: newFindingTitle.trim().toUpperCase(),
+      severity: newFindingSeverity,
+      confidenceVal: 99,
+      conf: '100% (Field Verified)',
+      color: (newFindingSeverity === 'High Severity' ? 'critical' : newFindingSeverity === 'Medium Severity' ? 'attention' : 'healthy') as 'critical' | 'attention' | 'healthy',
+      icon: newFindingSeverity === 'High Severity' ? '🔴' : newFindingSeverity === 'Medium Severity' ? '🟡' : '🟢',
+      tag: 'Field Inspector Finding',
+      metricText: newFindingMetric.trim() || 'Visual anomaly recorded on-site',
+      measurements: {
+        notes: newFindingMetric.trim()
+      },
+      isHumanAdded: true
+    };
+    const updated = [...customFindings, newFinding];
+    setCustomFindings(updated);
+    setVerifications(prev => ({ ...prev, [newFinding.id]: 'Confirmed' }));
+
+    // Persist to session
+    try {
+      const saved = sessionStorage.getItem('currentInspection');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        parsed.customDefects = updated;
+        sessionStorage.setItem('currentInspection', JSON.stringify(parsed));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+
+    setNewFindingTitle('');
+    setNewFindingMetric('');
+    setIsAddFindingOpen(false);
+    setCmmsToast(`Field finding "${newFinding.name}" added to official audit!`);
+    setTimeout(() => setCmmsToast(null), 3000);
   };
 
   const [inspectionData] = useState<{
@@ -351,7 +416,7 @@ export default function InspectionResult() {
     },
   ];
 
-  const allIssues = (isGemini && Array.isArray(geminiData.defects) && geminiData.defects.length > 0)
+  const baseIssues = (isGemini && Array.isArray(geminiData.defects) && geminiData.defects.length > 0)
     ? geminiData.defects.map((d: any, idx: number) => ({
         id: d.id || `DEFECT_${idx}`,
         name: d.name || 'Structural Defect',
@@ -366,7 +431,154 @@ export default function InspectionResult() {
       }))
     : (isMachine ? defaultMachineIssues : defaultInfraIssues);
 
-  const visibleIssues = allIssues.filter((issue: any) => issue.confidenceVal >= confidenceThreshold);
+  const allIssues = [...baseIssues, ...customFindings];
+
+  const visibleIssues = allIssues.filter((issue: any) => issue.confidenceVal >= confidenceThreshold || issue.isHumanAdded);
+
+  const primaryDefect = allIssues[0] || {
+    name: isMachine ? 'RIM CRACK / FRACTURE' : 'STRUCTURAL PIER CRACK',
+    conf: '96% Conf',
+    metricText: '14.2 mm • 96% Conf',
+    severity: 'High Severity',
+    icon: '🔴',
+    color: 'critical' as const
+  };
+
+  const secondaryDefect = allIssues[1] || {
+    name: isMachine ? 'SURFACE OXIDATION & RUST' : 'CONCRETE SPALLING',
+    conf: '89% Conf',
+    metricText: '18.4% Area • Pitting 0.65mm',
+    severity: 'Medium Severity',
+    icon: '🟡',
+    color: 'attention' as const
+  };
+
+  const tertiaryDefect = allIssues[2] || {
+    name: isMachine ? 'CENTER BORE SPLINE WEAR' : 'REBAR CORROSION EXPOSURE',
+    conf: '84% Conf',
+    metricText: '+0.045 mm Clearance',
+    severity: 'Low Severity',
+    icon: '🟢',
+    color: 'healthy' as const
+  };
+
+  const getComparisonData = () => {
+    const name = (inspectionData.assetName || '').toLowerCase();
+    if (name.includes('bridge') || name.includes('pier') || name.includes('dam') || name.includes('concrete')) {
+      return {
+        pastDate: 'June 2026',
+        pastDefect: 'Concrete hairline micro-fracture — 4.8 mm length',
+        pastScore: '89 / 100 Score',
+        currentDate: 'September 2026',
+        currentDefect: 'Shear crack expanded — 18.6 mm length (+13.8 mm growth)',
+        currentScore: '72 / 100 (-17 pts)',
+        condition: 'Condition: Deteriorating (recommended action: schedule epoxy resin pressure injection)',
+        detail: 'Crack propagation rate measured at +4.6 mm per quarter. Tensile stress concentration increasing along pier base.',
+        failureHorizon: '~3.8 months'
+      };
+    } else if (name.includes('transformer') || name.includes('substation') || name.includes('electric')) {
+      return {
+        pastDate: 'June 2026',
+        pastDefect: 'Winding thermal baseline — 62°C nominal operating temp',
+        pastScore: '92 / 100 Score',
+        currentDate: 'September 2026',
+        currentDefect: 'Cooling radiator hotspot — 84°C peak (+22°C variance)',
+        currentScore: '74 / 100 (-18 pts)',
+        condition: 'Condition: Attention Required (recommended action: flush radiator fins & sample dielectric oil)',
+        detail: 'Thermal runaway risk detected near radiator upper manifold. Dielectric breakdown margin narrowing.',
+        failureHorizon: '~5.1 months'
+      };
+    } else if (name.includes('pipeline') || name.includes('pipe') || name.includes('gas') || name.includes('oil')) {
+      return {
+        pastDate: 'June 2026',
+        pastDefect: 'Minor flange pitting — 0.4 mm wall loss',
+        pastScore: '90 / 100 Score',
+        currentDate: 'September 2026',
+        currentDefect: 'Localized wall thinning — 1.8 mm loss with weeping seal',
+        currentScore: '68 / 100 (-22 pts)',
+        condition: 'Condition: Critical Deterioration (recommended action: depressurize and install bolted clamp sleeve)',
+        detail: 'Corrosive hydrogen sulfide pitting accelerating. Hoop stress safety margin reduced below 1.25.',
+        failureHorizon: '~2.9 months'
+      };
+    } else {
+      // Mechanical / default machine
+      return {
+        pastDate: 'June 2026',
+        pastDefect: 'Corrosion detected — 12% surface area',
+        pastScore: '91 / 100 Score',
+        currentDate: 'September 2026',
+        currentDefect: 'Corrosion expanded — 31% surface area (+19% expansion)',
+        currentScore: '72 / 100 (-19 pts)',
+        condition: 'Condition: Deteriorating (recommended action: schedule recoating)',
+        detail: 'Surface oxidation velocity measured at +6.3% per month. Mechanical wear accelerating under elevated thermal friction.',
+        failureHorizon: '~4.2 months'
+      };
+    }
+  };
+
+  const compData = getComparisonData();
+
+  const handleExportCmmsCsv = () => {
+    const officer = getActiveOfficer();
+    const headers = ['Asset ID', 'Asset Name', 'Inspection Date', 'Inspector', 'Health Score', 'Safety Factor', 'Status', 'Defect Name', 'Severity', 'AI Confidence', 'Inspector Verification', 'Dimensions / Metrology'];
+    const rows = allIssues.map(issue => [
+      `"${inspectionData.isMachine ? 'MACH-401-HUB' : 'BRIDGE-102'}"`,
+      `"${inspectionData.assetName}"`,
+      `"2026-09-10"`,
+      `"${officer.name}"`,
+      `"${currentScore}"`,
+      `"${currentSafetyFactor}"`,
+      `"${currentStatus}"`,
+      `"${issue.name}"`,
+      `"${issue.severity}"`,
+      `"${issue.conf}"`,
+      `"${verifications[issue.id] || 'Confirmed'}"`,
+      `"${issue.metricText || ''}"`
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `CMMS_INSPECTION_${inspectionData.assetName.replace(/[^a-zA-Z0-9]/g, '_')}_20260911.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setCmmsToast('CMMS CSV successfully exported for SAP PM / IBM Maximo!');
+    setTimeout(() => setCmmsToast(null), 3500);
+  };
+
+  const handleExportMaximoJson = () => {
+    const officer = getActiveOfficer();
+    const payload = {
+      maximoWorkOrder: {
+        wonum: 'WO-2026-881',
+        description: `AI Asset Integrity Remediation: ${inspectionData.assetName}`,
+        assetnum: inspectionData.isMachine ? 'MACH-401-HUB' : 'BRIDGE-102',
+        status: 'WAPPR',
+        reportedby: officer.name,
+        reportdate: new Date().toISOString(),
+        healthScore: currentScore,
+        safetyFactor: currentSafetyFactor,
+        defectsDetected: allIssues.map(i => ({
+          defectId: i.id,
+          description: i.name,
+          severity: i.severity,
+          measurements: i.metricText,
+          inspectorVerification: verifications[i.id] || 'Confirmed'
+        })),
+        remediationProtocol: recommendedActionSteps
+      }
+    };
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(payload, null, 2));
+    const link = document.createElement('a');
+    link.setAttribute('href', dataStr);
+    link.setAttribute('download', `MAXIMO_WO_881_${inspectionData.assetName.replace(/[^a-zA-Z0-9]/g, '_')}.json`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setCmmsToast('Maximo Work Order JSON package generated!');
+    setTimeout(() => setCmmsToast(null), 3500);
+  };
 
   const diagnosticSummary = isGemini && geminiData.diagnosticSummary
     ? geminiData.diagnosticSummary
@@ -575,35 +787,35 @@ export default function InspectionResult() {
                   }}
                 />
                 
-                {/* Defect Callout 1: 🔴 CRACK (Screenshot 4) */}
+                {/* Defect Callout 1: Primary Dynamic Defect */}
                 {(activeLayer === 'ALL' || activeLayer === 'CRACK') && (
                   <div className="absolute top-[18%] left-[22%] z-20 pointer-events-none animate-in fade-in zoom-in-95">
-                    <div className="bg-slate-950/95 border-2 border-rose-500 text-white rounded-xl p-2.5 shadow-2xl backdrop-blur-md flex flex-col items-center">
-                      <div className="flex items-center gap-1.5 font-black text-rose-400 text-xs tracking-wider">
-                        <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
-                        <span>🔴 CRACK</span>
+                    <div className={`bg-slate-950/95 border-2 ${primaryDefect.color === 'critical' ? 'border-rose-500' : 'border-amber-500'} text-white rounded-xl p-2.5 shadow-2xl backdrop-blur-md flex flex-col items-center`}>
+                      <div className={`flex items-center gap-1.5 font-black ${primaryDefect.color === 'critical' ? 'text-rose-400' : 'text-amber-400'} text-xs tracking-wider`}>
+                        <span className={`w-2.5 h-2.5 rounded-full ${primaryDefect.color === 'critical' ? 'bg-rose-500 animate-pulse' : 'bg-amber-400'}`}></span>
+                        <span>{primaryDefect.icon} {primaryDefect.name}</span>
                       </div>
-                      <div className="text-rose-400 text-lg font-black leading-none my-0.5 animate-bounce">↓</div>
-                      <div className="w-20 h-0.5 bg-rose-500 rounded-full mb-1"></div>
-                      <span className="font-mono text-[10px] text-slate-200 font-bold">14.2 mm • 96% Conf</span>
+                      <div className={`${primaryDefect.color === 'critical' ? 'text-rose-400' : 'text-amber-400'} text-lg font-black leading-none my-0.5 animate-bounce`}>↓</div>
+                      <div className={`w-20 h-0.5 ${primaryDefect.color === 'critical' ? 'bg-rose-500' : 'bg-amber-500'} rounded-full mb-1`}></div>
+                      <span className="font-mono text-[10px] text-slate-200 font-bold">{primaryDefect.metricText} • {primaryDefect.conf}</span>
                     </div>
-                    <div className="w-36 h-24 border-2 border-dashed border-rose-500 bg-rose-500/15 rounded-lg -mt-2 -ml-4"></div>
+                    <div className={`w-36 h-24 border-2 border-dashed ${primaryDefect.color === 'critical' ? 'border-rose-500 bg-rose-500/15' : 'border-amber-500 bg-amber-500/15'} rounded-lg -mt-2 -ml-4`}></div>
                   </div>
                 )}
 
-                {/* Defect Callout 2: 🟡 CORROSION */}
+                {/* Defect Callout 2: Secondary Dynamic Defect */}
                 {(activeLayer === 'ALL' || activeLayer === 'RUST') && (
                   <div className="absolute top-[50%] left-[54%] z-20 pointer-events-none">
-                    <div className="bg-slate-950/95 border-2 border-amber-500 text-white rounded-xl p-2.5 shadow-2xl backdrop-blur-md flex flex-col items-center">
-                      <div className="flex items-center gap-1.5 font-black text-amber-400 text-xs tracking-wider">
-                        <span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
-                        <span>🟡 CORROSION</span>
+                    <div className={`bg-slate-950/95 border-2 ${secondaryDefect.color === 'critical' ? 'border-rose-500' : 'border-amber-500'} text-white rounded-xl p-2.5 shadow-2xl backdrop-blur-md flex flex-col items-center`}>
+                      <div className={`flex items-center gap-1.5 font-black ${secondaryDefect.color === 'critical' ? 'text-rose-400' : 'text-amber-400'} text-xs tracking-wider`}>
+                        <span className={`w-2.5 h-2.5 rounded-full ${secondaryDefect.color === 'critical' ? 'bg-rose-500' : 'bg-amber-400'}`}></span>
+                        <span>{secondaryDefect.icon} {secondaryDefect.name}</span>
                       </div>
-                      <div className="text-amber-400 text-lg font-black leading-none my-0.5">↓</div>
-                      <div className="w-24 h-0.5 bg-amber-500 rounded-full mb-1"></div>
-                      <span className="font-mono text-[10px] text-slate-200 font-bold">ISO Grade C • 18.4% Area</span>
+                      <div className={`${secondaryDefect.color === 'critical' ? 'text-rose-400' : 'text-amber-400'} text-lg font-black leading-none my-0.5`}>↓</div>
+                      <div className={`w-24 h-0.5 ${secondaryDefect.color === 'critical' ? 'bg-rose-500' : 'bg-amber-500'} rounded-full mb-1`}></div>
+                      <span className="font-mono text-[10px] text-slate-200 font-bold">{secondaryDefect.metricText} • {secondaryDefect.conf}</span>
                     </div>
-                    <div className="w-40 h-20 border-2 border-dashed border-amber-500 bg-amber-500/15 rounded-lg -mt-2 -ml-4"></div>
+                    <div className={`w-40 h-20 border-2 border-dashed ${secondaryDefect.color === 'critical' ? 'border-rose-500 bg-rose-500/15' : 'border-amber-500 bg-amber-500/15'} rounded-lg -mt-2 -ml-4`}></div>
                   </div>
                 )}
               </div>
@@ -710,48 +922,48 @@ export default function InspectionResult() {
                 />
               )}
 
-              {/* HERO CALLOUT ELEMENT 1: 🔴 CRACK (Screenshot 4) */}
-              {(activeLayer === 'ALL' || activeLayer === 'CRACK') && confidenceThreshold <= 96 && (
+              {/* HERO CALLOUT ELEMENT 1: Primary Dynamic Defect */}
+              {(activeLayer === 'ALL' || activeLayer === 'CRACK') && (
                 <div className="absolute top-[18%] left-[24%] z-20 pointer-events-auto group">
-                  <div className="bg-slate-950/95 border-2 border-rose-500 text-white rounded-2xl p-3 shadow-2xl backdrop-blur-md flex flex-col items-center transition-transform hover:scale-105">
-                    <div className="flex items-center gap-1.5 font-black text-rose-400 text-xs tracking-wider uppercase">
-                      <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
-                      <span>🔴 CRACK</span>
+                  <div className={`bg-slate-950/95 border-2 ${primaryDefect.color === 'critical' ? 'border-rose-500' : 'border-amber-500'} text-white rounded-2xl p-3 shadow-2xl backdrop-blur-md flex flex-col items-center transition-transform hover:scale-105`}>
+                    <div className={`flex items-center gap-1.5 font-black ${primaryDefect.color === 'critical' ? 'text-rose-400' : 'text-amber-400'} text-xs tracking-wider uppercase`}>
+                      <span className={`w-2.5 h-2.5 rounded-full ${primaryDefect.color === 'critical' ? 'bg-rose-500 animate-ping' : 'bg-amber-400'}`}></span>
+                      <span>{primaryDefect.icon} {primaryDefect.name}</span>
                     </div>
-                    <div className="text-rose-400 text-xl font-black leading-none my-1 animate-bounce">↓</div>
-                    <div className="w-24 h-0.5 bg-rose-500 rounded-full mb-1"></div>
+                    <div className={`${primaryDefect.color === 'critical' ? 'text-rose-400' : 'text-amber-400'} text-xl font-black leading-none my-1 animate-bounce`}>↓</div>
+                    <div className={`w-24 h-0.5 ${primaryDefect.color === 'critical' ? 'bg-rose-500' : 'bg-amber-500'} rounded-full mb-1`}></div>
                     <div className="text-[11px] font-mono text-slate-100 font-bold tracking-tight">
-                      14.2 mm • 96% Conf
+                      {primaryDefect.metricText} • {primaryDefect.conf}
                     </div>
                   </div>
-                  <div className="w-44 h-28 border-2 border-dashed border-rose-500 bg-rose-500/15 rounded-xl -mt-2 -ml-6 pointer-events-none animate-pulse"></div>
+                  <div className={`w-44 h-28 border-2 border-dashed ${primaryDefect.color === 'critical' ? 'border-rose-500 bg-rose-500/15' : 'border-amber-500 bg-amber-500/15'} rounded-xl -mt-2 -ml-6 pointer-events-none animate-pulse`}></div>
                 </div>
               )}
 
-              {/* HERO CALLOUT ELEMENT 2: 🟡 CORROSION */}
-              {(activeLayer === 'ALL' || activeLayer === 'RUST') && confidenceThreshold <= 89 && (
+              {/* HERO CALLOUT ELEMENT 2: Secondary Dynamic Defect */}
+              {(activeLayer === 'ALL' || activeLayer === 'RUST') && (
                 <div className="absolute top-[50%] left-[54%] z-20 pointer-events-auto group">
-                  <div className="bg-slate-950/95 border-2 border-amber-500 text-white rounded-2xl p-3 shadow-2xl backdrop-blur-md flex flex-col items-center transition-transform hover:scale-105">
-                    <div className="flex items-center gap-1.5 font-black text-amber-400 text-xs tracking-wider uppercase">
-                      <span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
-                      <span>🟡 CORROSION</span>
+                  <div className={`bg-slate-950/95 border-2 ${secondaryDefect.color === 'critical' ? 'border-rose-500' : 'border-amber-500'} text-white rounded-2xl p-3 shadow-2xl backdrop-blur-md flex flex-col items-center transition-transform hover:scale-105`}>
+                    <div className={`flex items-center gap-1.5 font-black ${secondaryDefect.color === 'critical' ? 'text-rose-400' : 'text-amber-400'} text-xs tracking-wider uppercase`}>
+                      <span className={`w-2.5 h-2.5 rounded-full ${secondaryDefect.color === 'critical' ? 'bg-rose-500' : 'bg-amber-400'}`}></span>
+                      <span>{secondaryDefect.icon} {secondaryDefect.name}</span>
                     </div>
-                    <div className="text-amber-400 text-xl font-black leading-none my-1">↓</div>
-                    <div className="w-28 h-0.5 bg-amber-500 rounded-full mb-1"></div>
+                    <div className={`${secondaryDefect.color === 'critical' ? 'text-rose-400' : 'text-amber-400'} text-xl font-black leading-none my-1`}>↓</div>
+                    <div className={`w-28 h-0.5 ${secondaryDefect.color === 'critical' ? 'bg-rose-500' : 'bg-amber-500'} rounded-full mb-1`}></div>
                     <div className="text-[11px] font-mono text-slate-100 font-bold tracking-tight">
-                      ISO Grade C • 18.4% Area
+                      {secondaryDefect.metricText} • {secondaryDefect.conf}
                     </div>
                   </div>
-                  <div className="w-52 h-24 border-2 border-dashed border-amber-500 bg-amber-500/15 rounded-xl -mt-2 -ml-6 pointer-events-none"></div>
+                  <div className={`w-52 h-24 border-2 border-dashed ${secondaryDefect.color === 'critical' ? 'border-rose-500 bg-rose-500/15' : 'border-amber-500 bg-amber-500/15'} rounded-xl -mt-2 -ml-6 pointer-events-none`}></div>
                 </div>
               )}
 
-              {/* HERO CALLOUT ELEMENT 3: 🟢 SPLINE WEAR */}
-              {(activeLayer === 'ALL' || activeLayer === 'WEAR') && confidenceThreshold <= 84 && (
+              {/* HERO CALLOUT ELEMENT 3: Tertiary Dynamic Defect */}
+              {(activeLayer === 'ALL' || activeLayer === 'WEAR') && (
                 <div className="absolute top-[32%] right-[16%] z-20 pointer-events-auto">
                   <div className="bg-slate-950/95 border border-cyan-400 rounded-xl px-3 py-1.5 shadow-xl backdrop-blur-md text-cyan-300 font-mono text-xs flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
-                    <span>🟢 SPLINE WEAR: +0.045mm</span>
+                    <span>{tertiaryDefect.icon} {tertiaryDefect.name}: {tertiaryDefect.metricText}</span>
                   </div>
                 </div>
               )}
@@ -938,25 +1150,25 @@ export default function InspectionResult() {
               </Link>
             </div>
 
-            {/* Comparison Box exactly matching Screenshot 4 */}
+            {/* Comparison Box dynamically tailored to asset category (Screenshot 4) */}
             <div className="rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 p-4 space-y-3 font-mono text-xs">
               <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between">
                 <div>
                   <span className="text-slate-400 font-bold block text-[10px] uppercase">Baseline Inspection</span>
-                  <span className="text-slate-800 dark:text-slate-200 font-bold text-sm">"June 2026: Corrosion detected — 12% surface area"</span>
+                  <span className="text-slate-800 dark:text-slate-200 font-bold text-sm">"{compData.pastDate}: {compData.pastDefect}"</span>
                 </div>
                 <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-[11px] border border-emerald-500/20">
-                  91 / 100 Score
+                  {compData.pastScore}
                 </span>
               </div>
 
               <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-rose-500/30 flex items-center justify-between">
                 <div>
                   <span className="text-rose-500 font-bold block text-[10px] uppercase">Current Inspection</span>
-                  <span className="text-slate-900 dark:text-white font-black text-sm">"September 2026: Corrosion expanded — 31% surface area"</span>
+                  <span className="text-slate-900 dark:text-white font-black text-sm">"{compData.currentDate}: {compData.currentDefect}"</span>
                 </div>
                 <span className="px-2 py-0.5 rounded bg-rose-500/10 text-rose-600 dark:text-rose-400 font-black text-[11px] border border-rose-500/20">
-                  72 / 100 (-19 pts)
+                  {compData.currentScore}
                 </span>
               </div>
 
@@ -965,10 +1177,10 @@ export default function InspectionResult() {
                 <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
                 <div>
                   <p className="text-xs font-black">
-                    "Condition: Deteriorating (recommended action: schedule recoating)"
+                    "{compData.condition}"
                   </p>
                   <p className="text-[11px] font-normal text-slate-600 dark:text-slate-400 mt-0.5">
-                    Surface oxidation velocity measured at +6.3% per month. Mechanical wear accelerating under elevated thermal friction.
+                    {compData.detail}
                   </p>
                 </div>
               </div>
@@ -981,7 +1193,7 @@ export default function InspectionResult() {
           </div>
 
           <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Predictive Failure Horizon: <strong>~4.2 months</strong></span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Predictive Failure Horizon: <strong>{compData.failureHorizon}</strong></span>
             <Link
               to="/history"
               className="text-xs font-bold text-primary hover:text-cyan-600 flex items-center gap-1 transition"
@@ -1309,6 +1521,17 @@ export default function InspectionResult() {
                 </div>
               </div>
             ))}
+
+            {/* Inspector Manual Finding Trigger */}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setIsAddFindingOpen(true)}
+                className="w-full py-3 px-4 rounded-xl border-2 border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 text-primary text-xs font-black transition flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.01]"
+              >
+                <Plus className="w-4 h-4" /> Add Field Inspector Finding (Human Override)
+              </button>
+            </div>
           </div>
         </section>
 
@@ -1426,26 +1649,130 @@ export default function InspectionResult() {
       </section>
 
       {/* Bottom Sticky Action Footer */}
-      <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
+      <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
         <button
           onClick={handleSaveToOfficerLog}
-          className={`px-8 py-4 rounded-2xl text-sm font-extrabold transition-all shadow-xl flex items-center gap-2 cursor-pointer ${
+          className={`px-6 py-3.5 rounded-2xl text-xs font-extrabold transition-all shadow-xl flex items-center gap-2 cursor-pointer ${
             isSaved
               ? 'bg-emerald-600 text-white'
               : 'bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-400 text-white shadow-primary/25 hover:scale-105'
           }`}
         >
-          <Save className="w-5 h-5" />
+          <Save className="w-4 h-4" />
           {isSaved ? 'Saved in Officer Work Vault ✓' : 'Save Work to Officer Log'}
+        </button>
+
+        <button
+          onClick={handleExportCmmsCsv}
+          className="px-6 py-3.5 rounded-2xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-extrabold shadow-md transition-all flex items-center gap-2 cursor-pointer border border-slate-200 dark:border-slate-700 hover:scale-105"
+          title="Export CSV for SAP PM / Oracle CMMS"
+        >
+          <FileSpreadsheet className="w-4 h-4 text-emerald-500" /> Export CMMS CSV
+        </button>
+
+        <button
+          onClick={handleExportMaximoJson}
+          className="px-6 py-3.5 rounded-2xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-extrabold shadow-md transition-all flex items-center gap-2 cursor-pointer border border-slate-200 dark:border-slate-700 hover:scale-105"
+          title="Export IBM Maximo Work Order JSON"
+        >
+          <Database className="w-4 h-4 text-cyan-500" /> Maximo JSON
         </button>
 
         <Link
           to="/report"
-          className="px-8 py-4 rounded-2xl bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 text-white text-sm font-extrabold shadow-xl transition-all flex items-center gap-2 cursor-pointer border border-slate-700 hover:scale-105"
+          className="px-6 py-3.5 rounded-2xl bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 text-white text-xs font-extrabold shadow-xl transition-all flex items-center gap-2 cursor-pointer border border-slate-700 hover:scale-105"
         >
-          <FileText className="w-5 h-5" /> Generate Formal PDF Report
+          <FileText className="w-4 h-4" /> Generate Formal PDF Report
         </Link>
       </div>
+
+      {/* CMMS Toast Alert */}
+      {cmmsToast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white text-xs font-bold px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 border border-emerald-500/30">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" /> {cmmsToast}
+        </div>
+      )}
+
+      {/* Add Field Inspector Finding Modal */}
+      {isAddFindingOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                  <Eye className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white">Add Field Finding</h3>
+                  <p className="text-xs text-slate-400">Log an on-site defect observed by inspector</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddFindingOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddFinding} className="space-y-3 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Defect Title / Component Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Grounding Flange Bolt Corroded / Loose"
+                  value={newFindingTitle}
+                  onChange={(e) => setNewFindingTitle(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none focus:border-primary"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Severity Level</label>
+                <select
+                  value={newFindingSeverity}
+                  onChange={(e) => setNewFindingSeverity(e.target.value as any)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none focus:border-primary"
+                >
+                  <option value="High Severity">🔴 High Severity (Immediate Action)</option>
+                  <option value="Medium Severity">🟡 Medium Severity (Attention Needed)</option>
+                  <option value="Low Severity">🟢 Low Severity (Monitor Only)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Physical Dimensions / Field Observation</label>
+                <textarea
+                  rows={3}
+                  required
+                  placeholder="e.g. Ultrasonic UTM verified 3.2mm remaining wall. Lock washer fatigued."
+                  value={newFindingMetric}
+                  onChange={(e) => setNewFindingMetric(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none focus:border-primary resize-none"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddFindingOpen(false)}
+                  className="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold cursor-pointer shadow-md shadow-primary/25"
+                >
+                  Save Finding
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -17,7 +17,9 @@ import {
   HelpCircle, 
   Award, 
   Camera, 
-  FileCheck2 
+  FileCheck2,
+  FileSpreadsheet,
+  Database
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getActiveOfficer, saveOfficerInspection } from '../utils/officerStore';
@@ -51,6 +53,7 @@ export default function Report() {
       'defect-wear': 'Needs Review'
     } as Record<string, string>,
     defects: [] as any[],
+    customDefects: [] as any[],
     recommendations: [] as any[]
   });
 
@@ -89,6 +92,7 @@ export default function Report() {
             'defect-wear': 'Needs Review'
           },
           defects: isG && Array.isArray(gResult.defects) ? gResult.defects : [],
+          customDefects: Array.isArray(parsed.customDefects) ? parsed.customDefects : [],
           recommendations: isG && Array.isArray(gResult.recommendations) ? gResult.recommendations : []
         });
       } catch (e) {
@@ -103,6 +107,66 @@ export default function Report() {
 
   const handleDownloadPdf = () => {
     window.print();
+  };
+
+  const handleExportCmmsCsv = () => {
+    const headers = ['Asset ID', 'Asset Name', 'Location', 'Inspection Date', 'Inspector', 'Duration', 'Defensible Health Score', 'Safety Factor', 'Status', 'Defect Name', 'Severity', 'AI Confidence', 'Inspector Verification', 'Dimensions / Metrology'];
+    const rows = defectsToRender.map(defect => [
+      `"${data.assetId}"`,
+      `"${data.assetName}"`,
+      `"${data.location}"`,
+      `"2026-09-10"`,
+      `"${officer.name} (${officer.id})"`,
+      `"${data.duration}"`,
+      `"${data.score}"`,
+      `"${data.safetyFactor}"`,
+      `"${data.status}"`,
+      `"${defect.name}"`,
+      `"${defect.severity}"`,
+      `"${defect.confidence}"`,
+      `"${data.humanVerifications[defect.id] || 'Confirmed'}"`,
+      `"${defect.metricText || ''}"`
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `CMMS_AUDIT_${data.assetId}_20260911.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExportMaximoJson = () => {
+    const payload = {
+      maximoWorkOrder: {
+        wonum: `WO-2026-${data.assetId}`,
+        description: `Formal Inspection Audit Certification: ${data.assetName}`,
+        assetnum: data.assetId,
+        status: 'APPR',
+        reportedby: `${officer.name} (${officer.id})`,
+        reportdate: new Date().toISOString(),
+        healthScore: data.score,
+        safetyFactor: data.safetyFactor,
+        cryptographicDigest: data.securityHash,
+        defectsDetected: defectsToRender.map(d => ({
+          defectId: d.id,
+          description: d.name,
+          severity: d.severity,
+          measurements: d.metricText,
+          tolerance: d.tolerance,
+          confidence: d.confidence,
+          inspectorVerification: data.humanVerifications[d.id] || 'Confirmed'
+        }))
+      }
+    };
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(payload, null, 2));
+    const link = document.createElement('a');
+    link.setAttribute('href', dataStr);
+    link.setAttribute('download', `MAXIMO_AUDIT_${data.assetId}.json`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleSaveReportToOfficerLog = () => {
@@ -179,7 +243,7 @@ export default function Report() {
     }
   ];
 
-  const defectsToRender = data.defects.length > 0 
+  const baseDefects = data.defects.length > 0 
     ? data.defects.map(d => ({
         id: d.id || 'CRACK',
         name: d.name,
@@ -190,13 +254,24 @@ export default function Report() {
       }))
     : (data.isMachine ? defaultMachineDefects : defaultInfraDefects);
 
+  const customMapped = data.customDefects.map(c => ({
+    id: c.id,
+    name: c.name,
+    severity: c.severity,
+    metricText: c.metricText,
+    tolerance: c.measurements?.notes || 'Field inspector observed anomaly',
+    confidence: c.conf || '100% (Human Verified)'
+  }));
+
+  const defectsToRender = [...baseDefects, ...customMapped];
+
   return (
     <div className="p-4 sm:p-6 md:p-10 max-w-5xl mx-auto space-y-6 animate-in fade-in duration-300">
       
       {/* Toast Notification */}
       {saveToast && (
         <div className="fixed top-20 right-6 z-50 bg-slate-900 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2 border border-emerald-500/30">
-          <Check className="w-4 h-4 text-emerald-400" /> Formal report successfully archived in Officer Work Vault!
+          <Check className="w-4 h-4 text-emerald-400" /> Action confirmed & saved in Officer Work Vault!
         </div>
       )}
 
@@ -208,30 +283,46 @@ export default function Report() {
         >
           <ArrowLeft className="w-4 h-4" /> Back to Inspection Result
         </Link>
-        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
           <button
             onClick={handleSaveReportToOfficerLog}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer ${
+            className={`px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer ${
               isSaved
                 ? 'bg-emerald-500/15 text-emerald-600 border border-emerald-500/30'
                 : 'bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-400 text-white shadow-primary/25 hover:scale-105'
             }`}
           >
             <Save className="w-4 h-4" />
-            {isSaved ? 'Archived in Vault ✓' : 'Save to Officer Log'}
+            {isSaved ? 'Archived in Vault ✓' : 'Save Log'}
+          </button>
+
+          <button 
+            onClick={handleExportCmmsCsv}
+            className="btn-secondary py-2.5 px-3.5 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+            title="Export CSV for SAP PM / Oracle CMMS"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" /> Export CSV
+          </button>
+          
+          <button 
+            onClick={handleExportMaximoJson}
+            className="btn-secondary py-2.5 px-3.5 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+            title="Export IBM Maximo JSON"
+          >
+            <Database className="w-4 h-4 text-cyan-600" /> Maximo JSON
           </button>
           
           <button 
             onClick={handlePrint}
-            className="btn-secondary flex-1 sm:flex-initial cursor-pointer"
+            className="btn-secondary py-2.5 px-3.5 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
           >
-            <Printer className="w-4 h-4" /> Print Report
+            <Printer className="w-4 h-4" /> Print
           </button>
           
           {/* Action: "Download PDF Report" button matching Screenshot 2 */}
           <button 
             onClick={handleDownloadPdf}
-            className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-black transition-all flex items-center gap-2 cursor-pointer shadow-lg shadow-slate-900/20 hover:scale-105"
+            className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-black transition-all flex items-center gap-2 cursor-pointer shadow-lg shadow-slate-900/20 hover:scale-105"
           >
             <Download className="w-4 h-4 text-cyan-400" /> Download PDF Report
           </button>
