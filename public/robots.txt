@@ -1,0 +1,4 @@
+﻿User-agent: *
+Allow: /
+
+Sitemap: https://ai-inspect-assistant.onrender.com/sitemap.xml

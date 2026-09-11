@@ -829,6 +829,8 @@ export default function NewInspection() {
                       <img 
                         src={mediaFile.url} 
                         alt={mediaFile.name} 
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-cover"
                       />
                     ) : (

@@ -493,6 +493,8 @@ export default function InspectionResult() {
                 <img 
                   src={inspectionData.mediaUrl} 
                   alt="AI Annotated View"
+                  loading="lazy"
+                  decoding="async"
                   className="w-full h-full object-cover"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = bridge102Img;
@@ -541,6 +543,8 @@ export default function InspectionResult() {
                   <img 
                     src={inspectionData.mediaUrl} 
                     alt="Original Unaltered View"
+                    loading="lazy"
+                    decoding="async"
                     className="absolute inset-0 w-full h-full object-cover max-w-none"
                     style={{ width: '100%', height: '100%' }}
                     onError={(e) => {
@@ -593,6 +597,8 @@ export default function InspectionResult() {
                 <img 
                   src={inspectionData.mediaUrl} 
                   alt="Original Asset" 
+                  loading="lazy"
+                  decoding="async"
                   className="w-full h-full object-cover"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = bridge102Img;
@@ -619,6 +625,8 @@ export default function InspectionResult() {
                 <img 
                   src={inspectionData.mediaUrl} 
                   alt="AI Detected Asset" 
+                  loading="lazy"
+                  decoding="async"
                   className="w-full h-full object-cover"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = bridge102Img;

@@ -717,8 +717,11 @@ export default function Dashboard() {
                           <img 
                             src={row.image} 
                             alt={row.name}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                            width="40"
+                            height="40"
                             loading="lazy"
+                            decoding="async"
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                             onError={(e) => {
                               const target = e.currentTarget;
                               target.onerror = null;

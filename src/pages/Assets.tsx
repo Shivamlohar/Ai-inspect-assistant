@@ -122,10 +122,14 @@ export default function Assets() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {filteredAssets.map((asset) => (
           <div key={asset.id} className="card bg-white flex flex-col hover:shadow-lg transition-all group">
-            <div className="h-48 bg-slate-800 relative overflow-hidden">
+            <div className="h-48 bg-slate-800 relative overflow-hidden aspect-[16/9]">
               <img 
                 src={asset.image} 
                 alt={asset.name} 
+                width="400"
+                height="192"
+                loading="lazy"
+                decoding="async"
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90"
                 onError={(e) => {
                   const target = e.currentTarget;

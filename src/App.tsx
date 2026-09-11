@@ -62,7 +62,11 @@ function AlertsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
               <p className="text-xs text-slate-500">Real-time infrastructure notifications</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-slate-600 transition">
+          <button 
+            onClick={onClose} 
+            aria-label="Close alerts dialog"
+            className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-slate-600 transition cursor-pointer"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -140,7 +144,11 @@ function SettingsModal({
               <p className="text-xs text-slate-500">Configure visual themes, metrology diagnostics & preferences</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-slate-600 transition cursor-pointer">
+          <button 
+            onClick={onClose} 
+            aria-label="Close settings dialog"
+            className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-slate-600 transition cursor-pointer"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -343,7 +351,11 @@ function OfficerModal({
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-slate-400 hover:text-slate-600 transition cursor-pointer">
+          <button 
+            onClick={onClose} 
+            aria-label="Close officer modal"
+            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-slate-400 hover:text-slate-600 transition cursor-pointer"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -501,6 +513,7 @@ function TopNav({
         <input 
           type="text" 
           placeholder="Search assets, telemetry, reports..." 
+          aria-label="Search assets, telemetry, and reports"
           className="bg-transparent border-none outline-none text-xs text-slate-700 dark:text-slate-200 placeholder:text-slate-400 w-full"
         />
         <kbd className="text-[10px] font-mono bg-white dark:bg-slate-700 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-600 text-slate-400 shadow-xs shrink-0">Ctrl+K</kbd>
@@ -521,6 +534,7 @@ function TopNav({
         {/* 1-Click Dark/Light Theme Quick Toggle */}
         <button
           onClick={onToggleTheme}
+          aria-label={currentTheme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
           className="p-2 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
           title={currentTheme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
         >
@@ -533,6 +547,7 @@ function TopNav({
 
         <button 
           onClick={onOpenAlerts}
+          aria-label="View system alerts and notifications"
           className="relative p-2 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
           title="View Alerts"
         >
@@ -542,6 +557,7 @@ function TopNav({
 
         <button 
           onClick={onOpenSettings}
+          aria-label="Open application settings"
           className="p-2 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
           title="Settings"
         >
@@ -552,6 +568,7 @@ function TopNav({
         {officer.isLoggedIn ? (
           <button
             onClick={onOpenOfficerModal}
+            aria-label={`Officer profile for ${officer.name}`}
             className="flex items-center gap-2.5 pl-2 border-l border-slate-200 dark:border-slate-800 hover:opacity-85 transition cursor-pointer text-left group"
             title="Officer Profile & Work Vault"
           >
@@ -569,6 +586,7 @@ function TopNav({
         ) : (
           <button
             onClick={onOpenOfficerModal}
+            aria-label="Officer sign in"
             className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-400 text-white font-bold text-xs shadow-md shadow-primary/25 transition cursor-pointer ml-1"
             title="Sign In Officer"
           >
@@ -582,6 +600,7 @@ function TopNav({
       <div className="md:hidden flex items-center gap-1.5">
         <button
           onClick={onToggleTheme}
+          aria-label="Toggle theme appearance"
           className="p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
           title="Toggle Theme"
         >
@@ -594,6 +613,7 @@ function TopNav({
 
         <button 
           onClick={onOpenAlerts}
+          aria-label="View system alerts"
           className="relative p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
         >
           <Bell className="w-5 h-5" />

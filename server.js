@@ -1,6 +1,7 @@
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
+import zlib from 'zlib';
 import { fileURLToPath } from 'url';
 
 /**
@@ -25,6 +26,8 @@ const MIME_TYPES = {
   '.mjs': 'application/javascript; charset=UTF-8',
   '.css': 'text/css; charset=UTF-8',
   '.json': 'application/json; charset=UTF-8',
+  '.xml': 'application/xml; charset=UTF-8',
+  '.txt': 'text/plain; charset=UTF-8',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
@@ -150,11 +153,12 @@ function applySecurityHeaders(res, contentType, ext) {
   res.setHeader('X-Defense-Tier', 'Active-Shield-Level-4');
 
   // Cache Control Policies
-  if (ext === '.html') {
+  if (ext === '.html' || ext === '.txt' || ext === '.xml') {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
   } else {
+    // 1-year immutable caching for static hashed assets (scripts, styles, images, fonts)
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
   }
 }
@@ -366,8 +370,26 @@ const server = http.createServer((req, res) => {
       }
 
       applySecurityHeaders(res, contentType, ext);
-      res.writeHead(200, { 'Content-Type': contentType });
-      res.end(content);
+
+      // High-performance gzip compression for text, code, and SVG assets
+      const compressible = /^\.?(html|js|mjs|css|json|svg|wasm|xml|txt)$/i.test(ext);
+      const acceptEncoding = req.headers['accept-encoding'] || '';
+
+      if (compressible && /\bgzip\b/i.test(acceptEncoding)) {
+        res.setHeader('Content-Encoding', 'gzip');
+        res.setHeader('Vary', 'Accept-Encoding');
+        res.writeHead(200, { 'Content-Type': contentType });
+        zlib.gzip(content, (err, compressed) => {
+          if (err) {
+            res.end(content);
+          } else {
+            res.end(compressed);
+          }
+        });
+      } else {
+        res.writeHead(200, { 'Content-Type': contentType });
+        res.end(content);
+      }
     });
   });
 });
