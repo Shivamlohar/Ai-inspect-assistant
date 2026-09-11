@@ -27,10 +27,11 @@ import {
   type OfficerProfile 
 } from '../utils/officerStore';
 import { 
-  bridge102Img, 
-  transformer204Img, 
-  windTurbine401Img, 
-  cellTower44Img 
+  industrialMotorImg, 
+  centrifugalPumpImg, 
+  structuralJointImg, 
+  pipelinePlImg,
+  bridge102Img 
 } from '../assets/assetImages';
 
 const containerVariants: Variants = {
@@ -122,56 +123,56 @@ export default function Dashboard() {
   };
 
   const healthData = [
-    { name: 'Healthy', value: 186, color: '#10b981', pct: '75%', strokeDash: 198, offset: 0 },
-    { name: 'Attention', value: 34, color: '#f59e0b', pct: '14%', strokeDash: 37, offset: -200 },
-    { name: 'At Risk', value: 16, color: '#f97316', pct: '6%', strokeDash: 16, offset: -239 },
-    { name: 'Critical', value: 12, color: '#f43f5e', pct: '5%', strokeDash: 14, offset: -256 },
+    { name: 'Inspected & Verified', value: 8, color: '#10b981', pct: '67%', strokeDash: 176, offset: 0 },
+    { name: 'Attention Required', value: 2, color: '#f59e0b', pct: '17%', strokeDash: 44, offset: -176 },
+    { name: 'Critical Severity', value: 1, color: '#f43f5e', pct: '8%', strokeDash: 22, offset: -220 },
+    { name: 'Pending Inspection', value: 1, color: '#0ea5e9', pct: '8%', strokeDash: 22, offset: -242 },
   ];
 
   const recentInspections = [
     {
-      name: 'Bridge #102',
-      id: 'BRG-102-S5',
-      type: 'Highway Viaduct',
-      health: 64,
-      date: 'Today, 08:30 AM',
-      status: 'At Risk',
-      statusClass: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20',
-      scoreRing: '#f97316',
-      image: bridge102Img
+      name: 'Industrial Motor M-401',
+      id: 'M-401',
+      type: 'Heavy Induction Motor (350 kW)',
+      health: 94,
+      date: 'Today, 11:20 AM',
+      status: 'Verified',
+      statusClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20',
+      scoreRing: '#10b981',
+      image: industrialMotorImg
     },
     {
-      name: 'Transformer T-204',
-      id: 'TRN-204-N',
-      type: 'Substation North',
-      health: 82,
-      date: 'Today, 07:15 AM',
+      name: 'Centrifugal Pump P-204',
+      id: 'P-204',
+      type: 'Multistage Fluid Pump',
+      health: 92,
+      date: 'Today, 10:45 AM',
+      status: 'Verified',
+      statusClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20',
+      scoreRing: '#10b981',
+      image: centrifugalPumpImg
+    },
+    {
+      name: 'Structural Joint SJ-087',
+      id: 'SJ-087',
+      type: 'Bolted Gusset Truss Joint',
+      health: 74,
+      date: 'Today, 09:30 AM',
       status: 'Attention',
       statusClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
       scoreRing: '#f59e0b',
-      image: transformer204Img
+      image: structuralJointImg
     },
     {
-      name: 'Rotor Hub M-401',
-      id: 'WND-401-E',
-      type: 'Wind Turbine Gen-3',
-      health: 91,
-      date: 'Yesterday, 16:40',
-      status: 'Healthy',
-      statusClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20',
-      scoreRing: '#10b981',
-      image: windTurbine401Img
-    },
-    {
-      name: 'Cell Tower #44',
-      id: 'TWR-044-RP',
-      type: 'Telecom Lattice Array',
-      health: 96,
-      date: '01 Sep 2026',
-      status: 'Healthy',
-      statusClass: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20',
-      scoreRing: '#06b6d4',
-      image: cellTower44Img
+      name: 'High-Pressure Pipeline PL-201',
+      id: 'PL-201',
+      type: 'Process Manifold Sector 2',
+      health: 42,
+      date: 'Today, 08:15 AM',
+      status: 'Critical',
+      statusClass: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20',
+      scoreRing: '#f43f5e',
+      image: pipelinePlImg
     },
   ];
 
@@ -264,9 +265,9 @@ export default function Dashboard() {
                 <TrendingUp className="w-3 h-3" /> +4% this wk
               </span>
             </div>
-            <h3 className="text-3xl md:text-4xl font-black text-slate-800 dark:text-white tracking-tight mb-1">248</h3>
+            <h3 className="text-3xl md:text-4xl font-black text-slate-800 dark:text-white tracking-tight mb-1">12</h3>
             <p className="text-slate-700 dark:text-slate-200 font-bold text-sm">Total Monitored Assets</p>
-            <p className="text-xs text-slate-400 dark:text-slate-400 mt-1 font-medium">Spanning 5 industrial sectors</p>
+            <p className="text-xs text-slate-400 dark:text-slate-400 mt-1 font-medium">Spanning 4 industrial sectors</p>
           </div>
 
           <div className="mt-4 pt-2 border-t border-slate-100 dark:border-slate-800">
@@ -305,12 +306,12 @@ export default function Dashboard() {
                 <CheckCircle2 className="w-6 h-6" />
               </div>
               <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                75% Complete
+                67% Verified
               </span>
             </div>
-            <h3 className="text-3xl md:text-4xl font-black text-slate-800 dark:text-white tracking-tight mb-1">186</h3>
+            <h3 className="text-3xl md:text-4xl font-black text-slate-800 dark:text-white tracking-tight mb-1">8</h3>
             <p className="text-slate-700 dark:text-slate-200 font-bold text-sm">Inspected & Verified</p>
-            <p className="text-xs text-slate-400 dark:text-slate-400 mt-1 font-medium">Cleared within last 30 days</p>
+            <p className="text-xs text-slate-400 dark:text-slate-400 mt-1 font-medium">Cleared within last 48 hours</p>
           </div>
 
           <div className="mt-4 pt-2 border-t border-slate-100 dark:border-slate-800">
@@ -349,10 +350,10 @@ export default function Dashboard() {
                 <AlertTriangle className="w-6 h-6" />
               </div>
               <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                14% Scheduled
+                17% Action
               </span>
             </div>
-            <h3 className="text-3xl md:text-4xl font-black text-slate-800 dark:text-white tracking-tight mb-1">34</h3>
+            <h3 className="text-3xl md:text-4xl font-black text-slate-800 dark:text-white tracking-tight mb-1">2</h3>
             <p className="text-slate-700 dark:text-slate-200 font-bold text-sm">Need Attention</p>
             <p className="text-xs text-slate-400 dark:text-slate-400 mt-1 font-medium">Minor wear & micro-fractures</p>
           </div>
@@ -393,10 +394,10 @@ export default function Dashboard() {
                 <AlertOctagon className="w-6 h-6" />
               </div>
               <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 animate-pulse">
-                High Alert
+                1 Critical • 1 Pending
               </span>
             </div>
-            <h3 className="text-3xl md:text-4xl font-black text-slate-800 dark:text-white tracking-tight mb-1">12</h3>
+            <h3 className="text-3xl md:text-4xl font-black text-slate-800 dark:text-white tracking-tight mb-1">1</h3>
             <p className="text-slate-700 dark:text-slate-200 font-bold text-sm">Critical Severity</p>
             <p className="text-xs text-slate-400 dark:text-slate-400 mt-1 font-medium">Immediate mitigation flagged</p>
           </div>
@@ -640,11 +641,11 @@ export default function Dashboard() {
               transition={{ delay: 0.3, type: "spring", stiffness: 300, damping: 20 }}
               className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none"
             >
-              <span className="text-4xl font-black text-slate-800 dark:text-white tracking-tight">84</span>
+              <span className="text-4xl font-black text-slate-800 dark:text-white tracking-tight">87</span>
               <span className="text-[10px] font-extrabold uppercase tracking-widest text-cyan-600 dark:text-cyan-400">
                 Health Index
               </span>
-              <span className="text-[10px] text-slate-400 font-medium">248 Assets</span>
+              <span className="text-[10px] text-slate-400 font-medium">12 Registered Assets</span>
             </motion.div>
           </div>
 

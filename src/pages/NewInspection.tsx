@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { 
   Camera, 
   Image as ImageIcon, 
@@ -23,17 +23,29 @@ import { JitterFilter } from '../utils/jitterFilter';
 import { SUPPORTED_LANGUAGES, type InspectionLanguage } from '../utils/multilingualSpeech';
 import { validateAssetRelevance } from '../utils/assetValidator';
 import { 
-  bridge102Img, 
-  transformer204Img, 
-  pipeline201Img, 
-  cellTower44Img, 
-  mainDam01Img, 
-  windTurbine401Img 
+  industrialMotorImg,
+  centrifugalPumpImg,
+  gearboxImg,
+  airCompressorImg,
+  concretePillarImg,
+  steelBeamImg,
+  structuralJointImg,
+  electricalPanelImg,
+  transformerTrImg,
+  storageTankImg,
+  pipelinePlImg,
+  pressureVesselImg
 } from '../assets/assetImages';
 
 export default function NewInspection() {
   const navigate = useNavigate();
-  const [selectedAsset, setSelectedAsset] = useState<string>('Industrial Machine #M-401 (Mechanical Hub)');
+  const location = useLocation();
+  const [selectedAsset, setSelectedAsset] = useState<string>(() => {
+    if (location.state?.assetName) return location.state.assetName;
+    const stored = sessionStorage.getItem('selectedAsset');
+    if (stored) return stored;
+    return 'Industrial Motor M-401 (M-401)';
+  });
   const [selectedLang, setSelectedLang] = useState<InspectionLanguage>('en');
   const [luminance, setLuminance] = useState<number | null>(null);
   const [tabNotice, setTabNotice] = useState<string | null>(null);
@@ -94,58 +106,112 @@ export default function NewInspection() {
   // Preset sample media for quick testing
   const samplePresets = [
     {
-      name: 'Bridge #102 Concrete Pier',
+      name: 'Industrial Motor M-401',
       type: 'image' as const,
-      url: bridge102Img,
+      url: industrialMotorImg,
       size: '0.9 MB',
-      category: 'Civil Infrastructure (Bridge)',
-      asset: 'Bridge #102 (Sector 5)',
-      note: 'Shear crack and surface spalling observed on load-bearing concrete pier.'
+      category: 'Industrial Machinery',
+      asset: 'Industrial Motor M-401 (M-401)',
+      note: 'Thermal signature nominal (54°C). Drive bearing harmonic vibration within ISO 10816 limits.'
     },
     {
-      name: 'Transformer T-204 Casing',
+      name: 'Centrifugal Pump P-204',
       type: 'image' as const,
-      url: transformer204Img,
+      url: centrifugalPumpImg,
       size: '1.0 MB',
-      category: 'Electrical Grid Asset',
-      asset: 'Transformer T-204 (Substation North)',
-      note: 'Oil residue and thermal oxidation observed near high-voltage cooling radiator fins.'
+      category: 'Industrial Machinery',
+      asset: 'Centrifugal Pump P-204 (P-204)',
+      note: 'Mechanical seal pressure steady. Zero dynamic cavitation or flange weepage observed.'
     },
     {
-      name: 'Pipeline P-201 Manifold',
+      name: 'Gearbox G-118 Speed Reducer',
       type: 'image' as const,
-      url: pipeline201Img,
+      url: gearboxImg,
+      size: '1.0 MB',
+      category: 'Industrial Machinery',
+      asset: 'Gearbox G-118 (G-118)',
+      note: 'Helical gear mesh backlash 0.18mm within OEM limits. Particle spectrometry normal.'
+    },
+    {
+      name: 'Air Compressor C-305',
+      type: 'image' as const,
+      url: airCompressorImg,
+      size: '0.9 MB',
+      category: 'Industrial Machinery',
+      asset: 'Air Compressor C-305 (C-305)',
+      note: 'Air dryer dew point -40°C verified. Discharge temperature stable at 76°C under full load.'
+    },
+    {
+      name: 'Concrete Pillar CP-021',
+      type: 'image' as const,
+      url: concretePillarImg,
+      size: '1.0 MB',
+      category: 'Structural Infrastructure',
+      asset: 'Concrete Pillar CP-021 (CP-021)',
+      note: 'Rebound hammer compressive strength 46 MPa. Surface sealed, no spalling or carbonation.'
+    },
+    {
+      name: 'Steel Beam SB-114',
+      type: 'image' as const,
+      url: steelBeamImg,
       size: '1.1 MB',
-      category: 'Oil & Gas Piping',
-      asset: 'Pipeline P-201 (Sector 2)',
-      note: 'Flange bolt corrosion and surface wear detected at high-pressure junction.'
+      category: 'Structural Infrastructure',
+      asset: 'Steel Beam SB-114 (SB-114)',
+      note: 'Max mid-span deflection 0.8mm (limit L/500 satisfied). Anti-corrosive primer coating intact.'
     },
     {
-      name: 'Cell Tower #44 Lattice',
+      name: 'Structural Joint SJ-087',
       type: 'image' as const,
-      url: cellTower44Img,
+      url: structuralJointImg,
       size: '0.9 MB',
-      category: 'Telecommunications Tower',
-      asset: 'Cell Tower #44 (Ridge Peak)',
-      note: 'Galvanized steel structural lattice check and microwave dish alignment.'
+      category: 'Structural Infrastructure',
+      asset: 'Structural Joint SJ-087 (SJ-087)',
+      note: 'Mild surface oxidation on lower gusset flange; torque check recommended on bolt group #3.'
     },
     {
-      name: 'Main Dam Spillway & Penstocks',
+      name: 'Electrical Panel EP-052',
       type: 'image' as const,
-      url: mainDam01Img,
+      url: electricalPanelImg,
+      size: '0.9 MB',
+      category: 'Electrical Switchgear',
+      asset: 'Electrical Panel EP-052 (EP-052)',
+      note: 'Infrared thermography scan reveals thermal Delta-T < 2.8°C across all MCC busbars.'
+    },
+    {
+      name: 'Transformer TR-009',
+      type: 'image' as const,
+      url: transformerTrImg,
+      size: '1.1 MB',
+      category: 'Electrical Substation',
+      asset: 'Transformer TR-009 (TR-009)',
+      note: 'Dielectric breakdown voltage 68 kV. Conservator oil level normal, silica breather dry.'
+    },
+    {
+      name: 'Storage Tank ST-301',
+      type: 'image' as const,
+      url: storageTankImg,
       size: '1.0 MB',
-      category: 'Hydroelectric Dam',
-      asset: 'Main Dam #01 (River Valley)',
-      note: 'Spillway chute erosion and penstock valve pressure seal diagnostic.'
+      category: 'Storage & Pipeline',
+      asset: 'Storage Tank ST-301 (ST-301)',
+      note: 'Ultrasonic shell thickness nominal 9.2mm. Surface paint blister noticed near spiral ladder weld.'
     },
     {
-      name: 'Industrial Machine Rotor Hub',
+      name: 'High-Pressure Pipeline PL-201',
       type: 'image' as const,
-      url: windTurbine401Img,
-      size: '0.8 MB',
-      category: 'Wind Turbine / Industrial Machine',
-      asset: 'Industrial Machine #M-401 (Mechanical Hub)',
-      note: 'Structural rim crack detected on outer collar with noticeable surface oxidation.'
+      url: pipelinePlImg,
+      size: '1.0 MB',
+      category: 'Storage & Pipeline',
+      asset: 'High-Pressure Pipeline PL-201 (PL-201)',
+      note: 'Critical: Flange gasket micro-weepage detected at valve PL-201-V1. Local wall thinning (3.2mm).'
+    },
+    {
+      name: 'Pressure Vessel PV-102',
+      type: 'image' as const,
+      url: pressureVesselImg,
+      size: '1.0 MB',
+      category: 'Storage & Pipeline',
+      asset: 'Pressure Vessel PV-102 (PV-102)',
+      note: 'Statutory 6-month ASME compliance audit scheduled today. Hydrostatic & NDT probe queued.'
     }
   ];
 
@@ -714,13 +780,28 @@ export default function NewInspection() {
         <select 
           value={selectedAsset}
           onChange={(e) => setSelectedAsset(e.target.value)}
-          className="bg-slate-50 border border-slate-200 text-slate-700 font-bold text-sm rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer w-full sm:w-auto"
+          className="bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold text-sm rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer w-full sm:w-auto"
         >
-          <option value="Industrial Machine #M-401 (Mechanical Hub)">Industrial Machine #M-401 (Mechanical Hub)</option>
-          <option value="Bridge #102 (Sector 5)">Bridge #102 (Sector 5)</option>
-          <option value="Transformer T-204 (Substation North)">Transformer T-204 (Substation North)</option>
-          <option value="Pipeline P-201 (Sector 2)">Pipeline P-201 (Sector 2)</option>
-          <option value="Cell Tower #44 (Ridge Peak)">Cell Tower #44 (Ridge Peak)</option>
+          <optgroup label="🏭 INDUSTRIAL MACHINERY">
+            <option value="Industrial Motor M-401 (M-401)">Industrial Motor M-401 (M-401)</option>
+            <option value="Centrifugal Pump P-204 (P-204)">Centrifugal Pump P-204 (P-204)</option>
+            <option value="Gearbox G-118 (G-118)">Gearbox G-118 (G-118)</option>
+            <option value="Air Compressor C-305 (C-305)">Air Compressor C-305 (C-305)</option>
+          </optgroup>
+          <optgroup label="🏗️ STRUCTURAL INFRASTRUCTURE">
+            <option value="Concrete Pillar CP-021 (CP-021)">Concrete Pillar CP-021 (CP-021)</option>
+            <option value="Steel Beam SB-114 (SB-114)">Steel Beam SB-114 (SB-114)</option>
+            <option value="Structural Joint SJ-087 (SJ-087)">Structural Joint SJ-087 (SJ-087)</option>
+          </optgroup>
+          <optgroup label="🔌 ELECTRICAL">
+            <option value="Electrical Panel EP-052 (EP-052)">Electrical Panel EP-052 (EP-052)</option>
+            <option value="Transformer TR-009 (TR-009)">Transformer TR-009 (TR-009)</option>
+          </optgroup>
+          <optgroup label="🛢️ STORAGE & PIPELINE">
+            <option value="Storage Tank ST-301 (ST-301)">Storage Tank ST-301 (ST-301)</option>
+            <option value="High-Pressure Pipeline PL-201 (PL-201)">High-Pressure Pipeline PL-201 (PL-201)</option>
+            <option value="Pressure Vessel PV-102 (PV-102)">Pressure Vessel PV-102 (PV-102)</option>
+          </optgroup>
         </select>
       </div>
 
