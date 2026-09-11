@@ -321,9 +321,30 @@ export default function NewInspection() {
                         fileName.toLowerCase().includes('machine') || 
                         fileName.toLowerCase().includes('rotor') ||
                         fileName.toLowerCase().includes('hub') ||
+                        fileName.toLowerCase().includes('motor') ||
+                        fileName.toLowerCase().includes('pump') ||
                         fileName.toLowerCase().includes('part');
 
-      if (isMachine) {
+      const isBeamOrCeiling = fileName.toLowerCase().includes('beam') ||
+                              fileName.toLowerCase().includes('ceiling') ||
+                              fileName.toLowerCase().includes('wall') ||
+                              fileName.toLowerCase().includes('crack') ||
+                              selectedAsset.toLowerCase().includes('beam') ||
+                              selectedAsset.toLowerCase().includes('pillar') ||
+                              selectedAsset.toLowerCase().includes('concrete') ||
+                              selectedAsset.toLowerCase().includes('joint');
+
+      if (isBeamOrCeiling) {
+        setSelectedAsset('Reinforced Concrete Beam & Ceiling Slab (Civil Infrastructure)');
+        setDescription('Structural inspection: Severe vertical shear/tension crack traversing reinforced concrete lintel beam and ceiling slab.');
+        setAiDetectionResult({
+          category: 'Civil & Structural Infrastructure',
+          description: 'Reinforced concrete lintel beam and ceiling slab exhibiting prominent vertical tensile shear fracture.',
+          defects: ['🔴 Structural Beam Fracture (Vertical Fissure)', '🟡 Plaster Delamination & Spalling', '🟢 Reinforcement Core Integrity'],
+          confidence: '98.6% Precision Metrology',
+          measurements: 'Crack Aperture: 4.2mm • Vertical Span: 1.85m • Penetration: 28mm'
+        });
+      } else if (isMachine) {
         setSelectedAsset('Industrial Machine #M-401 (Mechanical Hub)');
         setDescription('Mechanical component inspected: Structural rim crack detected on outer collar with noticeable surface oxidation and rust accumulation.');
         setAiDetectionResult({

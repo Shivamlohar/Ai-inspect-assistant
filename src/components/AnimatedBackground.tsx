@@ -65,7 +65,7 @@ export const AnimatedBackground = memo(function AnimatedBackground() {
     document.addEventListener('mouseleave', onMouseLeave, { passive: true });
 
     // Initialize 45 liquid telemetry nodes
-    const particleCount = Math.min(48, Math.floor((width * height) / 22000));
+    const particleCount = Math.min(36, Math.floor((width * height) / 28000));
     const colors = [
       '#06b6d4', // electric cyan
       '#0ea5e9', // sky blue
@@ -190,10 +190,23 @@ export const AnimatedBackground = memo(function AnimatedBackground() {
       animFrameId = requestAnimationFrame(render);
     };
 
-    render();
+        let isMounted = true;
+    const scheduleStart = typeof window.requestIdleCallback === 'function'
+      ? window.requestIdleCallback
+      : (cb: () => void) => setTimeout(cb, 80);
+
+    const idleToken = scheduleStart(() => {
+      if (isMounted) {
+        render();
+      }
+    });
 
     return () => {
+      isMounted = false;
       cancelAnimationFrame(animFrameId);
+      if (typeof window.cancelIdleCallback === 'function' && typeof idleToken === 'number') {
+        window.cancelIdleCallback(idleToken);
+      }
       window.removeEventListener('resize', resize);
       window.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseleave', onMouseLeave);

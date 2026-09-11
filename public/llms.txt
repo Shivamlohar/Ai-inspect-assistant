@@ -1,0 +1,23 @@
+# AI Inspection Assistance
+
+> Real-Time AI Infrastructure & Machine Diagnostics. Vision-based defect detection, structural metrology, asset health telemetry, and formal engineering compliance reporting.
+
+## Overview
+AI Inspection Assistance is an industrial metrology and asset health management platform. Field engineers, NDT inspectors, and maintenance teams inspect critical infrastructure, industrial machinery, structural elements, electrical systems, and storage pipelines using computer vision AI models.
+
+## Core Navigation & Capabilities
+- [Dashboard](https://ai-inspect-assistant.onrender.com/): Executive field ops dashboard with live status cards, telemetry sparklines, and officer work vault.
+- [System Check](https://ai-inspect-assistant.onrender.com/system-check): Hardware sensor diagnostics, network air-gap integrity verification, and AI engine benchmarking.
+- [Asset Registry](https://ai-inspect-assistant.onrender.com/assets): Directory of 12 registered industrial assets across Industrial Machinery, Structural Infrastructure, Electrical, and Pipeline categories.
+- [Asset History](https://ai-inspect-assistant.onrender.com/history): Historical timeline of inspection records, temporal degradation trends, and comparative telemetry.
+- [New Inspection](https://ai-inspect-assistant.onrender.com/inspect): Vision-based visual capture, camera feed, and AI defect detection interface.
+- [Reports](https://ai-inspect-assistant.onrender.com/report): Formal engineering PDF export, ISO 9001/ASME compliance sign-offs, and corrective action workflows.
+
+## Technical Specifications
+- Architecture: Single Page Web Application (Vite, React 19, TypeScript, Tailwind CSS)
+- AI Model: Multimodal Gemini 1.5 Flash Vision API with air-gapped heuristic failover
+- Supported Asset Categories: Industrial Machinery, Structural Infrastructure, Electrical Systems, Storage & Pipeline
+- Security: Client-side local persistence, strict Content Security Policy, zero cloud telemetry tracking
+
+## Optional Documentation
+- [Full LLM Context](https://ai-inspect-assistant.onrender.com/llms-full.txt): Detailed application architecture and developer telemetry specification.

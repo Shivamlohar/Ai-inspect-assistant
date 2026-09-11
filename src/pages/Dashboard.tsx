@@ -35,25 +35,24 @@ import {
 } from '../assets/assetImages';
 
 const containerVariants: Variants = {
-  hidden: { opacity: 0 },
+  hidden: { opacity: 1 },
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.08,
-      delayChildren: 0.04,
+      staggerChildren: 0.04,
+      delayChildren: 0.02,
     },
   },
 };
 
 const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 18 },
+  hidden: { opacity: 1, y: 0 },
   visible: {
     opacity: 1,
     y: 0,
     transition: {
-      type: 'spring' as const,
-      damping: 24,
-      stiffness: 280,
+      duration: 0.2,
+      ease: 'easeOut',
     },
   },
 };

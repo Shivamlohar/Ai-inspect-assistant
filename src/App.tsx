@@ -32,7 +32,7 @@ import { getStoredTheme, applyTheme } from './utils/theme';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { getActiveOfficer, setActiveOfficer, logoutOfficer, getOfficerInspections, type OfficerProfile } from './utils/officerStore';
 
-const Dashboard = lazy(() => import('./pages/Dashboard'));
+import Dashboard from './pages/Dashboard';
 const NewInspection = lazy(() => import('./pages/NewInspection'));
 const AiAnalysis = lazy(() => import('./pages/AiAnalysis'));
 const InspectionResult = lazy(() => import('./pages/InspectionResult'));

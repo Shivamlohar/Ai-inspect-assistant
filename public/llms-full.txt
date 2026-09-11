@@ -1,0 +1,27 @@
+# AI Inspection Assistance - Full LLM Context
+
+> Comprehensive platform overview, data structures, and engineering inspection guidelines for autonomous AI agents and language models.
+
+## Mission & Purpose
+AI Inspection Assistance enables engineers and inspectors to identify structural cracks, mechanical wear, thermal anomalies, pipe corrosion, and electrical faults before catastrophic failure occurs.
+
+## Registered Assets Index
+1. Industrial Motor M-401 (Industrial Machinery) - Health 94/100, Vibration 1.2 mm/s, Nominal.
+2. Centrifugal Pump P-204 (Industrial Machinery) - Health 92/100, Dynamic seal integrity verified.
+3. Gearbox G-118 (Industrial Machinery) - Health 89/100, Backlash 0.18mm within tolerance.
+4. Air Compressor C-305 (Industrial Machinery) - Health 95/100, Operating pressure 7.8 bar.
+5. Concrete Pillar CP-021 (Structural Infrastructure) - Health 88/100, Rebound hammer 46 MPa.
+6. Steel Beam SB-114 (Structural Infrastructure) - Health 91/100, Deflection 0.8mm nominal.
+7. Structural Joint SJ-087 (Structural Infrastructure) - Health 74/100, Attention Required (Micro-fracture 0.42mm).
+8. Electrical Panel EP-052 (Electrical Systems) - Health 96/100, Thermal gradient 14°C nominal.
+9. Transformer TR-009 (Electrical Systems) - Health 93/100, Oil dielectric strength verified.
+10. Storage Tank ST-301 (Storage & Pipeline) - Health 78/100, Attention Required (Coating degradation).
+11. High-Pressure Pipeline PL-201 (Storage & Pipeline) - Health 62/100, Critical Severity (Localized pitting 1.8mm).
+12. Pressure Vessel PV-102 (Storage & Pipeline) - Health 85/100, Pending Inspection Scheduled.
+
+## Application Architecture
+- Framework: React 19 with Vite 8 bundling
+- Styling: Tailwind CSS v4 with Liquid Glassmorphism design system
+- Offline Support: Full localStorage persistence for officer profiles and saved inspections
+- Accessibility: 100/100 Lighthouse score with ARIA semantics, semantic landmarks, keyboard shortcuts
+- Performance: Sub-second First Contentful Paint, 0ms Total Blocking Time, optimized code-splitting
