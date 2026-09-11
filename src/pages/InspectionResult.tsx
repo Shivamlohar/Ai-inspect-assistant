@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   CheckCircle2, 
@@ -31,10 +31,22 @@ import {
   Plus,
   FileSpreadsheet,
   Database,
-  X
+  X,
+  Mic,
+  Volume2,
+  VolumeX,
+  Send
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { getActiveOfficer, saveOfficerInspection } from '../utils/officerStore';
+import { getActiveOfficer, saveOfficerInspection, autoSaveCurrentInspection, getAssetPastInspections } from '../utils/officerStore';
+import { 
+  SUPPORTED_LANGUAGES, 
+  type InspectionLanguage, 
+  speakInspectionVoice, 
+  stopInspectionVoice, 
+  generateInspectorAnswer,
+  startMultilingualRecognition 
+} from '../utils/multilingualSpeech';
 import { bridge102Img, windTurbine401Img } from '../assets/assetImages';
 
 export default function InspectionResult() {
@@ -462,7 +474,44 @@ export default function InspectionResult() {
     color: 'healthy' as const
   };
 
+  // Auto-save inspection audit to active officer's persistent work vault on mount
+  useEffect(() => {
+    try {
+      autoSaveCurrentInspection(inspectionData);
+    } catch (e) {
+      console.warn('Auto-save error:', e);
+    }
+  }, []);
+
+  // Past Audits for Dynamic Inspection Comparison
+  const pastAudits = getAssetPastInspections(inspectionData.assetName);
+  const [selectedPastAuditId, setSelectedPastAuditId] = useState<string>('baseline');
+
   const getComparisonData = () => {
+    // If a specific past audit is selected by the inspector
+    if (selectedPastAuditId !== 'baseline') {
+      const past = pastAudits.find(a => a.id === selectedPastAuditId);
+      if (past) {
+        const scoreDiff = currentScore - past.healthScore;
+        const diffText = scoreDiff >= 0 ? `+${scoreDiff} pts` : `${scoreDiff} pts`;
+        return {
+          pastDate: past.formattedDate,
+          pastDefect: `${past.defectsCount} defects recorded • Status: ${past.status}`,
+          pastScore: `${past.healthScore} / 100 Score`,
+          currentDate: 'Today (Live)',
+          currentDefect: `${visibleIssues.length} active defects • Status: ${currentStatus}`,
+          currentScore: `${currentScore} / 100 (${diffText})`,
+          condition: scoreDiff < 0 
+            ? 'Condition: Deteriorating (scheduled intervention advised)' 
+            : scoreDiff > 0 
+            ? 'Condition: Improving (post-maintenance gain)' 
+            : 'Condition: Stable',
+          detail: `Comparison against past audit by ${past.officerName}. Delta score: ${diffText}. Defect count delta: ${visibleIssues.length - past.defectsCount}.`,
+          failureHorizon: currentScore < 70 ? '~2.8 months' : '~5.4 months'
+        };
+      }
+    }
+
     const name = (inspectionData.assetName || '').toLowerCase();
     if (name.includes('bridge') || name.includes('pier') || name.includes('dam') || name.includes('concrete')) {
       return {
@@ -517,6 +566,100 @@ export default function InspectionResult() {
   };
 
   const compData = getComparisonData();
+
+  // Multilingual Voice AI Copilot State
+  const initialLang: InspectionLanguage = ((inspectionData as any).language as InspectionLanguage) || 'hinglish';
+  const [copilotLang, setCopilotLang] = useState<InspectionLanguage>(initialLang);
+  const [copilotInput, setCopilotInput] = useState('');
+  const [copilotAnswer, setCopilotAnswer] = useState<string>(() => {
+    if (initialLang === 'hi') {
+      return 'नमस्ते! मैं आपका एआई वॉयस कॉपायलट हूं। आप मुझसे इस एसेट की स्थिति, कमियों या मरम्मत के बारे में हिंदी में पूछ सकते हैं।';
+    } else if (initialLang === 'hinglish') {
+      return 'Hello Inspector! Main aapka AI Voice Copilot hoon. Aap mujhse is asset ke defects, health score ya repair steps ke baare me Hindi ya English me pooch sakte hain.';
+    }
+    return 'Greetings Inspector! I am your AI Voice Copilot. Feel free to ask about structural defects, safety score, or recommended remediation in English, Hindi, or Hinglish.';
+  });
+  const [isCopilotListening, setIsCopilotListening] = useState(false);
+  const [isSpeakingVoice, setIsSpeakingVoice] = useState(false);
+
+  const quickPrompts: Record<InspectionLanguage, string[]> = {
+    hi: [
+      'मुख्य समस्याएं क्या हैं?',
+      'एसेट का हेल्थ स्कोर और स्थिति कैसी है?',
+      'विफलता का समय (फेलियर) कब तक है?',
+      'तत्काल क्या कदम उठाएं?'
+    ],
+    hinglish: [
+      'Defects summary batao',
+      'Overall health score kaisa hai?',
+      'Failure risk kab tak aayega?',
+      'Immediate repair action kya chahiye?'
+    ],
+    en: [
+      'Summarize top defects',
+      'What is the asset condition & safety score?',
+      'What is the failure horizon?',
+      'Recommended maintenance steps'
+    ]
+  };
+
+  const handleAskCopilot = (questionText: string) => {
+    const answer = generateInspectorAnswer(questionText, copilotLang, {
+      assetName: inspectionData.assetName,
+      healthScore: currentScore,
+      status: currentStatus,
+      defects: allIssues.map(i => ({ name: i.name, severity: i.severity, metricText: i.metricText })),
+      failureHorizon: compData.failureHorizon,
+      diagnosticSummary
+    });
+    setCopilotAnswer(answer);
+    setIsSpeakingVoice(true);
+    speakInspectionVoice(answer, copilotLang, () => setIsSpeakingVoice(false));
+  };
+
+  const handleManualAsk = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!copilotInput.trim()) return;
+    handleAskCopilot(copilotInput);
+    setCopilotInput('');
+  };
+
+  const toggleVoiceSpeaking = () => {
+    if (isSpeakingVoice) {
+      stopInspectionVoice();
+      setIsSpeakingVoice(false);
+    } else {
+      setIsSpeakingVoice(true);
+      speakInspectionVoice(copilotAnswer, copilotLang, () => setIsSpeakingVoice(false));
+    }
+  };
+
+  const toggleCopilotMic = () => {
+    if (isCopilotListening) {
+      setIsCopilotListening(false);
+    } else {
+      setIsCopilotListening(true);
+      startMultilingualRecognition(
+        copilotLang,
+        (transcript) => {
+          setCopilotInput(transcript);
+          handleAskCopilot(transcript);
+        },
+        () => setIsCopilotListening(false),
+        (err) => {
+          console.warn('Voice recognition error:', err);
+          setIsCopilotListening(false);
+          const fallbackQ = copilotLang === 'hi' 
+            ? 'मुख्य समस्याएं क्या हैं?' 
+            : copilotLang === 'hinglish' 
+            ? 'Defects summary batao' 
+            : 'Summarize top defects';
+          setCopilotInput(fallbackQ);
+          handleAskCopilot(fallbackQ);
+        }
+      );
+    }
+  };
 
   const handleExportCmmsCsv = () => {
     const officer = getActiveOfficer();
@@ -1150,6 +1293,27 @@ export default function InspectionResult() {
               </Link>
             </div>
 
+            {/* Dynamic Past Audits Comparison Selector */}
+            {pastAudits.length > 0 && (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs font-semibold">
+                <span className="text-slate-600 dark:text-slate-300 shrink-0 flex items-center gap-1">
+                  <History className="w-3.5 h-3.5 text-primary" /> Compare Baseline:
+                </span>
+                <select
+                  value={selectedPastAuditId}
+                  onChange={e => setSelectedPastAuditId(e.target.value)}
+                  className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 outline-none text-xs font-bold w-full sm:w-auto cursor-pointer"
+                >
+                  <option value="baseline">Standard Baseline ({compData.pastDate})</option>
+                  {pastAudits.map((audit, idx) => (
+                    <option key={audit.id} value={audit.id}>
+                      Past Audit #{idx + 1}: {audit.formattedDate} — Score: {audit.healthScore}/100
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {/* Comparison Box dynamically tailored to asset category (Screenshot 4) */}
             <div className="rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 p-4 space-y-3 font-mono text-xs">
               <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between">
@@ -1204,6 +1368,135 @@ export default function InspectionResult() {
         </section>
 
       </div>
+
+      {/* =========================================================================
+          MULTILINGUAL VOICE AI COPILOT (AI आवाज़ सहायक — HINDI / HINGLISH / ENGLISH)
+      ========================================================================= */}
+      <section className="card p-6 md:p-8 bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950 text-white rounded-3xl border border-indigo-500/30 shadow-2xl relative overflow-hidden space-y-6">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-primary/10 rounded-full blur-3xl pointer-events-none"></div>
+
+        {/* Header & Language Switcher */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4 relative z-10">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-500 to-primary flex items-center justify-center text-white shadow-lg shadow-primary/30 shrink-0">
+              <Sparkles className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-xl font-black text-white">AI Voice Copilot</h3>
+                <span className="text-[10px] uppercase font-black tracking-widest bg-cyan-500/20 text-cyan-300 px-2.5 py-0.5 rounded-full border border-cyan-500/30">
+                  आवाज़ सहायक
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                Ask questions in Hindi, Hinglish, or English • Live speech recognition & voice audio synthesis
+              </p>
+            </div>
+          </div>
+
+          {/* Language Selection Pills */}
+          <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-800/90 border border-slate-700/80 text-xs font-bold">
+            {SUPPORTED_LANGUAGES.map(lang => (
+              <button
+                key={lang.code}
+                type="button"
+                onClick={() => setCopilotLang(lang.code)}
+                className={`px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 cursor-pointer ${
+                  copilotLang === lang.code
+                    ? 'bg-primary text-white shadow-md shadow-primary/30'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <span>{lang.flag}</span>
+                <span>{lang.nativeLabel}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Copilot Interactive Answer Bubble */}
+        <div className="p-4 md:p-5 rounded-2xl bg-slate-800/80 border border-indigo-500/20 space-y-3 relative z-10">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-cyan-400 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5" /> Inspector Copilot Response
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={toggleVoiceSpeaking}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                  isSpeakingVoice 
+                    ? 'bg-rose-500 text-white animate-pulse' 
+                    : 'bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 border border-indigo-500/30'
+                }`}
+              >
+                {isSpeakingVoice ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                <span>{isSpeakingVoice ? 'Stop Audio' : '🔊 Listen / आवाज़ सुनें'}</span>
+              </button>
+            </div>
+          </div>
+
+          <p className="text-sm md:text-base font-medium text-slate-100 leading-relaxed">
+            {copilotAnswer}
+          </p>
+        </div>
+
+        {/* Quick Voice Query Chips */}
+        <div className="space-y-2 relative z-10">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+            {copilotLang === 'hi' ? 'त्वरित प्रश्न:' : copilotLang === 'hinglish' ? 'Quick Voice Prompts:' : 'Suggested Inquiries:'}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {quickPrompts[copilotLang].map((prompt, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => handleAskCopilot(prompt)}
+                className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-indigo-600/40 text-slate-300 hover:text-white border border-slate-700 hover:border-indigo-500/50 transition cursor-pointer"
+              >
+                💬 "{prompt}"
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* User Input & Microphone Trigger */}
+        <form onSubmit={handleManualAsk} className="flex items-center gap-2 pt-1 relative z-10">
+          <button
+            type="button"
+            onClick={toggleCopilotMic}
+            className={`p-3 rounded-2xl transition cursor-pointer shrink-0 shadow-lg ${
+              isCopilotListening 
+                ? 'bg-rose-500 text-white animate-pulse' 
+                : 'bg-primary hover:bg-primary/90 text-white shadow-primary/30'
+            }`}
+            title={isCopilotListening ? 'Listening... Speak now' : 'Click to Speak'}
+          >
+            <Mic className="w-5 h-5" />
+          </button>
+          <input
+            type="text"
+            value={copilotInput}
+            onChange={e => setCopilotInput(e.target.value)}
+            placeholder={
+              copilotLang === 'hi' 
+                ? 'प्रश्न बोलें या टाइप करें (उदा. मुख्य कमियां क्या हैं?)...' 
+                : copilotLang === 'hinglish' 
+                ? 'Bolkar ya type karke poochein (e.g. Defects summary sunao)...' 
+                : 'Speak or type your question (e.g. What is the failure horizon?)...'
+            }
+            className="flex-1 bg-slate-800/80 border border-slate-700 focus:border-cyan-400 rounded-2xl px-4 py-3 text-xs md:text-sm text-white placeholder:text-slate-500 outline-none transition"
+          />
+          <button
+            type="submit"
+            disabled={!copilotInput.trim()}
+            className="p-3 rounded-2xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-slate-950 font-bold transition cursor-pointer shrink-0"
+            title="Send Inquiry"
+          >
+            <Send className="w-5 h-5" />
+          </button>
+        </form>
+      </section>
 
       {/* =========================================================================
           2 & 3. DEFENSIBLE INSPECTION SCORE (Screenshots 2 & 5) + RECOMMENDED ACTIONS (Screenshot 3)

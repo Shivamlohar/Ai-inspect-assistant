@@ -20,6 +20,7 @@ import { getGeminiApiKey } from '../services/aiApi';
 import { optimizeImageForInspection } from '../utils/imageOptimizer';
 import { saveSessionDraft, loadSessionDraft, clearSessionDraft, type InspectionDraft } from '../utils/sessionRecovery';
 import { JitterFilter } from '../utils/jitterFilter';
+import { SUPPORTED_LANGUAGES, type InspectionLanguage } from '../utils/multilingualSpeech';
 import { 
   bridge102Img, 
   transformer204Img, 
@@ -32,6 +33,7 @@ import {
 export default function NewInspection() {
   const navigate = useNavigate();
   const [selectedAsset, setSelectedAsset] = useState<string>('Industrial Machine #M-401 (Mechanical Hub)');
+  const [selectedLang, setSelectedLang] = useState<InspectionLanguage>('en');
   const [luminance, setLuminance] = useState<number | null>(null);
   const [tabNotice, setTabNotice] = useState<string | null>(null);
   
@@ -444,7 +446,7 @@ export default function NewInspection() {
     stopCamera();
   };
 
-  // Voice recording toggle
+  // Voice recording toggle with Multilingual Speech Recognition
   const toggleRecording = () => {
     if (!isRecording) {
       setIsRecording(true);
@@ -454,7 +456,8 @@ export default function NewInspection() {
           const recognition = new SpeechRecognition();
           recognition.continuous = false;
           recognition.interimResults = true;
-          recognition.lang = 'en-US';
+          // Set recognition language: Hindi for Hindi & Hinglish, English for English
+          recognition.lang = selectedLang === 'en' ? 'en-US' : 'hi-IN';
 
           recognition.onresult = (event: any) => {
             const transcript = event.results[0][0].transcript;
@@ -476,10 +479,16 @@ export default function NewInspection() {
         }
       }
 
-      // Fallback speech simulation
+      // Fallback speech simulation tailored to selected language
       setTimeout(() => {
         setIsRecording(false);
-        setDescription('Crack visible on the outer rim lip. Deep surface oxidation and rust present around center bore.');
+        if (selectedLang === 'hi') {
+          setDescription('आउटर रिम पर गहरा फ्रैक्चर क्रैक दिखाई दे रहा है। सेंटर बोर के चारों तरफ सतह पर भारी जंग और ऑक्सीडेशन मौजूद है।');
+        } else if (selectedLang === 'hinglish') {
+          setDescription('Outer rim collar par fracture crack visible hai. Center bore ke paas heavy surface rust aur corrosion accumulated hai.');
+        } else {
+          setDescription('Crack visible on the outer rim lip. Deep surface oxidation and rust present around center bore.');
+        }
       }, 3500);
     } else {
       setIsRecording(false);
@@ -502,6 +511,7 @@ export default function NewInspection() {
       mediaType: mediaFile?.type || 'image',
       mediaName: mediaFile?.name || 'asset_scan.jpg',
       description,
+      language: selectedLang,
       isMachine,
       securityHash: mediaFile?.securityHash || 'SHA256:7f3a9e10c4b281d5',
       geminiPending: hasGemini,
@@ -993,6 +1003,25 @@ export default function NewInspection() {
           </div>
 
           <div className="flex flex-col items-center text-center space-y-6">
+            {/* Language Selector for Voice Recognition */}
+            <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 text-xs font-bold shadow-xs">
+              {SUPPORTED_LANGUAGES.map(lang => (
+                <button
+                  key={lang.code}
+                  type="button"
+                  onClick={() => setSelectedLang(lang.code)}
+                  className={`px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 cursor-pointer ${
+                    selectedLang === lang.code
+                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                      : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'
+                  }`}
+                >
+                  <span>{lang.flag}</span>
+                  <span>{lang.nativeLabel}</span>
+                </button>
+              ))}
+            </div>
+
             <div className="flex flex-col items-center gap-3">
               <button 
                 type="button"

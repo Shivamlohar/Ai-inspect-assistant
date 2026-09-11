@@ -18,7 +18,11 @@ import {
   LogIn,
   LogOut,
   User,
-  History
+  History,
+  Phone,
+  Check,
+  ArrowLeft,
+  KeyRound
 } from 'lucide-react';
 import { getGeminiApiKey } from './services/aiApi';
 import type { ThemeMode } from './utils/theme';
@@ -252,6 +256,29 @@ function SettingsModal({
   );
 }
 
+function GoogleLogoSvg({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24">
+      <path
+        fill="#4285F4"
+        d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.03 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+      />
+    </svg>
+  );
+}
+
 function OfficerModal({
   isOpen,
   onClose,
@@ -264,6 +291,21 @@ function OfficerModal({
   onOfficerUpdated: (profile: OfficerProfile) => void;
 }) {
   const [isEditing, setIsEditing] = useState(!officer.isLoggedIn);
+  const [authMethod, setAuthMethod] = useState<'google' | 'phone' | 'badge'>('google');
+
+  // Google Login State
+  const [googleName, setGoogleName] = useState('Shivam Lohar');
+  const [googleEmail, setGoogleEmail] = useState('shivam.lohar@gmail.com');
+  const [isCustomGoogle, setIsCustomGoogle] = useState(false);
+
+  // Phone OTP Login State
+  const [phone, setPhone] = useState('9876543210');
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [generatedOtp, setGeneratedOtp] = useState('4092');
+  const [phoneError, setPhoneError] = useState('');
+
+  // Badge Login State
   const [name, setName] = useState(officer.name);
   const [badgeId, setBadgeId] = useState(officer.id);
   const [department, setDepartment] = useState(officer.department);
@@ -276,6 +318,8 @@ function OfficerModal({
       setDepartment(officer.department);
       setRole(officer.role);
       setIsEditing(!officer.isLoggedIn);
+      setOtpSent(false);
+      setPhoneError('');
     }
   }, [isOpen, officer]);
 
@@ -283,7 +327,69 @@ function OfficerModal({
 
   const savedInspections = getOfficerInspections();
 
-  const handleLogin = (e: React.FormEvent) => {
+  // Handle Google Sign-in
+  const handleGoogleSignIn = () => {
+    const cleanName = googleName.trim() || 'Shivam Lohar';
+    const initials = cleanName.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase() || 'SL';
+    const profile: OfficerProfile = {
+      id: `GOOG-${cleanName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase()}`,
+      name: cleanName,
+      email: googleEmail.trim() || 'shivam.lohar@gmail.com',
+      authProvider: 'google',
+      role: 'Certified Senior Inspector',
+      department: 'Infrastructure & Safety Engineering',
+      avatarInitials: initials,
+      isLoggedIn: true,
+      loginTime: Date.now()
+    };
+    setActiveOfficer(profile);
+    onOfficerUpdated(profile);
+    setIsEditing(false);
+    onClose();
+  };
+
+  // Handle Phone OTP Dispatch
+  const handleSendOtp = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const cleanDigits = phone.replace(/\D/g, '');
+    if (cleanDigits.length < 10) {
+      setPhoneError('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+    const newOtp = Math.floor(1000 + Math.random() * 9000).toString();
+    setGeneratedOtp(newOtp);
+    setOtpSent(true);
+    setOtpCode(newOtp); // Auto-fill for convenience
+    setPhoneError('');
+  };
+
+  // Handle Phone OTP Verification
+  const handleVerifyOtp = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (otpCode.trim() !== generatedOtp.trim()) {
+      setPhoneError('Invalid verification code. Please check the SMS code.');
+      return;
+    }
+    const cleanDigits = phone.replace(/\D/g, '');
+    const profile: OfficerProfile = {
+      id: `PH-${cleanDigits.slice(-4)}`,
+      name: `Inspector (+91 ${cleanDigits.slice(0, 5)} ${cleanDigits.slice(5)})`,
+      phone: `+91 ${cleanDigits}`,
+      authProvider: 'phone',
+      role: 'Field Mobile Inspector',
+      department: 'Mobile Telemetry Unit',
+      avatarInitials: 'IN',
+      isLoggedIn: true,
+      loginTime: Date.now()
+    };
+    setActiveOfficer(profile);
+    onOfficerUpdated(profile);
+    setIsEditing(false);
+    onClose();
+  };
+
+  // Handle Badge ID Form Submit
+  const handleBadgeLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
     const initials = name
@@ -300,6 +406,7 @@ function OfficerModal({
       role: role || 'Field Inspector',
       department: department || 'Civil & Structural Infrastructure',
       avatarInitials: initials,
+      authProvider: 'badge',
       isLoggedIn: true,
       loginTime: Date.now()
     };
@@ -316,6 +423,7 @@ function OfficerModal({
       role: 'Lead Field Inspector',
       department: 'Civil & Structural Infrastructure',
       avatarInitials: 'FI',
+      authProvider: 'badge',
       isLoggedIn: true,
       loginTime: Date.now()
     };
@@ -337,19 +445,19 @@ function OfficerModal({
         initial={{ opacity: 0, scale: 0.92, y: 15 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ type: "spring", duration: 0.35, bounce: 0.18 }}
-        className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl border border-slate-100 dark:border-slate-800 space-y-6 max-h-[90vh] overflow-y-auto"
+        className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl border border-slate-100 dark:border-slate-800 space-y-6 max-h-[90vh] overflow-y-auto"
       >
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-xl bg-primary/10 text-primary">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2.5 rounded-2xl bg-primary/10 text-primary shadow-xs">
               <ShieldCheck className="w-6 h-6" />
             </div>
             <div>
               <h3 className="text-xl font-bold text-slate-800 dark:text-white">
-                {isEditing ? 'Officer Sign In' : 'Officer Profile & Work Vault'}
+                {isEditing ? 'Inspector Authentication' : 'Inspector Profile & Vault'}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                {isEditing ? 'Sign in to save and preserve inspection audits' : 'Active verified inspection credentials'}
+                {isEditing ? 'Sign in via Google, Mobile OTP, or Service Badge' : 'Active verified credentials & persistent work audits'}
               </p>
             </div>
           </div>
@@ -363,71 +471,290 @@ function OfficerModal({
         </div>
 
         {isEditing ? (
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 uppercase tracking-wider">
-                Officer / Inspector Full Name
-              </label>
-              <input
-                type="text"
-                required
-                value={name}
-                onChange={e => setName(e.target.value)}
-                placeholder="e.g. Officer Shivam Lohar"
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm font-semibold outline-none focus:border-primary"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 uppercase tracking-wider">
-                Service Badge / ID #
-              </label>
-              <input
-                type="text"
-                required
-                value={badgeId}
-                onChange={e => setBadgeId(e.target.value)}
-                placeholder="e.g. OFF-409"
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm font-semibold outline-none focus:border-primary font-mono"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 uppercase tracking-wider">
-                Assigned Department / Sector
-              </label>
-              <select
-                value={department}
-                onChange={e => setDepartment(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm font-semibold outline-none focus:border-primary cursor-pointer"
-              >
-                <option value="Civil & Structural Infrastructure">Civil & Structural Infrastructure</option>
-                <option value="Electrical Substation & Power Grid">Electrical Substation & Power Grid</option>
-                <option value="Mechanical & Turbomachinery">Mechanical & Turbomachinery</option>
-                <option value="Telecom & Tower Facilities">Telecom & Tower Facilities</option>
-                <option value="Oil, Gas & Energy Pipelines">Oil, Gas & Energy Pipelines</option>
-              </select>
-            </div>
-
-            <div className="pt-2 space-y-2.5">
-              <button
-                type="submit"
-                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-400 text-white font-bold text-sm shadow-md shadow-primary/25 transition cursor-pointer"
-              >
-                Sign In & Unlock Work Vault
-              </button>
-
+          <div className="space-y-5">
+            {/* Auth Method Tabs */}
+            <div className="grid grid-cols-3 gap-1.5 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800 text-xs font-bold">
               <button
                 type="button"
-                onClick={handleQuickLogin409}
-                className="w-full py-2.5 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs transition cursor-pointer flex items-center justify-center gap-1.5"
+                onClick={() => { setAuthMethod('google'); setPhoneError(''); }}
+                className={`py-2 px-2.5 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                  authMethod === 'google' 
+                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs' 
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
+                }`}
               >
-                ⚡ Quick Sign In as Officer #409 (Lead Field Inspector)
+                <GoogleLogoSvg className="w-3.5 h-3.5" />
+                <span>Google</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setAuthMethod('phone'); setPhoneError(''); }}
+                className={`py-2 px-2.5 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                  authMethod === 'phone' 
+                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs' 
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
+                }`}
+              >
+                <Phone className="w-3.5 h-3.5 text-emerald-500" />
+                <span>Phone OTP</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setAuthMethod('badge'); setPhoneError(''); }}
+                className={`py-2 px-2.5 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                  authMethod === 'badge' 
+                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs' 
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
+                }`}
+              >
+                <KeyRound className="w-3.5 h-3.5 text-primary" />
+                <span>Badge ID</span>
               </button>
             </div>
-          </form>
+
+            {/* TAB 1: GOOGLE SIGN-IN */}
+            {authMethod === 'google' && (
+              <div className="space-y-4 animate-in fade-in duration-150">
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-3">
+                  <p className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                    <GoogleLogoSvg className="w-4 h-4" /> Google Identity Services
+                  </p>
+                  
+                  {!isCustomGoogle ? (
+                    <div 
+                      onClick={handleGoogleSignIn}
+                      className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-between hover:border-primary/50 hover:shadow-sm transition cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-primary to-cyan-400 text-white font-black text-xs flex items-center justify-center">
+                          SL
+                        </div>
+                        <div className="text-left">
+                          <p className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-primary transition">
+                            Shivam Lohar
+                          </p>
+                          <p className="text-[11px] text-slate-400 font-mono">shivam.lohar@gmail.com</p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] uppercase font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                        Default
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1 uppercase tracking-wider">
+                          Google Account Name
+                        </label>
+                        <input
+                          type="text"
+                          value={googleName}
+                          onChange={e => setGoogleName(e.target.value)}
+                          placeholder="e.g. Shivam Lohar"
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-xs font-semibold outline-none focus:border-primary"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1 uppercase tracking-wider">
+                          Google Email Address
+                        </label>
+                        <input
+                          type="email"
+                          value={googleEmail}
+                          onChange={e => setGoogleEmail(e.target.value)}
+                          placeholder="e.g. shivam.lohar@gmail.com"
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-xs font-semibold outline-none focus:border-primary font-mono"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsCustomGoogle(!isCustomGoogle)}
+                      className="text-[11px] text-primary hover:underline font-semibold cursor-pointer"
+                    >
+                      {isCustomGoogle ? '← Use default account' : 'Sign in with another Google account'}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleGoogleSignIn}
+                  className="w-full py-3 px-4 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-100 font-bold text-xs shadow-sm transition flex items-center justify-center gap-2.5 cursor-pointer"
+                >
+                  <GoogleLogoSvg className="w-4 h-4" />
+                  <span>Continue with Google Account</span>
+                </button>
+              </div>
+            )}
+
+            {/* TAB 2: PHONE OTP LOGIN */}
+            {authMethod === 'phone' && (
+              <div className="space-y-4 animate-in fade-in duration-150">
+                {!otpSent ? (
+                  <form onSubmit={handleSendOtp} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 uppercase tracking-wider">
+                        Mobile / Contact Number
+                      </label>
+                      <div className="flex items-center rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus-within:border-primary overflow-hidden">
+                        <span className="px-3.5 py-2.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 font-bold text-xs border-r border-slate-200 dark:border-slate-700 select-none">
+                          🇮🇳 +91
+                        </span>
+                        <input
+                          type="tel"
+                          required
+                          value={phone}
+                          onChange={e => setPhone(e.target.value)}
+                          placeholder="98765 43210"
+                          maxLength={12}
+                          className="w-full px-3.5 py-2.5 bg-transparent text-slate-800 dark:text-slate-100 text-sm font-semibold outline-none font-mono"
+                        />
+                      </div>
+                      {phoneError && (
+                        <p className="text-xs text-rose-500 font-bold mt-1.5">{phoneError}</p>
+                      )}
+                      <p className="text-[11px] text-slate-400 mt-1.5">
+                        We will send a 4-digit verification code to this number.
+                      </p>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold text-xs shadow-md shadow-emerald-500/20 transition cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <Phone className="w-4 h-4" />
+                      <span>Send 4-Digit Verification OTP</span>
+                    </button>
+                  </form>
+                ) : (
+                  <form onSubmit={handleVerifyOtp} className="space-y-4">
+                    <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex items-start gap-3">
+                      <div className="p-1.5 rounded-lg bg-emerald-500 text-white shrink-0 mt-0.5">
+                        <Check className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                          OTP Sent to +91 {phone}
+                        </p>
+                        <p className="text-[11px] text-slate-600 dark:text-slate-300 font-mono mt-0.5">
+                          Simulated SMS: Your OTP code is <strong>{generatedOtp}</strong>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 uppercase tracking-wider">
+                        Enter 4-Digit Code
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={otpCode}
+                        onChange={e => setOtpCode(e.target.value)}
+                        placeholder="4092"
+                        maxLength={4}
+                        className="w-full text-center tracking-[1em] text-lg font-black px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 outline-none focus:border-emerald-500 font-mono"
+                      />
+                      {phoneError && (
+                        <p className="text-xs text-rose-500 font-bold mt-1.5">{phoneError}</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <button
+                        type="submit"
+                        className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold text-xs shadow-md shadow-emerald-500/20 transition cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <Check className="w-4 h-4" />
+                        <span>Verify OTP & Unlock Vault</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setOtpSent(false); setPhoneError(''); }}
+                        className="w-full py-2 text-xs text-slate-400 hover:text-slate-600 transition flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <ArrowLeft className="w-3.5 h-3.5" /> Change Phone Number
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            )}
+
+            {/* TAB 3: SERVICE BADGE LOGIN */}
+            {authMethod === 'badge' && (
+              <form onSubmit={handleBadgeLogin} className="space-y-4 animate-in fade-in duration-150">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 uppercase tracking-wider">
+                    Officer Full Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    placeholder="e.g. Er. Shivam Lohar"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm font-semibold outline-none focus:border-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 uppercase tracking-wider">
+                    Service Badge / ID #
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={badgeId}
+                    onChange={e => setBadgeId(e.target.value)}
+                    placeholder="e.g. OFF-409"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm font-semibold outline-none focus:border-primary font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 uppercase tracking-wider">
+                    Assigned Department
+                  </label>
+                  <select
+                    value={department}
+                    onChange={e => setDepartment(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm font-semibold outline-none focus:border-primary cursor-pointer"
+                  >
+                    <option value="Civil & Structural Infrastructure">Civil & Structural Infrastructure</option>
+                    <option value="Electrical Substation & Power Grid">Electrical Substation & Power Grid</option>
+                    <option value="Mechanical & Turbomachinery">Mechanical & Turbomachinery</option>
+                    <option value="Telecom & Tower Facilities">Telecom & Tower Facilities</option>
+                    <option value="Oil, Gas & Energy Pipelines">Oil, Gas & Energy Pipelines</option>
+                  </select>
+                </div>
+
+                <div className="pt-1 space-y-2">
+                  <button
+                    type="submit"
+                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-400 text-white font-bold text-xs shadow-md shadow-primary/25 transition cursor-pointer"
+                  >
+                    Sign In with Badge ID
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleQuickLogin409}
+                    className="w-full py-2.5 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs transition cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    ⚡ Quick Sign In as Lead Officer #409
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
         ) : (
           <div className="space-y-4">
+            {/* Logged in Profile Card */}
             <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700 flex items-center gap-4">
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-primary to-cyan-400 text-white font-black text-lg flex items-center justify-center shadow-md shrink-0">
                 {officer.avatarInitials}
@@ -441,19 +768,56 @@ function OfficerModal({
                     ACTIVE
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5 truncate">{officer.id} • {officer.role}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5 truncate">
+                  {officer.authProvider === 'google' 
+                    ? `🔵 Google • ${officer.email}` 
+                    : officer.authProvider === 'phone' 
+                    ? `🟢 Phone • ${officer.phone}` 
+                    : `🟣 Badge • ${officer.id}`}
+                </p>
                 <p className="text-[11px] text-slate-400 mt-1 truncate">{officer.department}</p>
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-primary/5 dark:bg-primary/10 border border-primary/20 flex items-center justify-between">
-              <div>
-                <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Local Work Vault</p>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">Audits & inspection records saved</p>
+            {/* Persistent Work Vault Summary */}
+            <div className="p-4 rounded-2xl bg-primary/5 dark:bg-primary/10 border border-primary/20 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Personal Work Vault</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Inspections & audits automatically preserved</p>
+                </div>
+                <span className="text-sm font-black text-primary px-3 py-1 bg-white dark:bg-slate-800 rounded-xl shadow-xs">
+                  {savedInspections.length} Saved
+                </span>
               </div>
-              <span className="text-sm font-black text-primary px-3 py-1 bg-white dark:bg-slate-800 rounded-xl shadow-xs">
-                {savedInspections.length} Saved
-              </span>
+
+              {/* Recent Saved Audits List */}
+              {savedInspections.length > 0 && (
+                <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
+                  {savedInspections.slice(0, 4).map(audit => (
+                    <Link
+                      key={audit.id}
+                      to="/report"
+                      onClick={onClose}
+                      className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between hover:border-primary/50 transition block"
+                    >
+                      <div className="truncate mr-2">
+                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{audit.assetName}</p>
+                        <p className="text-[10px] text-slate-400 font-mono">{audit.formattedDate}</p>
+                      </div>
+                      <span className={`text-[11px] font-black px-2 py-0.5 rounded ${
+                        audit.healthScore >= 80 
+                          ? 'bg-emerald-500/10 text-emerald-600' 
+                          : audit.healthScore >= 60 
+                          ? 'bg-amber-500/10 text-amber-600' 
+                          : 'bg-rose-500/10 text-rose-600'
+                      }`}>
+                        {audit.healthScore}/100
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="pt-2 flex items-center gap-3">
@@ -461,7 +825,7 @@ function OfficerModal({
                 onClick={() => setIsEditing(true)}
                 className="flex-1 py-2.5 px-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs transition cursor-pointer"
               >
-                Switch / Edit Profile
+                Switch Account / Login
               </button>
               <button
                 onClick={handleLogout}
