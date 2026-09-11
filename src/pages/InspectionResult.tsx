@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { getActiveOfficer, saveOfficerInspection } from '../utils/officerStore';
+import { bridge102Img, windTurbine401Img } from '../assets/assetImages';
 
 export default function InspectionResult() {
   const [viewMode, setViewMode] = useState<'ORIGINAL' | 'AI_OVERLAY' | 'COMPARE'>('AI_OVERLAY');
@@ -71,7 +72,7 @@ export default function InspectionResult() {
     }
     return {
       assetName: 'Industrial Machine #M-401 (Mechanical Hub)',
-      mediaUrl: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?q=80&w=1000&auto=format&fit=crop',
+      mediaUrl: windTurbine401Img,
       mediaType: 'image',
       mediaName: 'machine_rotor_hub.png',
       securityHash: 'SHA256:7f3a9e10c4b281d5',
@@ -494,7 +495,7 @@ export default function InspectionResult() {
                   alt="AI Annotated View"
                   className="w-full h-full object-cover"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1545558014-8692077e9b5c?q=80&w=1000&auto=format&fit=crop';
+                    (e.target as HTMLImageElement).src = bridge102Img;
                   }}
                 />
                 
@@ -543,7 +544,7 @@ export default function InspectionResult() {
                     className="absolute inset-0 w-full h-full object-cover max-w-none"
                     style={{ width: '100%', height: '100%' }}
                     onError={(e) => {
-                      (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1545558014-8692077e9b5c?q=80&w=1000&auto=format&fit=crop';
+                      (e.target as HTMLImageElement).src = bridge102Img;
                     }}
                   />
                   <div className="absolute top-4 left-4 bg-slate-950/80 backdrop-blur-md text-white px-2.5 py-1 rounded-lg text-[10px] font-bold border border-slate-700">
@@ -594,7 +595,7 @@ export default function InspectionResult() {
                   alt="Original Asset" 
                   className="w-full h-full object-cover"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1545558014-8692077e9b5c?q=80&w=1000&auto=format&fit=crop';
+                    (e.target as HTMLImageElement).src = bridge102Img;
                   }}
                 />
               )}
@@ -620,7 +621,7 @@ export default function InspectionResult() {
                   alt="AI Detected Asset" 
                   className="w-full h-full object-cover"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1545558014-8692077e9b5c?q=80&w=1000&auto=format&fit=crop';
+                    (e.target as HTMLImageElement).src = bridge102Img;
                   }}
                 />
               )}

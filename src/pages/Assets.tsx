@@ -1,6 +1,13 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Building2, Search, Camera } from 'lucide-react';
+import { 
+  bridge102Img, 
+  transformer204Img, 
+  pipeline201Img, 
+  cellTower44Img, 
+  mainDam01Img 
+} from '../assets/assetImages';
 
 export default function Assets() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -16,7 +23,7 @@ export default function Assets() {
       status: 'At Risk',
       date: '10 Sep 2026',
       badge: 'badge-risk',
-      image: 'https://images.unsplash.com/photo-1545558014-8692077e9b5c?q=80&w=600&auto=format&fit=crop'
+      image: bridge102Img
     },
     {
       id: 'TRANS-204',
@@ -27,7 +34,7 @@ export default function Assets() {
       status: 'Attention',
       date: '10 Sep 2026',
       badge: 'badge-attention',
-      image: 'https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?q=80&w=600&auto=format&fit=crop'
+      image: transformer204Img
     },
     {
       id: 'PIPE-201',
@@ -38,7 +45,7 @@ export default function Assets() {
       status: 'Attention',
       date: '09 Sep 2026',
       badge: 'badge-attention',
-      image: 'https://images.unsplash.com/photo-1504917599217-d4dc5ebe6122?q=80&w=600&auto=format&fit=crop'
+      image: pipeline201Img
     },
     {
       id: 'TOWER-44',
@@ -49,7 +56,7 @@ export default function Assets() {
       status: 'Healthy',
       date: '01 Sep 2026',
       badge: 'badge-healthy',
-      image: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?q=80&w=600&auto=format&fit=crop'
+      image: cellTower44Img
     },
     {
       id: 'DAM-01',
@@ -60,7 +67,7 @@ export default function Assets() {
       status: 'Critical',
       date: '10 Sep 2026',
       badge: 'badge-critical',
-      image: 'https://images.unsplash.com/photo-1578328819058-b69f3a3b0f6b?q=80&w=600&auto=format&fit=crop'
+      image: mainDam01Img
     }
   ];
 

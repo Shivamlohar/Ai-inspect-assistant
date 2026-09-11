@@ -26,6 +26,12 @@ import {
   type SavedInspectionRecord, 
   type OfficerProfile 
 } from '../utils/officerStore';
+import { 
+  bridge102Img, 
+  transformer204Img, 
+  windTurbine401Img, 
+  cellTower44Img 
+} from '../assets/assetImages';
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -93,7 +99,7 @@ export default function Dashboard() {
     // Populate sessionStorage with the saved inspection data
     sessionStorage.setItem('currentInspection', JSON.stringify({
       assetName: record.assetName,
-      mediaUrl: record.imageThumbnail || 'https://images.unsplash.com/photo-1545464197-09d3b8417c82?q=80&w=800&auto=format&fit=crop',
+      mediaUrl: record.imageThumbnail || bridge102Img,
       mediaType: 'image',
       mediaName: `${record.assetName.toLowerCase().replace(/\s+/g, '_')}.jpg`,
       securityHash: record.securityHash,
@@ -132,7 +138,7 @@ export default function Dashboard() {
       status: 'At Risk',
       statusClass: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20',
       scoreRing: '#f97316',
-      image: 'https://images.unsplash.com/photo-1545558014-8692077e9b5c?q=80&w=300&auto=format&fit=crop'
+      image: bridge102Img
     },
     {
       name: 'Transformer T-204',
@@ -143,7 +149,7 @@ export default function Dashboard() {
       status: 'Attention',
       statusClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
       scoreRing: '#f59e0b',
-      image: 'https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?q=80&w=300&auto=format&fit=crop'
+      image: transformer204Img
     },
     {
       name: 'Rotor Hub M-401',
@@ -154,7 +160,7 @@ export default function Dashboard() {
       status: 'Healthy',
       statusClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20',
       scoreRing: '#10b981',
-      image: 'https://images.unsplash.com/photo-1466611653911-95081537e5b7?q=80&w=300&auto=format&fit=crop'
+      image: windTurbine401Img
     },
     {
       name: 'Cell Tower #44',
@@ -165,7 +171,7 @@ export default function Dashboard() {
       status: 'Healthy',
       statusClass: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20',
       scoreRing: '#06b6d4',
-      image: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?q=80&w=300&auto=format&fit=crop'
+      image: cellTower44Img
     },
   ];
 

@@ -6,11 +6,11 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
     
-    <!-- Robust Content Security Policy to prevent malware, XSS, and unauthorized external connections -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://images.unsplash.com https://*.unsplash.com; media-src 'self' blob: data:; connect-src 'self' https:; object-src 'none'; base-uri 'self';" />
+    <!-- Hardened Blue Team Zero-Trust Content Security Policy -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' blob: data:; connect-src 'self' https://generativelanguage.googleapis.com; object-src 'none'; base-uri 'self'; form-action 'self';" />
     
-    <!-- Permissions Policy to prevent camera/microphone hijacking by third parties -->
-    <meta http-equiv="Permissions-Policy" content="camera=(self), microphone=(self), geolocation=(), interest-cohort=()" />
+    <!-- Permissions Policy to restrict sensitive hardware APIs -->
+    <meta http-equiv="Permissions-Policy" content="camera=(self), microphone=(), geolocation=(), payment=(), usb=(), display-capture=()" />
 
     <!-- Title & SEO Branding -->
     <title>AI Inspection Assistance | Real-Time Infrastructure & Machine Diagnostics</title>

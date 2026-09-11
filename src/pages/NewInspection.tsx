@@ -21,6 +21,14 @@ import { getGeminiApiKey } from '../services/aiApi';
 import { optimizeImageForInspection } from '../utils/imageOptimizer';
 import { saveSessionDraft, loadSessionDraft, clearSessionDraft, type InspectionDraft } from '../utils/sessionRecovery';
 import { JitterFilter } from '../utils/jitterFilter';
+import { 
+  bridge102Img, 
+  transformer204Img, 
+  pipeline201Img, 
+  cellTower44Img, 
+  mainDam01Img, 
+  windTurbine401Img 
+} from '../assets/assetImages';
 
 export default function NewInspection() {
   const navigate = useNavigate();
@@ -79,31 +87,58 @@ export default function NewInspection() {
   // Preset sample media for quick testing
   const samplePresets = [
     {
-      name: 'Industrial Machine Rotor Hub',
-      type: 'image' as const,
-      url: 'https://images.unsplash.com/photo-1581092334812-78d10b7b13df?q=80&w=1000&auto=format&fit=crop',
-      size: '0.7 MB',
-      category: 'Industrial Machinery Component',
-      asset: 'Industrial Machine #M-401 (Mechanical Hub)',
-      note: 'Mechanical component inspected: Structural rim crack detected with surface oxidation.'
-    },
-    {
       name: 'Bridge #102 Concrete Pier',
       type: 'image' as const,
-      url: 'https://images.unsplash.com/photo-1545464197-09d3b8417c82?q=80&w=1000&auto=format&fit=crop',
-      size: '1.4 MB',
+      url: bridge102Img,
+      size: '0.9 MB',
       category: 'Civil Infrastructure (Bridge)',
       asset: 'Bridge #102 (Sector 5)',
-      note: 'Crack visible on the left side. Some corrosion is also present on load-bearing pillar.'
+      note: 'Shear crack and surface spalling observed on load-bearing concrete pier.'
     },
     {
       name: 'Transformer T-204 Casing',
       type: 'image' as const,
-      url: 'https://images.unsplash.com/photo-1613398774005-728b49911e3b?q=80&w=1000&auto=format&fit=crop',
-      size: '1.8 MB',
+      url: transformer204Img,
+      size: '1.0 MB',
       category: 'Electrical Grid Asset',
       asset: 'Transformer T-204 (Substation North)',
-      note: 'Oil leakage residue and surface spalling observed near primary cooling fins.'
+      note: 'Oil residue and thermal oxidation observed near high-voltage cooling radiator fins.'
+    },
+    {
+      name: 'Pipeline P-201 Manifold',
+      type: 'image' as const,
+      url: pipeline201Img,
+      size: '1.1 MB',
+      category: 'Oil & Gas Piping',
+      asset: 'Pipeline P-201 (Sector 2)',
+      note: 'Flange bolt corrosion and surface wear detected at high-pressure junction.'
+    },
+    {
+      name: 'Cell Tower #44 Lattice',
+      type: 'image' as const,
+      url: cellTower44Img,
+      size: '0.9 MB',
+      category: 'Telecommunications Tower',
+      asset: 'Cell Tower #44 (Ridge Peak)',
+      note: 'Galvanized steel structural lattice check and microwave dish alignment.'
+    },
+    {
+      name: 'Main Dam Spillway & Penstocks',
+      type: 'image' as const,
+      url: mainDam01Img,
+      size: '1.0 MB',
+      category: 'Hydroelectric Dam',
+      asset: 'Main Dam #01 (River Valley)',
+      note: 'Spillway chute erosion and penstock valve pressure seal diagnostic.'
+    },
+    {
+      name: 'Industrial Machine Rotor Hub',
+      type: 'image' as const,
+      url: windTurbine401Img,
+      size: '0.8 MB',
+      category: 'Wind Turbine / Industrial Machine',
+      asset: 'Industrial Machine #M-401 (Mechanical Hub)',
+      note: 'Structural rim crack detected on outer collar with noticeable surface oxidation.'
     }
   ];
 
