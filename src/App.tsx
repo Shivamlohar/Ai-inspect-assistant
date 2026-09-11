@@ -17,7 +17,8 @@ import {
   Search,
   LogIn,
   LogOut,
-  User
+  User,
+  History
 } from 'lucide-react';
 import { getGeminiApiKey } from './services/aiApi';
 import type { ThemeMode } from './utils/theme';
@@ -32,6 +33,7 @@ const InspectionResult = lazy(() => import('./pages/InspectionResult'));
 const Report = lazy(() => import('./pages/Report'));
 const Assets = lazy(() => import('./pages/Assets'));
 const SystemCheck = lazy(() => import('./pages/SystemCheck'));
+const AssetHistory = lazy(() => import('./pages/AssetHistory'));
 
 function PageLoader() {
   return (
@@ -662,6 +664,7 @@ function Sidebar({
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/system-check', icon: Activity, label: 'System Check' },
     { path: '/assets', icon: Building2, label: 'Assets' },
+    { path: '/history', icon: History, label: 'Asset History' },
     { path: '/inspect', icon: Camera, label: 'Inspections' },
     { path: '/report', icon: FileText, label: 'Reports' },
   ];
@@ -864,6 +867,7 @@ function App() {
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/system-check" element={<SystemCheck />} />
                   <Route path="/assets" element={<Assets />} />
+                  <Route path="/history" element={<AssetHistory />} />
                   <Route path="/inspect" element={<NewInspection />} />
                   <Route path="/analysis" element={<AiAnalysis />} />
                   <Route path="/result" element={<InspectionResult />} />

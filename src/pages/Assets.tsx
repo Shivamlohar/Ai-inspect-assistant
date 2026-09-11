@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, Search, Camera } from 'lucide-react';
+import { Building2, Search, Camera, History } from 'lucide-react';
 import { 
   bridge102Img, 
   transformer204Img, 
@@ -170,18 +170,24 @@ export default function Assets() {
                   <span className="font-bold text-slate-700">{asset.date}</span>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-2 pt-1">
+                <div className="grid grid-cols-3 gap-1.5 pt-1">
                   <Link 
                     to="/result" 
-                    className="btn-secondary py-2 px-3 text-xs font-bold text-center justify-center"
+                    className="btn-secondary py-2 px-1.5 text-[11px] font-bold text-center justify-center truncate"
                   >
-                    View Details
+                    Details
+                  </Link>
+                  <Link 
+                    to="/history" 
+                    className="py-2 px-1.5 text-[11px] font-bold text-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 flex items-center gap-1 transition"
+                  >
+                    <History className="w-3 h-3" /> History
                   </Link>
                   <Link 
                     to="/inspect" 
-                    className="btn-primary py-2 px-3 text-xs font-bold text-center justify-center"
+                    className="btn-primary py-2 px-1.5 text-[11px] font-bold text-center justify-center truncate"
                   >
-                    <Camera className="w-3.5 h-3.5" /> Inspect
+                    <Camera className="w-3 h-3" /> Inspect
                   </Link>
                 </div>
               </div>

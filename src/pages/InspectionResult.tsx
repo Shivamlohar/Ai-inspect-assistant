@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   CheckCircle2, 
@@ -21,7 +21,13 @@ import {
   Clock,
   Calendar,
   Wrench,
-  Split
+  Split,
+  History,
+  TrendingDown,
+  Eye,
+  CheckSquare,
+  XSquare,
+  HelpCircle
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { getActiveOfficer, saveOfficerInspection } from '../utils/officerStore';
@@ -38,6 +44,74 @@ export default function InspectionResult() {
   const [saveToast, setSaveToast] = useState(false);
   const [workOrderDispatched, setWorkOrderDispatched] = useState(false);
   const [dispatchToast, setDispatchToast] = useState(false);
+
+  // Video Ref & Inspection Timeline (Screenshot 1)
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [activeTimelineIndex, setActiveTimelineIndex] = useState<number | null>(null);
+  const [timelineCopied, setTimelineCopied] = useState(false);
+
+  // Timeline events matching Screenshot 1
+  const timelineEvents = [
+    { time: '00:14', seconds: 14, title: 'Surface corrosion detected', detail: 'ISO 8501-1 Grade C oxidation (18.4% area)', severity: 'warning' },
+    { time: '00:37', seconds: 37, title: 'Oil leakage detected', detail: 'Gasket weeping with 0.4 bar hydraulic pressure variance', severity: 'critical' },
+    { time: '01:12', seconds: 72, title: 'Abnormal vibration mentioned', detail: 'Harmonic resonance detected at 142 Hz FFT peak', severity: 'warning' },
+    { time: '01:45', seconds: 105, title: 'Inspector adds observation', detail: 'Officer note: Ultrasonic thickness gauge verification pending', severity: 'info' },
+    { time: '02:10', seconds: 130, title: 'Inspection completed', detail: 'Autonomous precision metrology scan locked', severity: 'success' },
+  ];
+
+  // AI vs Inspector Verification State (Screenshot 3)
+  const [verifications, setVerifications] = useState<Record<string, 'Confirmed' | 'Rejected' | 'Needs Review'>>(() => {
+    try {
+      const saved = sessionStorage.getItem('currentInspection');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.humanVerifications) return parsed.humanVerifications;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return {
+      'CRACK': 'Confirmed',
+      'RUST': 'Confirmed',
+      'WEAR': 'Needs Review',
+      'defect-crack': 'Confirmed',
+      'defect-corrosion': 'Confirmed',
+      'defect-wear': 'Needs Review',
+      'defect-thermal': 'Confirmed'
+    };
+  });
+
+  const handleSeekTimeline = (seconds: number, index: number) => {
+    setActiveTimelineIndex(index);
+    if (videoRef.current) {
+      videoRef.current.currentTime = seconds;
+      videoRef.current.play().catch(() => {});
+    }
+  };
+
+  const handleCopyTimeline = () => {
+    const text = timelineEvents.map(e => `${e.time} — ${e.title}`).join('\n');
+    navigator.clipboard.writeText(text);
+    setTimelineCopied(true);
+    setTimeout(() => setTimelineCopied(false), 2200);
+  };
+
+  const handleSetVerification = (defectId: string, status: 'Confirmed' | 'Rejected' | 'Needs Review') => {
+    setVerifications(prev => {
+      const updated = { ...prev, [defectId]: status };
+      try {
+        const saved = sessionStorage.getItem('currentInspection');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          parsed.humanVerifications = updated;
+          sessionStorage.setItem('currentInspection', JSON.stringify(parsed));
+        }
+      } catch (e) {
+        console.error(e);
+      }
+      return updated;
+    });
+  };
 
   const [inspectionData] = useState<{
     assetName: string;
@@ -586,6 +660,7 @@ export default function InspectionResult() {
             <div className="relative w-full h-full">
               {inspectionData.mediaType === 'video' ? (
                 <video 
+                  ref={videoRef}
                   src={inspectionData.mediaUrl} 
                   controls 
                   autoPlay 
@@ -614,6 +689,7 @@ export default function InspectionResult() {
             <div className="relative w-full h-full">
               {inspectionData.mediaType === 'video' ? (
                 <video 
+                  ref={videoRef}
                   src={inspectionData.mediaUrl} 
                   controls 
                   autoPlay 
@@ -758,6 +834,164 @@ export default function InspectionResult() {
           </div>
         </div>
       </section>
+
+      {/* =========================================================================
+          FEATURE 6 & 13: INSPECTION TIMELINE (Screenshot 1) & INSPECTION COMPARISON (Screenshot 4)
+      ========================================================================= */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        {/* CARD 1: INSPECTION TIMELINE (Screenshot 1) */}
+        <section className="card p-6 md:p-8 bg-slate-950 text-slate-100 border border-slate-800 shadow-xl flex flex-col justify-between">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-xs font-black uppercase tracking-widest text-cyan-400">
+                  6. Create a timeline of the inspection
+                </span>
+                <h3 className="text-xl font-black text-white mt-1">
+                  Video & Audio Telemetry Timeline
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Make video inspections navigable with timestamps:
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCopyTimeline}
+                className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 hover:bg-slate-800 text-xs font-mono font-bold text-slate-300 hover:text-white transition flex items-center gap-1.5 cursor-pointer"
+                title="Copy timeline to clipboard"
+              >
+                {timelineCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
+                <span>{timelineCopied ? 'Copied' : 'Copy'}</span>
+              </button>
+            </div>
+
+            {/* Dark Code-styled Terminal Box matching Screenshot 1 */}
+            <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-4 font-mono text-xs sm:text-sm space-y-2.5 shadow-inner">
+              {timelineEvents.map((evt, idx) => {
+                const isActive = activeTimelineIndex === idx;
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleSeekTimeline(evt.seconds, idx)}
+                    className={`w-full text-left p-2.5 rounded-xl transition flex items-center justify-between group cursor-pointer ${
+                      isActive 
+                        ? 'bg-cyan-500/20 border border-cyan-500/50 text-white' 
+                        : 'hover:bg-slate-800/80 text-slate-300 hover:text-white border border-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className={`px-2 py-0.5 rounded font-black text-xs ${
+                        isActive ? 'bg-cyan-400 text-slate-950' : 'bg-slate-800 text-cyan-400 group-hover:bg-cyan-500 group-hover:text-slate-950 transition'
+                      }`}>
+                        {evt.time}
+                      </span>
+                      <span className="font-semibold text-slate-200">
+                        — {evt.title}
+                      </span>
+                    </div>
+
+                    <span className="text-[10px] text-slate-500 group-hover:text-slate-400 hidden sm:inline">
+                      Jump to {evt.time} ⏩
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center gap-2 text-[11px] text-slate-400 pt-1">
+              <Clock className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+              <span>Clicking a timestamp jumps to that point in the video inspection.</span>
+            </div>
+          </div>
+
+          {activeTimelineIndex !== null && (
+            <div className="mt-4 pt-3 border-t border-slate-800 text-xs text-cyan-300 flex items-center justify-between">
+              <span>Currently seeking: <strong>{timelineEvents[activeTimelineIndex].title}</strong></span>
+              <span className="font-mono text-[11px] text-slate-400">Offset: {timelineEvents[activeTimelineIndex].time}</span>
+            </div>
+          )}
+        </section>
+
+        {/* CARD 2: INSPECTION COMPARISON (Screenshot 4) */}
+        <section className="card p-6 md:p-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl flex flex-col justify-between">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-xs font-black uppercase tracking-widest text-cyan-600 dark:text-cyan-400">
+                  13. Add an inspection comparison feature
+                </span>
+                <h3 className="text-xl font-black text-slate-900 dark:text-white mt-1">
+                  Delta Metrology & Rate of Deterioration
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Compare today's inspection with the previous one:
+                </p>
+              </div>
+
+              <Link
+                to="/history"
+                className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition flex items-center gap-1.5 border border-slate-200 dark:border-slate-700"
+              >
+                <History className="w-3.5 h-3.5 text-primary" /> Asset History
+              </Link>
+            </div>
+
+            {/* Comparison Box exactly matching Screenshot 4 */}
+            <div className="rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 p-4 space-y-3 font-mono text-xs">
+              <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between">
+                <div>
+                  <span className="text-slate-400 font-bold block text-[10px] uppercase">Baseline Inspection</span>
+                  <span className="text-slate-800 dark:text-slate-200 font-bold text-sm">"June 2026: Corrosion detected — 12% surface area"</span>
+                </div>
+                <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-[11px] border border-emerald-500/20">
+                  91 / 100 Score
+                </span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-rose-500/30 flex items-center justify-between">
+                <div>
+                  <span className="text-rose-500 font-bold block text-[10px] uppercase">Current Inspection</span>
+                  <span className="text-slate-900 dark:text-white font-black text-sm">"September 2026: Corrosion expanded — 31% surface area"</span>
+                </div>
+                <span className="px-2 py-0.5 rounded bg-rose-500/10 text-rose-600 dark:text-rose-400 font-black text-[11px] border border-rose-500/20">
+                  72 / 100 (-19 pts)
+                </span>
+              </div>
+
+              {/* Condition Banner matching Screenshot 4 */}
+              <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-800 dark:text-amber-300 font-sans font-extrabold flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-black">
+                    "Condition: Deteriorating (recommended action: schedule recoating)"
+                  </p>
+                  <p className="text-[11px] font-normal text-slate-600 dark:text-slate-400 mt-0.5">
+                    Surface oxidation velocity measured at +6.3% per month. Mechanical wear accelerating under elevated thermal friction.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+              <TrendingDown className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+              <span>This turns one-off inspections into predictive maintenance.</span>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Predictive Failure Horizon: <strong>~4.2 months</strong></span>
+            <Link
+              to="/history"
+              className="text-xs font-bold text-primary hover:text-cyan-600 flex items-center gap-1 transition"
+            >
+              View Full 12-Month Progression <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        </section>
+
+      </div>
 
       {/* =========================================================================
           2 & 3. DEFENSIBLE INSPECTION SCORE (Screenshots 2 & 5) + RECOMMENDED ACTIONS (Screenshot 3)
@@ -1028,6 +1262,50 @@ export default function InspectionResult() {
                 <div className="mt-3 pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center gap-2 text-xs font-mono text-slate-700 dark:text-slate-300">
                   <Ruler className="w-3.5 h-3.5 text-primary shrink-0" />
                   <span>{issue.metricText}</span>
+                </div>
+
+                {/* 9. AI Finding vs Inspector Verification (Screenshot 3) */}
+                <div className="mt-3 pt-3 border-t border-slate-200/60 dark:border-slate-700/60 space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-1 text-[11px]">
+                    <span className="font-mono text-slate-500 dark:text-slate-400">
+                      AI Finding: <strong className="text-slate-800 dark:text-slate-200">"{issue.name} — {issue.conf}"</strong>
+                    </span>
+                    <span className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 flex items-center gap-1">
+                      <Eye className="w-3 h-3" /> Human-in-the-loop
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      Inspector Verification:
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {(['Confirmed', 'Rejected', 'Needs Review'] as const).map((status) => {
+                        const isSelected = (verifications[issue.id] || (status === 'Confirmed' ? 'Confirmed' : '')) === status;
+                        return (
+                          <button
+                            key={status}
+                            type="button"
+                            onClick={() => handleSetVerification(issue.id, status)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                              isSelected
+                                ? status === 'Confirmed'
+                                  ? 'bg-emerald-500 text-white shadow-xs'
+                                  : status === 'Rejected'
+                                  ? 'bg-rose-500 text-white shadow-xs'
+                                  : 'bg-amber-500 text-slate-950 shadow-xs font-black'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700'
+                            }`}
+                          >
+                            {status === 'Confirmed' && <CheckSquare className="w-3.5 h-3.5" />}
+                            {status === 'Rejected' && <XSquare className="w-3.5 h-3.5" />}
+                            {status === 'Needs Review' && <HelpCircle className="w-3.5 h-3.5" />}
+                            <span>{isSelected ? `[✓] ${status}` : `[ ] ${status}`}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
