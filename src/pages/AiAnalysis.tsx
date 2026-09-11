@@ -58,19 +58,26 @@ export default function AiAnalysis() {
               geminiPending: false,
               isGemini: true,
               geminiResult,
+              isIndustrialAsset: geminiResult.isIndustrialAsset !== false,
+              detectedSubject: geminiResult.detectedSubject,
+              rejectionReason: geminiResult.rejectionReason,
               assetName: geminiResult.assetName || parsed.assetName,
               assetCategory: geminiResult.category || parsed.assetCategory,
               healthScore: geminiResult.healthScore,
               status: geminiResult.status,
               safetyFactor: geminiResult.safetyFactor,
               diagnosticSummary: geminiResult.diagnosticSummary,
-              liveDefects: geminiResult.defects,
-              liveRecommendations: geminiResult.recommendations,
+              liveDefects: geminiResult.defects || [],
+              liveRecommendations: geminiResult.recommendations || [],
               modelUsed: geminiResult.modelUsed
             };
 
             sessionStorage.setItem('currentInspection', JSON.stringify(updatedPayload));
-            setStatusMessage('Gemini Neural Metrology Analysis Complete!');
+            if (geminiResult.isIndustrialAsset === false) {
+              setStatusMessage('Non-industrial subject detected: ' + (geminiResult.detectedSubject || 'Subject not an engineering asset'));
+            } else {
+              setStatusMessage('Gemini Neural Metrology Analysis Complete!');
+            }
           }
         } catch (apiError: any) {
           console.warn('Gemini live vision call failed, falling back to offline model:', apiError);

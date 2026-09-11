@@ -89,10 +89,13 @@ export interface GeminiDefectItem {
 }
 
 export interface GeminiDiagnosticResult {
+  isIndustrialAsset?: boolean;
+  detectedSubject?: string;
+  rejectionReason?: string;
   assetName: string;
   category: string;
   healthScore: number;
-  status: 'HEALTHY' | 'ATTENTION' | 'AT RISK' | 'CRITICAL';
+  status: 'HEALTHY' | 'ATTENTION' | 'AT RISK' | 'CRITICAL' | 'NON_ASSET';
   safetyFactor: string;
   safetyBreached: boolean;
   diagnosticSummary: string;
@@ -120,13 +123,42 @@ export async function analyzeAssetWithGemini(
 
   const systemPrompt = `
 You are an ASME & ISO 9001 Senior Asset Integrity & Diagnostic Engineer.
-Carefully inspect this asset image for any physical defects (such as cracks, fractures, surface oxidation/rust, erosion, fatigue wear, deformation, spalling, or tolerance breaches).
+
+CRITICAL FIRST STEP - DOMAIN VALIDATION:
+Evaluate if this image represents a genuine industrial machine, civil structure, electrical power equipment, pipeline, or engineering component.
+IF THE IMAGE IS NOT AN INDUSTRIAL ASSET (e.g., animals, pets, hamsters, humans, portraits, food, cartoons, memes, domestic items, landscapes):
+- Set "isIndustrialAsset": false
+- Set "detectedSubject": A brief label of what is actually in the image (e.g. "Domestic hamsters at computer monitors")
+- Set "rejectionReason": "Non-industrial subject detected. Optical flaw metrology requires physical machinery or structural infrastructure."
+- Set "assetName": "Non-Industrial Image"
+- Set "category": "Non-Engineering Content"
+- Set "healthScore": 0
+- Set "status": "NON_ASSET"
+- Set "safetyFactor": "N/A"
+- Set "safetyBreached": false
+- Set "diagnosticSummary": "Non-industrial subject detected. Defect detection algorithms are deactivated."
+- Set "defects": [] (MUST BE COMPLETELY EMPTY ARRAY. DO NOT GENERATE DEFECTS ON ANIMALS, PETS, OR PEOPLE)
+- Set "recommendations": [
+    {
+      "icon": "⚠️",
+      "title": "Upload Valid Engineering Asset",
+      "sub": "Please take or upload a photo of machinery, bridges, power equipment, or pipelines."
+    }
+  ]
+
+IF AND ONLY IF THE IMAGE IS A REAL INDUSTRIAL ASSET:
+- Set "isIndustrialAsset": true
+- Set "detectedSubject": Asset description
+- Carefully inspect for physical defects (cracks, fractures, oxidation, wear, spalling, leaks).
 
 User inspector notes: "${userNotes || 'Routine visual asset diagnostic'}"
 
 You must respond ONLY with a valid, raw JSON object (no markdown formatting, no \`\`\`json code fences, no extra text).
 JSON schema to strictly follow:
 {
+  "isIndustrialAsset": true,
+  "detectedSubject": "Brief subject label",
+  "rejectionReason": "",
   "assetName": "Brief name identifying the asset, e.g. Industrial Machine Rotor Hub or Bridge Pier #102",
   "category": "Asset category, e.g. Industrial Machinery, Civil Infrastructure, Electrical Power Equipment",
   "healthScore": 58,

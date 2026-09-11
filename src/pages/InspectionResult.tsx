@@ -204,6 +204,9 @@ export default function InspectionResult() {
     safetyFactor?: string;
     status?: string;
     diagnosticSummary?: string;
+    isIndustrialAsset?: boolean;
+    detectedSubject?: string;
+    rejectionReason?: string;
   }>(() => {
     const saved = sessionStorage.getItem('currentInspection');
     if (saved) {
@@ -236,10 +239,21 @@ export default function InspectionResult() {
   const isGemini = Boolean(inspectionData.isGemini && inspectionData.geminiResult);
   const geminiData = inspectionData.geminiResult;
 
+  // Domain Relevance & False Positive Prevention
+  const isNonAsset = (inspectionData as any).isIndustrialAsset === false || 
+                     (geminiData && geminiData.isIndustrialAsset === false) ||
+                     (inspectionData as any).status === 'NON_ASSET' ||
+                     (geminiData && geminiData.status === 'NON_ASSET') ||
+                     (inspectionData as any).assetName?.toLowerCase().includes('non-industrial') ||
+                     (inspectionData as any).assetCategory?.toLowerCase().includes('non-industrial');
+
+  const nonAssetSubject = (inspectionData as any).detectedSubject || (geminiData && geminiData.detectedSubject) || 'Non-Industrial Subject';
+  const nonAssetReason = (inspectionData as any).rejectionReason || (geminiData && geminiData.rejectionReason) || 'The uploaded image does not appear to be an industrial machine, civil infrastructure, power asset, or structural component. Defect metrology has been safely suppressed.';
+
   // Defensible Score: 72 / 100 as per engineering compliance benchmark & Screenshots 2 & 5
-  const currentScore = isGemini ? (geminiData.healthScore ?? 72) : 72;
-  const currentSafetyFactor = isGemini ? (geminiData.safetyFactor ?? '1.15') : (isMachine ? '1.15' : '1.28');
-  const currentStatus = isGemini ? (geminiData.status ?? 'At Risk') : 'At Risk';
+  const currentScore = isNonAsset ? 0 : (isGemini ? (geminiData.healthScore ?? 72) : 72);
+  const currentSafetyFactor = isNonAsset ? 'N/A' : (isGemini ? (geminiData.safetyFactor ?? '1.15') : (isMachine ? '1.15' : '1.28'));
+  const currentStatus = isNonAsset ? 'Out of Scope (Non-Asset)' : (isGemini ? (geminiData.status ?? 'At Risk') : 'At Risk');
 
   // Mathematically defensible inspection score breakdown (Screenshots 2 & 5)
   const scoreBreakdown = [
@@ -428,7 +442,7 @@ export default function InspectionResult() {
     },
   ];
 
-  const baseIssues = (isGemini && Array.isArray(geminiData.defects) && geminiData.defects.length > 0)
+  const baseIssues = isNonAsset ? [] : ((isGemini && Array.isArray(geminiData.defects) && geminiData.defects.length > 0)
     ? geminiData.defects.map((d: any, idx: number) => ({
         id: d.id || `DEFECT_${idx}`,
         name: d.name || 'Structural Defect',
@@ -441,38 +455,38 @@ export default function InspectionResult() {
         metricText: d.metricText || 'Geometric variance detected',
         measurements: d.measurements || {}
       }))
-    : (isMachine ? defaultMachineIssues : defaultInfraIssues);
+    : (isMachine ? defaultMachineIssues : defaultInfraIssues));
 
-  const allIssues = [...baseIssues, ...customFindings];
+  const allIssues = isNonAsset ? [] : [...baseIssues, ...customFindings];
 
   const visibleIssues = allIssues.filter((issue: any) => issue.confidenceVal >= confidenceThreshold || issue.isHumanAdded);
 
-  const primaryDefect = allIssues[0] || {
+  const primaryDefect = isNonAsset ? null : (allIssues[0] || {
     name: isMachine ? 'RIM CRACK / FRACTURE' : 'STRUCTURAL PIER CRACK',
     conf: '96% Conf',
     metricText: '14.2 mm • 96% Conf',
     severity: 'High Severity',
     icon: '🔴',
     color: 'critical' as const
-  };
+  });
 
-  const secondaryDefect = allIssues[1] || {
+  const secondaryDefect = isNonAsset ? null : (allIssues[1] || {
     name: isMachine ? 'SURFACE OXIDATION & RUST' : 'CONCRETE SPALLING',
     conf: '89% Conf',
     metricText: '18.4% Area • Pitting 0.65mm',
     severity: 'Medium Severity',
     icon: '🟡',
     color: 'attention' as const
-  };
+  });
 
-  const tertiaryDefect = allIssues[2] || {
+  const tertiaryDefect = isNonAsset ? null : (allIssues[2] || {
     name: isMachine ? 'CENTER BORE SPLINE WEAR' : 'REBAR CORROSION EXPOSURE',
     conf: '84% Conf',
     metricText: '+0.045 mm Clearance',
     severity: 'Low Severity',
     icon: '🟢',
     color: 'healthy' as const
-  };
+  });
 
   // Auto-save inspection audit to active officer's persistent work vault on mount
   useEffect(() => {
@@ -488,6 +502,20 @@ export default function InspectionResult() {
   const [selectedPastAuditId, setSelectedPastAuditId] = useState<string>('baseline');
 
   const getComparisonData = () => {
+    if (isNonAsset) {
+      return {
+        pastDate: 'N/A',
+        pastDefect: 'No historical engineering baseline',
+        pastScore: 'N/A',
+        currentDate: 'Today (Live)',
+        currentDefect: `Out of Scope: ${nonAssetSubject}`,
+        currentScore: 'N/A (Defects Suppressed)',
+        condition: 'Domain Validation: Non-Industrial Image Suppressed',
+        detail: 'AI prevented false-positive defect hallucination. Comparison against industrial baselines is disabled for non-engineering assets.',
+        failureHorizon: 'N/A'
+      };
+    }
+
     // If a specific past audit is selected by the inspector
     if (selectedPastAuditId !== 'baseline') {
       const past = pastAudits.find(a => a.id === selectedPastAuditId);
@@ -572,6 +600,14 @@ export default function InspectionResult() {
   const [copilotLang, setCopilotLang] = useState<InspectionLanguage>(initialLang);
   const [copilotInput, setCopilotInput] = useState('');
   const [copilotAnswer, setCopilotAnswer] = useState<string>(() => {
+    if (isNonAsset) {
+      if (initialLang === 'hi') {
+        return `नमस्ते! आपकी अपलोड की गई छवि किसी औद्योगिक मशीन या सिविल ढांचे (ब्रिज/पाइपलाइन) की नहीं है (${nonAssetSubject})। इसलिए गलत रिपोर्ट से बचने के लिए क्रैक और जंग के डिफेक्ट पिन बंद कर दिए गए हैं। कृपया कोई औद्योगिक छवि अपलोड करें।`;
+      } else if (initialLang === 'hinglish') {
+        return `Hello Inspector! Aapki uploaded photo ek non-industrial subject hai (${nonAssetSubject}) aur kisi machine ya civil structure ki nahi lagti. False positive se bachne ke liye AI defect metrology suppress kar di gayi hai.`;
+      }
+      return `Hello Inspector! The uploaded image is identified as an out-of-scope non-industrial subject (${nonAssetSubject}). Defect metrology and risk pins have been suppressed to prevent false positives.`;
+    }
     if (initialLang === 'hi') {
       return 'नमस्ते! मैं आपका एआई वॉयस कॉपायलट हूं। आप मुझसे इस एसेट की स्थिति, कमियों या मरम्मत के बारे में हिंदी में पूछ सकते हैं।';
     } else if (initialLang === 'hinglish') {
@@ -723,11 +759,13 @@ export default function InspectionResult() {
     setTimeout(() => setCmmsToast(null), 3500);
   };
 
-  const diagnosticSummary = isGemini && geminiData.diagnosticSummary
-    ? geminiData.diagnosticSummary
-    : (isMachine 
-        ? "Industrial mechanical hub inspected. High-severity structural fracture (14.2mm) detected along the outer circular rim lip with extensive surface oxidation (18.4% surface area). Defect propagation risk is high under centrifugal rotational stress. Immediate component isolation and ultrasonic thickness verification mandated."
-        : "Crack and surface deterioration were detected across load-bearing pillars. The asset shows accelerating fatigue compared with previous quarterly inspections. Urgent engineering remediation recommended.");
+  const diagnosticSummary = isNonAsset
+    ? (nonAssetReason || `Non-industrial subject detected (${nonAssetSubject}). Defect metrology, crack propagation, and corrosion algorithms have been safely withheld to prevent false alarms. Please provide an industrial asset capture.`)
+    : (isGemini && geminiData.diagnosticSummary
+        ? geminiData.diagnosticSummary
+        : (isMachine 
+            ? "Industrial mechanical hub inspected. High-severity structural fracture (14.2mm) detected along the outer circular rim lip with extensive surface oxidation (18.4% surface area). Defect propagation risk is high under centrifugal rotational stress. Immediate component isolation and ultrasonic thickness verification mandated."
+            : "Crack and surface deterioration were detected across load-bearing pillars. The asset shows accelerating fatigue compared with previous quarterly inspections. Urgent engineering remediation recommended."));
 
   const handleCopySummary = () => {
     const summaryText = `AI INSPECTION ASSISTANCE DIAGNOSTIC REPORT\nAsset: ${inspectionData.assetName}\nModel: ${isGemini ? 'Google Gemini 1.5 Flash Vision' : 'Built-in Precision Metrology Engine'}\nOverall Defensible Health Score: 72 / 100\nSafety Factor: ${currentSafetyFactor} SF\nStatus: ${currentStatus}\nPrimary Defect: ${allIssues[0]?.name} (${allIssues[0]?.conf}) - ${allIssues[0]?.metricText}\nRecommended Action: 1. Isolate affected component | 2. Ultrasonic thickness measurement | 3. Remove surface corrosion | 4. Reinspect after treatment (Priority: HIGH, Timeframe: Within 7 days)`;
@@ -931,7 +969,7 @@ export default function InspectionResult() {
                 />
                 
                 {/* Defect Callout 1: Primary Dynamic Defect */}
-                {(activeLayer === 'ALL' || activeLayer === 'CRACK') && (
+                {!isNonAsset && (activeLayer === 'ALL' || activeLayer === 'CRACK') && primaryDefect && (
                   <div className="absolute top-[18%] left-[22%] z-20 pointer-events-none animate-in fade-in zoom-in-95">
                     <div className={`bg-slate-950/95 border-2 ${primaryDefect.color === 'critical' ? 'border-rose-500' : 'border-amber-500'} text-white rounded-xl p-2.5 shadow-2xl backdrop-blur-md flex flex-col items-center`}>
                       <div className={`flex items-center gap-1.5 font-black ${primaryDefect.color === 'critical' ? 'text-rose-400' : 'text-amber-400'} text-xs tracking-wider`}>
@@ -947,7 +985,7 @@ export default function InspectionResult() {
                 )}
 
                 {/* Defect Callout 2: Secondary Dynamic Defect */}
-                {(activeLayer === 'ALL' || activeLayer === 'RUST') && (
+                {!isNonAsset && (activeLayer === 'ALL' || activeLayer === 'RUST') && secondaryDefect && (
                   <div className="absolute top-[50%] left-[54%] z-20 pointer-events-none">
                     <div className={`bg-slate-950/95 border-2 ${secondaryDefect.color === 'critical' ? 'border-rose-500' : 'border-amber-500'} text-white rounded-xl p-2.5 shadow-2xl backdrop-blur-md flex flex-col items-center`}>
                       <div className={`flex items-center gap-1.5 font-black ${secondaryDefect.color === 'critical' ? 'text-rose-400' : 'text-amber-400'} text-xs tracking-wider`}>
@@ -1066,7 +1104,7 @@ export default function InspectionResult() {
               )}
 
               {/* HERO CALLOUT ELEMENT 1: Primary Dynamic Defect */}
-              {(activeLayer === 'ALL' || activeLayer === 'CRACK') && (
+              {!isNonAsset && (activeLayer === 'ALL' || activeLayer === 'CRACK') && primaryDefect && (
                 <div className="absolute top-[18%] left-[24%] z-20 pointer-events-auto group">
                   <div className={`bg-slate-950/95 border-2 ${primaryDefect.color === 'critical' ? 'border-rose-500' : 'border-amber-500'} text-white rounded-2xl p-3 shadow-2xl backdrop-blur-md flex flex-col items-center transition-transform hover:scale-105`}>
                     <div className={`flex items-center gap-1.5 font-black ${primaryDefect.color === 'critical' ? 'text-rose-400' : 'text-amber-400'} text-xs tracking-wider uppercase`}>
@@ -1084,7 +1122,7 @@ export default function InspectionResult() {
               )}
 
               {/* HERO CALLOUT ELEMENT 2: Secondary Dynamic Defect */}
-              {(activeLayer === 'ALL' || activeLayer === 'RUST') && (
+              {!isNonAsset && (activeLayer === 'ALL' || activeLayer === 'RUST') && secondaryDefect && (
                 <div className="absolute top-[50%] left-[54%] z-20 pointer-events-auto group">
                   <div className={`bg-slate-950/95 border-2 ${secondaryDefect.color === 'critical' ? 'border-rose-500' : 'border-amber-500'} text-white rounded-2xl p-3 shadow-2xl backdrop-blur-md flex flex-col items-center transition-transform hover:scale-105`}>
                     <div className={`flex items-center gap-1.5 font-black ${secondaryDefect.color === 'critical' ? 'text-rose-400' : 'text-amber-400'} text-xs tracking-wider uppercase`}>
@@ -1102,7 +1140,7 @@ export default function InspectionResult() {
               )}
 
               {/* HERO CALLOUT ELEMENT 3: Tertiary Dynamic Defect */}
-              {(activeLayer === 'ALL' || activeLayer === 'WEAR') && (
+              {!isNonAsset && (activeLayer === 'ALL' || activeLayer === 'WEAR') && tertiaryDefect && (
                 <div className="absolute top-[32%] right-[16%] z-20 pointer-events-auto">
                   <div className="bg-slate-950/95 border border-cyan-400 rounded-xl px-3 py-1.5 shadow-xl backdrop-blur-md text-cyan-300 font-mono text-xs flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
@@ -1110,6 +1148,58 @@ export default function InspectionResult() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Centered Non-Industrial Domain Warning Overlay inside Viewport */}
+          {isNonAsset && (
+            <div className="absolute inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-20 pointer-events-auto">
+              <div className="max-w-md w-full bg-slate-900/95 border-2 border-amber-500/60 rounded-2xl p-5 sm:p-6 text-center shadow-2xl space-y-3 animate-in zoom-in-95">
+                <div className="w-12 h-12 mx-auto rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 text-2xl">
+                  ⚠️
+                </div>
+                <div>
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-black uppercase tracking-wider mb-2">
+                    Domain Out-of-Scope • गैर-औद्योगिक छवि
+                  </div>
+                  <h3 className="text-lg font-black text-white">
+                    Non-Industrial Image Detected
+                  </h3>
+                  <p className="text-xs text-slate-300 mt-1 font-medium leading-relaxed">
+                    {nonAssetReason}
+                  </p>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-[11px] text-slate-400 text-left space-y-1">
+                  <div className="flex items-center justify-between text-slate-300 font-bold">
+                    <span>Detected Subject:</span>
+                    <span className="text-amber-400 font-mono font-black">{nonAssetSubject}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-400">
+                    <span>AI Metrology Pins:</span>
+                    <span className="text-emerald-400 font-bold">Suppressed (0 False Positives)</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
+                  <Link
+                    to="/new-inspection"
+                    className="w-full py-2.5 px-3 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-bold transition shadow-lg shadow-primary/20 text-center"
+                  >
+                    📷 Upload Industrial Asset
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sessionStorage.removeItem('currentInspection');
+                      window.location.reload();
+                    }}
+                    className="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition border border-slate-700 text-center cursor-pointer"
+                  >
+                    ⚙️ Try Sample Machine
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -1177,15 +1267,23 @@ export default function InspectionResult() {
           </div>
 
           <div className="flex items-center gap-4 text-[11px] text-slate-400">
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-rose-500"></span> 1 Critical Fracture (96%)
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-amber-400"></span> 1 Corrosion Region (89%)
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-emerald-400"></span> Safety Factor: <strong>{currentSafetyFactor} SF</strong>
-            </span>
+            {isNonAsset ? (
+              <span className="flex items-center gap-1.5 text-amber-400 font-bold">
+                <span>⚠️</span> Metrology Suppressed: Non-Engineering Subject ({nonAssetSubject})
+              </span>
+            ) : (
+              <>
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-rose-500"></span> 1 Critical Fracture (96%)
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-amber-400"></span> 1 Corrosion Region (89%)
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400"></span> Safety Factor: <strong>{currentSafetyFactor} SF</strong>
+                </span>
+              </>
+            )}
           </div>
         </div>
       </section>
@@ -1526,78 +1624,119 @@ export default function InspectionResult() {
             </div>
 
             {/* Prominent Score + Progress Bar matching Screenshot 2 */}
-            <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 space-y-3">
-              <div className="flex items-baseline justify-between">
-                <div>
-                  <span className="text-xs font-black uppercase tracking-wider text-slate-400">Asset Health</span>
-                  <div className="text-4xl sm:text-5xl font-black text-slate-900 dark:text-white tracking-tight">
-                    72 <span className="text-2xl font-bold text-slate-400">/ 100</span>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25">
-                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-                    At Risk / Attention
-                  </span>
-                  <p className="text-[11px] text-slate-400 font-mono mt-1">Safety Factor: {currentSafetyFactor} SF</p>
-                </div>
-              </div>
-
-              {/* Visual High-Contrast Horizontal Meter matching Screenshot 2 */}
-              <div className="w-full h-5 rounded-xl bg-slate-200 dark:bg-slate-700 overflow-hidden relative shadow-inner p-0.5">
-                <div 
-                  className="h-full rounded-lg bg-gradient-to-r from-emerald-500 via-amber-500 to-orange-500 transition-all duration-1000"
-                  style={{ width: '72%' }}
-                ></div>
-              </div>
-            </div>
-
-            {/* Defensible Calculation Table matching Screenshot 5 */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
-                <p className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                  Show how it was calculated:
-                </p>
-                <span className="text-[11px] font-mono text-cyan-600 dark:text-cyan-400 font-bold">
-                  Overall Health Score
-                </span>
-              </div>
-
-              <div className="space-y-2.5 text-xs font-mono">
-                {scoreBreakdown.map((item, idx) => (
-                  <div key={idx} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/80 space-y-1.5">
-                    <div className="flex items-center justify-between text-slate-800 dark:text-slate-200 font-bold">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }}></span>
-                        <span>{item.name}</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-slate-400">{item.weight}% weight</span>
-                        <span className="mx-1.5 text-slate-400">→</span>
-                        <strong className="text-slate-900 dark:text-white font-black">{item.score}</strong>
-                        <span className="text-[10px] text-slate-400 ml-1.5">({item.contribution.toFixed(1)} pts)</span>
+            {isNonAsset ? (
+              <div className="space-y-4">
+                <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/25 space-y-3">
+                  <div className="flex items-baseline justify-between">
+                    <div>
+                      <span className="text-xs font-black uppercase tracking-wider text-amber-500">Asset Health</span>
+                      <div className="text-4xl sm:text-5xl font-black text-slate-900 dark:text-white tracking-tight">
+                        N/A <span className="text-sm font-bold text-slate-400">/ Out of Domain</span>
                       </div>
                     </div>
-
-                    <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full rounded-full transition-all duration-700" 
-                        style={{ width: `${item.score}%`, backgroundColor: item.color }}
-                      ></div>
+                    <div className="text-right">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                        Non-Industrial Image
+                      </span>
+                      <p className="text-[11px] text-slate-400 font-mono mt-1">Safety Factor: N/A</p>
                     </div>
                   </div>
-                ))}
-              </div>
 
-              {/* Calculation Summary Footer */}
-              <div className="pt-3 border-t-2 border-slate-800 dark:border-slate-700 flex items-center justify-between text-sm font-black">
-                <span className="text-slate-800 dark:text-white">Overall Health Score</span>
-                <div className="text-right">
-                  <span className="text-lg text-primary font-black">72 / 100</span>
-                  <p className="text-[10px] font-normal text-slate-400 font-mono">Weighted Total: {weightedSum.toFixed(1)} - 2.3 (Fatigue factor) = 72</p>
+                  <div className="w-full h-3 rounded-xl bg-slate-200 dark:bg-slate-700 overflow-hidden relative p-0.5">
+                    <div className="h-full rounded-lg bg-amber-400/40 w-full"></div>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 space-y-2 text-xs text-slate-600 dark:text-slate-300">
+                  <p className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                    Engineering Metrology Guard Active
+                  </p>
+                  <p className="leading-relaxed text-slate-500 dark:text-slate-400">
+                    ISO 55000 and ASME defensible scoring requires civil infrastructure or machinery assets (e.g. rotating turbines, bridge piers, pressure vessels). Defect scoring has been withheld to prevent false alarms on non-industrial subjects.
+                  </p>
+                  <div className="pt-2 flex flex-col gap-1 text-[11px] font-mono text-slate-400">
+                    <div>• Detected Subject: <span className="text-amber-500 font-bold">{nonAssetSubject}</span></div>
+                    <div>• False-Positive Defect Suppression: <span className="text-emerald-500 font-bold">100% Active</span></div>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <>
+                <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 space-y-3">
+                  <div className="flex items-baseline justify-between">
+                    <div>
+                      <span className="text-xs font-black uppercase tracking-wider text-slate-400">Asset Health</span>
+                      <div className="text-4xl sm:text-5xl font-black text-slate-900 dark:text-white tracking-tight">
+                        72 <span className="text-2xl font-bold text-slate-400">/ 100</span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25">
+                        <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                        At Risk / Attention
+                      </span>
+                      <p className="text-[11px] text-slate-400 font-mono mt-1">Safety Factor: {currentSafetyFactor} SF</p>
+                    </div>
+                  </div>
+
+                  {/* Visual High-Contrast Horizontal Meter matching Screenshot 2 */}
+                  <div className="w-full h-5 rounded-xl bg-slate-200 dark:bg-slate-700 overflow-hidden relative shadow-inner p-0.5">
+                    <div 
+                      className="h-full rounded-lg bg-gradient-to-r from-emerald-500 via-amber-500 to-orange-500 transition-all duration-1000"
+                      style={{ width: '72%' }}
+                    ></div>
+                  </div>
+                </div>
+
+                {/* Defensible Calculation Table matching Screenshot 5 */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+                    <p className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                      Show how it was calculated:
+                    </p>
+                    <span className="text-[11px] font-mono text-cyan-600 dark:text-cyan-400 font-bold">
+                      Overall Health Score
+                    </span>
+                  </div>
+
+                  <div className="space-y-2.5 text-xs font-mono">
+                    {scoreBreakdown.map((item, idx) => (
+                      <div key={idx} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/80 space-y-1.5">
+                        <div className="flex items-center justify-between text-slate-800 dark:text-slate-200 font-bold">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }}></span>
+                            <span>{item.name}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-slate-400">{item.weight}% weight</span>
+                            <span className="mx-1.5 text-slate-400">→</span>
+                            <strong className="text-slate-900 dark:text-white font-black">{item.score}</strong>
+                            <span className="text-[10px] text-slate-400 ml-1.5">({item.contribution.toFixed(1)} pts)</span>
+                          </div>
+                        </div>
+
+                        <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full rounded-full transition-all duration-700" 
+                            style={{ width: `${item.score}%`, backgroundColor: item.color }}
+                          ></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Calculation Summary Footer */}
+                  <div className="pt-3 border-t-2 border-slate-800 dark:border-slate-700 flex items-center justify-between text-sm font-black">
+                    <span className="text-slate-800 dark:text-white">Overall Health Score</span>
+                    <div className="text-right">
+                      <span className="text-lg text-primary font-black">72 / 100</span>
+                      <p className="text-[10px] font-normal text-slate-400 font-mono">Weighted Total: {weightedSum.toFixed(1)} - 2.3 (Fatigue factor) = 72</p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
 
           </div>
 
@@ -1632,76 +1771,119 @@ export default function InspectionResult() {
             </div>
 
             {/* Key Execution Metrics Row matching Screenshot 3 */}
-            <div className="grid grid-cols-3 gap-2.5 p-3 rounded-2xl bg-slate-800/80 border border-slate-700/80 text-center">
-              <div className="p-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Priority</span>
-                <span className="inline-flex items-center gap-1 text-xs font-black text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-md border border-rose-500/20">
-                  🔴 HIGH
-                </span>
-              </div>
+            {isNonAsset ? (
+              <div className="space-y-4">
+                <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700 text-xs text-slate-300 space-y-2">
+                  <div className="flex items-center gap-2 text-amber-400 font-bold">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    <span>Remediation Protocols Not Applicable</span>
+                  </div>
+                  <p className="text-slate-400 leading-relaxed">
+                    Engineering remediation steps, Lockout/Tagout (LOTO) protocols, and CMMS work orders are reserved exclusively for structural and mechanical engineering assets.
+                  </p>
+                </div>
 
-              <div className="p-2 border-x border-slate-700">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5 flex items-center justify-center gap-1">
-                  <Clock className="w-3 h-3 text-cyan-400" /> Est. Work
-                </span>
-                <span className="text-xs font-black text-white">
-                  2–4 hours
-                </span>
-              </div>
-
-              <div className="p-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5 flex items-center justify-center gap-1">
-                  <Calendar className="w-3 h-3 text-amber-400" /> Timeframe
-                </span>
-                <span className="text-xs font-black text-amber-400">
-                  Within 7 days
-                </span>
-              </div>
-            </div>
-
-            {/* 5-Step Action Checklist matching Screenshot 3 */}
-            <div className="space-y-3">
-              <p className="text-xs font-black text-slate-300 uppercase tracking-wider">
-                Engineering Remediation Protocol:
-              </p>
-
-              <div className="space-y-2.5">
-                {recommendedActionSteps.map((step) => (
-                  <div 
-                    key={step.step}
-                    className="p-3 rounded-xl bg-slate-800/50 border border-slate-700/60 hover:border-cyan-500/40 transition flex items-start gap-3"
-                  >
-                    <span className="w-6 h-6 rounded-lg bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 font-black text-xs flex items-center justify-center shrink-0 mt-0.5">
-                      {step.step}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <h4 className="font-bold text-white text-xs sm:text-sm">{step.title}</h4>
-                        <span className="text-[10px] font-mono text-slate-400 shrink-0">{step.timing}</span>
-                      </div>
-                      <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">{step.detail}</p>
+                <div className="space-y-2.5">
+                  <p className="text-xs font-black text-slate-300 uppercase tracking-wider">
+                    Recommended Next Steps for Inspector:
+                  </p>
+                  <div className="p-3.5 rounded-xl bg-slate-800/40 border border-slate-700/60 text-xs space-y-2.5">
+                    <div className="flex items-start gap-2.5">
+                      <span className="w-5 h-5 rounded-md bg-cyan-500/20 text-cyan-400 font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">1</span>
+                      <p className="text-slate-300">Upload a photograph or video of an authentic industrial component (turbine, pump, motor, flange, or civil pier).</p>
+                    </div>
+                    <div className="flex items-start gap-2.5">
+                      <span className="w-5 h-5 rounded-md bg-cyan-500/20 text-cyan-400 font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">2</span>
+                      <p className="text-slate-300">Ensure orthogonal camera angle and adequate illumination on key weld lines, flanges, or bearing collars.</p>
+                    </div>
+                    <div className="flex items-start gap-2.5">
+                      <span className="w-5 h-5 rounded-md bg-cyan-500/20 text-cyan-400 font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">3</span>
+                      <p className="text-slate-300">AI will automatically measure crack dimensions, surface oxidation percentage, and generate defensible ISO/ASME compliance scores.</p>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
 
-            {/* Interactive Action Dispatch Button */}
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={handleDispatchWorkOrder}
-                disabled={workOrderDispatched}
-                className={`w-full py-3.5 px-6 rounded-2xl font-extrabold text-sm flex items-center justify-center gap-2 transition-all shadow-lg cursor-pointer ${
-                  workOrderDispatched
-                    ? 'bg-emerald-600 text-white shadow-emerald-600/30'
-                    : 'bg-gradient-to-r from-rose-600 to-orange-600 hover:from-rose-500 hover:to-orange-500 text-white shadow-rose-600/30 hover:scale-[1.02]'
-                }`}
-              >
-                <Wrench className="w-4 h-4" />
-                {workOrderDispatched ? 'Work Order #WO-2026-881 Dispatched ✓' : 'Dispatch Work Order #WO-2026-881'}
-              </button>
-            </div>
+                <Link
+                  to="/new-inspection"
+                  className="w-full py-3.5 px-6 rounded-2xl font-extrabold text-sm flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/30 transition-all text-center"
+                >
+                  📷 Start New Industrial Inspection
+                </Link>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-3 gap-2.5 p-3 rounded-2xl bg-slate-800/80 border border-slate-700/80 text-center">
+                  <div className="p-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Priority</span>
+                    <span className="inline-flex items-center gap-1 text-xs font-black text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-md border border-rose-500/20">
+                      🔴 HIGH
+                    </span>
+                  </div>
+
+                  <div className="p-2 border-x border-slate-700">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5 flex items-center justify-center gap-1">
+                      <Clock className="w-3 h-3 text-cyan-400" /> Est. Work
+                    </span>
+                    <span className="text-xs font-black text-white">
+                      2–4 hours
+                    </span>
+                  </div>
+
+                  <div className="p-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5 flex items-center justify-center gap-1">
+                      <Calendar className="w-3 h-3 text-amber-400" /> Timeframe
+                    </span>
+                    <span className="text-xs font-black text-amber-400">
+                      Within 7 days
+                    </span>
+                  </div>
+                </div>
+
+                {/* 5-Step Action Checklist matching Screenshot 3 */}
+                <div className="space-y-3">
+                  <p className="text-xs font-black text-slate-300 uppercase tracking-wider">
+                    Engineering Remediation Protocol:
+                  </p>
+
+                  <div className="space-y-2.5">
+                    {recommendedActionSteps.map((step) => (
+                      <div 
+                        key={step.step}
+                        className="p-3 rounded-xl bg-slate-800/50 border border-slate-700/60 hover:border-cyan-500/40 transition flex items-start gap-3"
+                      >
+                        <span className="w-6 h-6 rounded-lg bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 font-black text-xs flex items-center justify-center shrink-0 mt-0.5">
+                          {step.step}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <h4 className="font-bold text-white text-xs sm:text-sm">{step.title}</h4>
+                            <span className="text-[10px] font-mono text-slate-400 shrink-0">{step.timing}</span>
+                          </div>
+                          <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">{step.detail}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Interactive Action Dispatch Button */}
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={handleDispatchWorkOrder}
+                    disabled={workOrderDispatched}
+                    className={`w-full py-3.5 px-6 rounded-2xl font-extrabold text-sm flex items-center justify-center gap-2 transition-all shadow-lg cursor-pointer ${
+                      workOrderDispatched
+                        ? 'bg-emerald-600 text-white shadow-emerald-600/30'
+                        : 'bg-gradient-to-r from-rose-600 to-orange-600 hover:from-rose-500 hover:to-orange-500 text-white shadow-rose-600/30 hover:scale-[1.02]'
+                    }`}
+                  >
+                    <Wrench className="w-4 h-4" />
+                    {workOrderDispatched ? 'Work Order #WO-2026-881 Dispatched ✓' : 'Dispatch Work Order #WO-2026-881'}
+                  </button>
+                </div>
+              </>
+            )}
 
           </div>
 
@@ -1732,100 +1914,122 @@ export default function InspectionResult() {
             </span>
           </div>
 
-          <div className="space-y-3">
-            {visibleIssues.map((issue: any) => (
-              <div 
-                key={issue.id} 
-                className={`p-4 rounded-2xl border transition-all ${
-                  issue.color === 'critical' 
-                    ? 'bg-rose-500/5 dark:bg-rose-950/20 border-rose-500/20' 
-                    : issue.color === 'attention' 
-                    ? 'bg-amber-500/5 dark:bg-amber-950/20 border-amber-500/20' 
-                    : 'bg-emerald-500/5 dark:bg-emerald-950/20 border-emerald-500/20'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <span className="text-2xl mt-0.5">{issue.icon}</span>
-                    <div>
-                      <h4 className="font-extrabold text-slate-900 dark:text-white text-sm">{issue.name}</h4>
-                      <p className={`text-xs font-bold ${
-                        issue.color === 'critical' ? 'text-rose-600 dark:text-rose-400' :
-                        issue.color === 'attention' ? 'text-amber-600 dark:text-amber-400' :
-                        'text-emerald-600 dark:text-emerald-400'
-                      }`}>
-                        {issue.severity} • {issue.tag}
-                      </p>
-                    </div>
-                  </div>
-
-                  <span className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-extrabold text-xs px-2.5 py-1 rounded-full shadow-xs">
-                    {issue.conf}
-                  </span>
-                </div>
-
-                <div className="mt-3 pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center gap-2 text-xs font-mono text-slate-700 dark:text-slate-300">
-                  <Ruler className="w-3.5 h-3.5 text-primary shrink-0" />
-                  <span>{issue.metricText}</span>
-                </div>
-
-                {/* 9. AI Finding vs Inspector Verification (Screenshot 3) */}
-                <div className="mt-3 pt-3 border-t border-slate-200/60 dark:border-slate-700/60 space-y-2">
-                  <div className="flex flex-wrap items-center justify-between gap-1 text-[11px]">
-                    <span className="font-mono text-slate-500 dark:text-slate-400">
-                      AI Finding: <strong className="text-slate-800 dark:text-slate-200">"{issue.name} — {issue.conf}"</strong>
-                    </span>
-                    <span className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 flex items-center gap-1">
-                      <Eye className="w-3 h-3" /> Human-in-the-loop
-                    </span>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                      Inspector Verification:
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      {(['Confirmed', 'Rejected', 'Needs Review'] as const).map((status) => {
-                        const isSelected = (verifications[issue.id] || (status === 'Confirmed' ? 'Confirmed' : '')) === status;
-                        return (
-                          <button
-                            key={status}
-                            type="button"
-                            onClick={() => handleSetVerification(issue.id, status)}
-                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                              isSelected
-                                ? status === 'Confirmed'
-                                  ? 'bg-emerald-500 text-white shadow-xs'
-                                  : status === 'Rejected'
-                                  ? 'bg-rose-500 text-white shadow-xs'
-                                  : 'bg-amber-500 text-slate-950 shadow-xs font-black'
-                                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700'
-                            }`}
-                          >
-                            {status === 'Confirmed' && <CheckSquare className="w-3.5 h-3.5" />}
-                            {status === 'Rejected' && <XSquare className="w-3.5 h-3.5" />}
-                            {status === 'Needs Review' && <HelpCircle className="w-3.5 h-3.5" />}
-                            <span>{isSelected ? `[✓] ${status}` : `[ ] ${status}`}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
+          {isNonAsset ? (
+            <div className="p-8 text-center space-y-3 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800">
+              <div className="w-12 h-12 mx-auto rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center justify-center font-black text-xl">
+                ✓
               </div>
-            ))}
-
-            {/* Inspector Manual Finding Trigger */}
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={() => setIsAddFindingOpen(true)}
-                className="w-full py-3 px-4 rounded-xl border-2 border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 text-primary text-xs font-black transition flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.01]"
-              >
-                <Plus className="w-4 h-4" /> Add Field Inspector Finding (Human Override)
-              </button>
+              <h4 className="font-extrabold text-base text-slate-900 dark:text-white">
+                Defect Metrology Withheld (0 False Alarms)
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
+                Because this image was classified as an out-of-domain non-industrial subject (<strong className="text-slate-700 dark:text-slate-300">{nonAssetSubject}</strong>), defect detection, bounding boxes, and tolerance measurements were withheld to prevent hallucinated fractures.
+              </p>
+              <div className="pt-2">
+                <Link
+                  to="/new-inspection"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold shadow-md hover:bg-primary/90 transition"
+                >
+                  📷 Upload Industrial Asset
+                </Link>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="space-y-3">
+              {visibleIssues.map((issue: any) => (
+                <div 
+                  key={issue.id} 
+                  className={`p-4 rounded-2xl border transition-all ${
+                    issue.color === 'critical' 
+                      ? 'bg-rose-500/5 dark:bg-rose-950/20 border-rose-500/20' 
+                      : issue.color === 'attention' 
+                      ? 'bg-amber-500/5 dark:bg-amber-950/20 border-amber-500/20' 
+                      : 'bg-emerald-500/5 dark:bg-emerald-950/20 border-emerald-500/20'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl mt-0.5">{issue.icon}</span>
+                      <div>
+                        <h4 className="font-extrabold text-slate-900 dark:text-white text-sm">{issue.name}</h4>
+                        <p className={`text-xs font-bold ${
+                          issue.color === 'critical' ? 'text-rose-600 dark:text-rose-400' :
+                          issue.color === 'attention' ? 'text-amber-600 dark:text-amber-400' :
+                          'text-emerald-600 dark:text-emerald-400'
+                        }`}>
+                          {issue.severity} • {issue.tag}
+                        </p>
+                      </div>
+                    </div>
+
+                    <span className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-extrabold text-xs px-2.5 py-1 rounded-full shadow-xs">
+                      {issue.conf}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center gap-2 text-xs font-mono text-slate-700 dark:text-slate-300">
+                    <Ruler className="w-3.5 h-3.5 text-primary shrink-0" />
+                    <span>{issue.metricText}</span>
+                  </div>
+
+                  {/* 9. AI Finding vs Inspector Verification (Screenshot 3) */}
+                  <div className="mt-3 pt-3 border-t border-slate-200/60 dark:border-slate-700/60 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-1 text-[11px]">
+                      <span className="font-mono text-slate-500 dark:text-slate-400">
+                        AI Finding: <strong className="text-slate-800 dark:text-slate-200">"{issue.name} — {issue.conf}"</strong>
+                      </span>
+                      <span className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 flex items-center gap-1">
+                        <Eye className="w-3 h-3" /> Human-in-the-loop
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                        Inspector Verification:
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {(['Confirmed', 'Rejected', 'Needs Review'] as const).map((status) => {
+                          const isSelected = (verifications[issue.id] || (status === 'Confirmed' ? 'Confirmed' : '')) === status;
+                          return (
+                            <button
+                              key={status}
+                              type="button"
+                              onClick={() => handleSetVerification(issue.id, status)}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                                isSelected
+                                  ? status === 'Confirmed'
+                                    ? 'bg-emerald-500 text-white shadow-xs'
+                                    : status === 'Rejected'
+                                    ? 'bg-rose-500 text-white shadow-xs'
+                                    : 'bg-amber-500 text-slate-950 shadow-xs font-black'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700'
+                              }`}
+                            >
+                              {status === 'Confirmed' && <CheckSquare className="w-3.5 h-3.5" />}
+                              {status === 'Rejected' && <XSquare className="w-3.5 h-3.5" />}
+                              {status === 'Needs Review' && <HelpCircle className="w-3.5 h-3.5" />}
+                              <span>{isSelected ? `[✓] ${status}` : `[ ] ${status}`}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {/* Inspector Manual Finding Trigger */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddFindingOpen(true)}
+                  className="w-full py-3 px-4 rounded-xl border-2 border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 text-primary text-xs font-black transition flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.01]"
+                >
+                  <Plus className="w-4 h-4" /> Add Field Inspector Finding (Human Override)
+                </button>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* AI Diagnostic Text & Safety Factor */}
@@ -1840,17 +2044,31 @@ export default function InspectionResult() {
               {diagnosticSummary}
             </p>
 
-            <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold text-rose-700 dark:text-rose-400">
-                <span className="flex items-center gap-1.5">
-                  <AlertTriangle className="w-4 h-4" /> Safety Factor Assessment:
-                </span>
-                <span className="font-mono text-sm font-black">{currentSafetyFactor} SF (Min Required: 1.50)</span>
+            {isNonAsset ? (
+              <div className="p-4 rounded-2xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-1.5">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
+                  <span className="flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-500" /> Domain Validation Assessment:
+                  </span>
+                  <span className="font-mono text-xs font-black text-amber-500 bg-amber-500/10 px-2.5 py-0.5 rounded-md border border-amber-500/20">Out of Scope</span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                  Structural load equations and yield stress safety margins (SF) only apply to civil infrastructure and mechanical equipment under mechanical or hydraulic stress.
+                </p>
               </div>
-              <p className="text-[11px] text-slate-600 dark:text-slate-400">
-                Current structural safety factor of {currentSafetyFactor} breaches the mandatory 1.50 baseline. Centrifugal hoop stresses require immediate Lockout/Tagout protocol.
-              </p>
-            </div>
+            ) : (
+              <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold text-rose-700 dark:text-rose-400">
+                  <span className="flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4" /> Safety Factor Assessment:
+                  </span>
+                  <span className="font-mono text-sm font-black">{currentSafetyFactor} SF (Min Required: 1.50)</span>
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                  Current structural safety factor of {currentSafetyFactor} breaches the mandatory 1.50 baseline. Centrifugal hoop stresses require immediate Lockout/Tagout protocol.
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
@@ -1879,66 +2097,79 @@ export default function InspectionResult() {
             </p>
           </div>
           
-          <div className="bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 px-4 py-2 rounded-xl font-extrabold text-xs sm:text-sm flex items-center gap-2">
+          <div className={`${isNonAsset ? 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400'} border px-4 py-2 rounded-xl font-extrabold text-xs sm:text-sm flex items-center gap-2`}>
             <AlertTriangle className="w-4 h-4" /> 
-            Degradation accelerating from 96 → 72 over 9 months
+            {isNonAsset ? 'Degradation tracking inactive for out-of-scope images' : 'Degradation accelerating from 96 → 72 over 9 months'}
           </div>
         </div>
         
-        {/* Step Timeline */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          {historyData.map((point, i) => (
-            <div key={i} className={`p-4 rounded-2xl border-2 ${
-              point.score >= 90 ? 'border-emerald-500/30 bg-emerald-500/5' :
-              point.score >= 80 ? 'border-cyan-500/30 bg-cyan-500/5' :
-              point.score >= 70 ? 'border-amber-500/30 bg-amber-500/5' :
-              'border-rose-500/30 bg-rose-500/5'
-            } flex flex-col items-center text-center relative`}>
-              <span className="text-slate-400 font-bold text-xs uppercase mb-1">{point.name}</span>
-              <span className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">{point.score}/100</span>
-              <span className={`font-extrabold text-xs mt-1 ${
-                point.score >= 90 ? 'text-emerald-500' :
-                point.score >= 80 ? 'text-cyan-500' :
-                point.score >= 70 ? 'text-amber-500' :
-                'text-rose-500'
-              }`}>
-                {point.score >= 90 ? 'Healthy' : point.score >= 80 ? 'Optimal' : point.score >= 70 ? 'At Risk' : 'Critical'}
-              </span>
-              {i < 3 && (
-                <ArrowRight className="absolute -right-4 top-1/2 -translate-y-1/2 text-slate-300 dark:text-slate-700 hidden md:block w-5 h-5 z-10" />
-              )}
+        {isNonAsset ? (
+          <div className="p-8 text-center rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 space-y-2">
+            <p className="font-bold text-slate-700 dark:text-slate-300 text-sm">
+              No historical engineering baseline for "{nonAssetSubject}".
+            </p>
+            <p>
+              Historical fatigue degradation and micro-crack progression charts require serial-tracked industrial equipment or civil infrastructure.
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Step Timeline */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+              {historyData.map((point, i) => (
+                <div key={i} className={`p-4 rounded-2xl border-2 ${
+                  point.score >= 90 ? 'border-emerald-500/30 bg-emerald-500/5' :
+                  point.score >= 80 ? 'border-cyan-500/30 bg-cyan-500/5' :
+                  point.score >= 70 ? 'border-amber-500/30 bg-amber-500/5' :
+                  'border-rose-500/30 bg-rose-500/5'
+                } flex flex-col items-center text-center relative`}>
+                  <span className="text-slate-400 font-bold text-xs uppercase mb-1">{point.name}</span>
+                  <span className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">{point.score}/100</span>
+                  <span className={`font-extrabold text-xs mt-1 ${
+                    point.score >= 90 ? 'text-emerald-500' :
+                    point.score >= 80 ? 'text-cyan-500' :
+                    point.score >= 70 ? 'text-amber-500' :
+                    'text-rose-500'
+                  }`}>
+                    {point.score >= 90 ? 'Healthy' : point.score >= 80 ? 'Optimal' : point.score >= 70 ? 'At Risk' : 'Critical'}
+                  </span>
+                  {i < 3 && (
+                    <ArrowRight className="absolute -right-4 top-1/2 -translate-y-1/2 text-slate-300 dark:text-slate-700 hidden md:block w-5 h-5 z-10" />
+                  )}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        {/* Clean Line Chart */}
-        <div className="h-[260px] w-full pt-4">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={historyData}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
-              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 700 }} dy={8} />
-              <YAxis domain={[50, 100]} axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} dx={-8} />
-              <Tooltip 
-                contentStyle={{ 
-                  borderRadius: '16px', 
-                  border: '1px solid #334155', 
-                  backgroundColor: '#0f172a',
-                  color: '#fff',
-                  boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.3)' 
-                }}
-                formatter={(val) => [`${val}/100`, 'Health Score']}
-              />
-              <Line 
-                type="monotone" 
-                dataKey="score" 
-                stroke="#06b6d4" 
-                strokeWidth={4} 
-                dot={{ r: 6, fill: '#06b6d4', strokeWidth: 3, stroke: '#0f172a' }} 
-                activeDot={{ r: 8 }} 
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+            {/* Clean Line Chart */}
+            <div className="h-[260px] w-full pt-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={historyData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 700 }} dy={8} />
+                  <YAxis domain={[50, 100]} axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} dx={-8} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      borderRadius: '16px', 
+                      border: '1px solid #334155', 
+                      backgroundColor: '#0f172a',
+                      color: '#fff',
+                      boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.3)' 
+                    }}
+                    formatter={(val) => [`${val}/100`, 'Health Score']}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="score" 
+                    stroke="#06b6d4" 
+                    strokeWidth={4} 
+                    dot={{ r: 6, fill: '#06b6d4', strokeWidth: 3, stroke: '#0f172a' }} 
+                    activeDot={{ r: 8 }} 
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </>
+        )}
       </section>
 
       {/* Bottom Sticky Action Footer */}

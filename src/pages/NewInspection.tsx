@@ -21,6 +21,7 @@ import { optimizeImageForInspection } from '../utils/imageOptimizer';
 import { saveSessionDraft, loadSessionDraft, clearSessionDraft, type InspectionDraft } from '../utils/sessionRecovery';
 import { JitterFilter } from '../utils/jitterFilter';
 import { SUPPORTED_LANGUAGES, type InspectionLanguage } from '../utils/multilingualSpeech';
+import { validateAssetRelevance } from '../utils/assetValidator';
 import { 
   bridge102Img, 
   transformer204Img, 
@@ -40,6 +41,11 @@ export default function NewInspection() {
   // Screen-split & window blur tracking
   const [windowBlurAlert, setWindowBlurAlert] = useState<string | null>(null);
   const [focusLostCount, setFocusLostCount] = useState<number>(0);
+
+  // Asset Domain Relevance Verification
+  const [isNonIndustrial, setIsNonIndustrial] = useState<boolean>(false);
+  const [nonIndustrialSubject, setNonIndustrialSubject] = useState<string>('');
+  const [nonIndustrialReason, setNonIndustrialReason] = useState<string>('');
 
   // Session persistence & recovery state
   const [recoveredDraft, setRecoveredDraft] = useState<InspectionDraft | null>(null);
@@ -217,10 +223,33 @@ export default function NewInspection() {
     return () => clearInterval(interval);
   }, [isRecording]);
 
-  const runAiPreScan = (fileName: string) => {
+  const runAiPreScan = (fileName: string, dataUrl?: string) => {
     setIsAiScanning(true);
     setTimeout(() => {
       setIsAiScanning(false);
+
+      // Validate asset domain relevance (detect animals, pets, selfies, food, etc.)
+      const validation = validateAssetRelevance(fileName, selectedAsset, description, dataUrl || mediaFile?.url);
+
+      if (!validation.isIndustrial) {
+        setIsNonIndustrial(true);
+        setNonIndustrialSubject(validation.detectedSubject || 'Non-Industrial Subject (Animals / Pets)');
+        setNonIndustrialReason(validation.reason || 'Image content does not match industrial machinery or civil infrastructure.');
+        setSelectedAsset('Non-Industrial Image (Domain Rejected)');
+        setAiDetectionResult({
+          category: `Non-Industrial Subject (${validation.detectedSubject || 'Living Organism / Domestic'})`,
+          description: validation.reason || 'The visual pre-scanner determined this image contains non-engineering subjects. Automated flaw metrology cannot be applied.',
+          defects: [],
+          confidence: 'Rejected from Metrology Pipeline (Non-Asset)',
+          measurements: 'N/A — Non-structural subject'
+        });
+        setSecurityNotice(`⚠️ Domain Alert: ${validation.detectedSubject || 'Non-Industrial Subject'} detected. Defect metrology disengaged.`);
+        return;
+      }
+
+      setIsNonIndustrial(false);
+      setNonIndustrialSubject('');
+      setNonIndustrialReason('');
       
       const isMachine = fileName.toLowerCase().includes('screenshot') || 
                         fileName.toLowerCase().includes('machine') || 
@@ -506,13 +535,16 @@ export default function NewInspection() {
 
     const inspectionPayload = {
       assetName: selectedAsset,
-      assetCategory: isMachine ? 'Industrial Machinery Component' : 'Civil Infrastructure',
+      assetCategory: isNonIndustrial ? 'Non-Industrial Subject' : (isMachine ? 'Industrial Machinery Component' : 'Civil Infrastructure'),
       mediaUrl: mediaFile?.url || samplePresets[0].url,
       mediaType: mediaFile?.type || 'image',
       mediaName: mediaFile?.name || 'asset_scan.jpg',
       description,
       language: selectedLang,
       isMachine,
+      isIndustrialAsset: !isNonIndustrial,
+      detectedSubject: nonIndustrialSubject,
+      rejectionReason: nonIndustrialReason,
       securityHash: mediaFile?.securityHash || 'SHA256:7f3a9e10c4b281d5',
       geminiPending: hasGemini,
       imageBase64: mediaFile?.base64,
@@ -919,14 +951,21 @@ export default function NewInspection() {
                         {aiDetectionResult.description}
                       </p>
 
-                      <div className="flex flex-wrap items-center gap-2 pt-1">
-                        <span className="text-xs font-bold text-slate-500">Defects Tagged:</span>
-                        {aiDetectionResult.defects.map((d, i) => (
-                          <span key={i} className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-800 shadow-xs">
-                            {d}
-                          </span>
-                        ))}
-                      </div>
+                      {aiDetectionResult.defects && aiDetectionResult.defects.length > 0 ? (
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                          <span className="text-xs font-bold text-slate-500">Defects Tagged:</span>
+                          {aiDetectionResult.defects.map((d, i) => (
+                            <span key={i} className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-800 shadow-xs">
+                              {d}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-800 dark:text-amber-200 text-xs font-semibold flex items-center gap-2 mt-2">
+                          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                          <span>Defect pins suppressed: Non-industrial image detected.</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Prominent Direct Next-Step Button */}

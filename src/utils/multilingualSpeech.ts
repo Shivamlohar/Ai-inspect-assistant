@@ -175,6 +175,23 @@ export function generateInspectorAnswer(
   }
 ): string {
   const q = question.toLowerCase();
+
+  // 0. DOMAIN VALIDATION (Non-industrial image check)
+  if (
+    context.status === 'NON_ASSET' || 
+    context.status?.toLowerCase().includes('non-asset') || 
+    context.status?.toLowerCase().includes('out of scope') ||
+    context.assetName?.toLowerCase().includes('non-industrial')
+  ) {
+    if (lang === 'hi') {
+      return `यह अपलोड की गई छवि किसी औद्योगिक मशीन या सिविल इंजीनियरिंग ढांचे की नहीं है। इसलिए गलत रिपोर्ट और फॉल्स-पॉजिटिव से बचने के लिए एआई ने डिफेक्ट मेट्रोलॉजी और स्कोरिंग रोक दी है। कृपया किसी वास्तविक मशीन, पाइपलाइन या ब्रिज की फोटो अपलोड करें।`;
+    }
+    if (lang === 'hinglish') {
+      return `Yeh uploaded photo kisi industrial machine ya civil structure ki nahi lagti. False positives se bachne ke liye AI defect metrology suppress kar di gayi hai. Please valid industrial asset upload karein.`;
+    }
+    return `The uploaded image is not recognized as an industrial or civil engineering asset. Defect metrology and crack scoring have been withheld to preserve engineering data integrity. Please provide an industrial asset image.`;
+  }
+
   const topDefect = context.defects[0] ? context.defects[0].name : 'Structural Anomaly';
   const topDefectMetric = context.defects[0]?.metricText || '14.2 mm dimension';
   const defectCount = context.defects.length;

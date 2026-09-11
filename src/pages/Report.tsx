@@ -35,6 +35,9 @@ export default function Report() {
     assetId: 'MACH-401-HUB',
     location: 'Sector 5 (Mechanical Fabrication Unit)',
     isMachine: true,
+    isIndustrialAsset: true,
+    detectedSubject: '',
+    rejectionReason: '',
     score: '72 / 100',
     status: 'At Risk',
     safetyFactor: '1.15',
@@ -69,20 +72,32 @@ export default function Report() {
         const isG = Boolean(parsed.isGemini && parsed.geminiResult);
         const gResult = parsed.geminiResult || {};
 
+        const isNonAsset = parsed.isIndustrialAsset === false || 
+                           gResult.isIndustrialAsset === false ||
+                           parsed.status === 'NON_ASSET' ||
+                           gResult.status === 'NON_ASSET' ||
+                           parsed.assetName?.toLowerCase().includes('non-industrial') ||
+                           parsed.assetCategory?.toLowerCase().includes('non-industrial');
+
         setData({
           assetName: parsed.assetName || (isM ? 'Industrial Machine #M-401 (Mechanical Hub)' : 'Bridge #102'),
-          assetId: isM ? 'MACH-401-HUB' : 'BRIDGE-102',
-          location: isM ? 'Sector 5 (Mechanical Fabrication Unit)' : 'Sector 5 (Highway Crossing)',
+          assetId: isNonAsset ? 'NON-ASSET-01' : (isM ? 'MACH-401-HUB' : 'BRIDGE-102'),
+          location: isNonAsset ? 'Out of Engineering Scope' : (isM ? 'Sector 5 (Mechanical Fabrication Unit)' : 'Sector 5 (Highway Crossing)'),
           isMachine: isM,
-          score: isG ? `${gResult.healthScore ?? 72} / 100` : '72 / 100',
-          status: isG ? (gResult.status ?? 'At Risk') : 'At Risk',
-          safetyFactor: isG ? (gResult.safetyFactor ?? '1.15') : (isM ? '1.15' : '1.28'),
+          isIndustrialAsset: !isNonAsset,
+          detectedSubject: parsed.detectedSubject || gResult.detectedSubject || '',
+          rejectionReason: parsed.rejectionReason || gResult.rejectionReason || '',
+          score: isNonAsset ? 'N/A' : (isG ? `${gResult.healthScore ?? 72} / 100` : '72 / 100'),
+          status: isNonAsset ? 'Out of Scope (Non-Asset)' : (isG ? (gResult.status ?? 'At Risk') : 'At Risk'),
+          safetyFactor: isNonAsset ? 'N/A' : (isG ? (gResult.safetyFactor ?? '1.15') : (isM ? '1.15' : '1.28')),
           securityHash: parsed.securityHash || 'SHA256:7f3a9e10c4b281d5',
           duration: parsed.duration || '02:10 minutes',
           mediaUrl: parsed.mediaUrl || (isM ? windTurbine401Img : bridge102Img),
           isGemini: isG,
           modelUsed: isG ? (gResult.modelUsed || 'Google Gemini 1.5 Flash Vision') : 'Built-in Precision Metrology Engine',
-          diagnosticSummary: isG ? gResult.diagnosticSummary : '',
+          diagnosticSummary: isNonAsset 
+            ? (parsed.rejectionReason || gResult.rejectionReason || 'Non-industrial image detected. Defect metrology and crack scoring withheld.') 
+            : (isG ? gResult.diagnosticSummary : ''),
           humanVerifications: parsed.humanVerifications || {
             'CRACK': 'Confirmed',
             'RUST': 'Confirmed',
@@ -91,9 +106,9 @@ export default function Report() {
             'defect-corrosion': 'Confirmed',
             'defect-wear': 'Needs Review'
           },
-          defects: isG && Array.isArray(gResult.defects) ? gResult.defects : [],
-          customDefects: Array.isArray(parsed.customDefects) ? parsed.customDefects : [],
-          recommendations: isG && Array.isArray(gResult.recommendations) ? gResult.recommendations : []
+          defects: isNonAsset ? [] : (isG && Array.isArray(gResult.defects) ? gResult.defects : []),
+          customDefects: isNonAsset ? [] : (Array.isArray(parsed.customDefects) ? parsed.customDefects : []),
+          recommendations: isNonAsset ? [] : (isG && Array.isArray(gResult.recommendations) ? gResult.recommendations : [])
         });
       } catch (e) {
         console.error(e);
@@ -243,7 +258,12 @@ export default function Report() {
     }
   ];
 
-  const baseDefects = data.defects.length > 0 
+  const isNonAsset = data.isIndustrialAsset === false || 
+                     data.status?.toLowerCase().includes('out of scope') || 
+                     data.status === 'NON_ASSET' ||
+                     data.assetName?.toLowerCase().includes('non-industrial');
+
+  const baseDefects = isNonAsset ? [] : (data.defects.length > 0 
     ? data.defects.map(d => ({
         id: d.id || 'CRACK',
         name: d.name,
@@ -252,9 +272,9 @@ export default function Report() {
         tolerance: d.measurements?.propagation || d.measurements?.isoGrade || d.measurements?.deviation || 'Exceeds nominal baseline',
         confidence: d.conf || `${d.confidenceVal || 90}%`
       }))
-    : (data.isMachine ? defaultMachineDefects : defaultInfraDefects);
+    : (data.isMachine ? defaultMachineDefects : defaultInfraDefects));
 
-  const customMapped = data.customDefects.map(c => ({
+  const customMapped = isNonAsset ? [] : data.customDefects.map(c => ({
     id: c.id,
     name: c.name,
     severity: c.severity,
@@ -431,24 +451,31 @@ export default function Report() {
             </div>
 
             {/* Defensible component breakdown table */}
-            <div className="text-[11px] font-mono border-t border-slate-100 pt-2 space-y-1 text-slate-600">
-              <div className="flex justify-between">
-                <span>• Structural integrity (40%):</span>
-                <strong className="text-slate-800 font-bold">82 (32.8 pts)</strong>
+            {isNonAsset ? (
+              <div className="p-3 rounded-lg bg-amber-50 text-[11px] text-amber-800 border border-amber-200/60 mt-2 space-y-1">
+                <span className="font-bold block">Domain Validation Active:</span>
+                <span>Standard civil & mechanical degradation scoring is not applicable to non-industrial subject ({data.detectedSubject || 'Non-Industrial'}). Metrology metrics withheld.</span>
               </div>
-              <div className="flex justify-between">
-                <span>• Corrosion & Rust (25%):</span>
-                <strong className="text-slate-800 font-bold">54 (13.5 pts)</strong>
+            ) : (
+              <div className="text-[11px] font-mono border-t border-slate-100 pt-2 space-y-1 text-slate-600">
+                <div className="flex justify-between">
+                  <span>• Structural integrity (40%):</span>
+                  <strong className="text-slate-800 font-bold">82 (32.8 pts)</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>• Corrosion & Rust (25%):</span>
+                  <strong className="text-slate-800 font-bold">54 (13.5 pts)</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>• Surface condition (15%):</span>
+                  <strong className="text-slate-800 font-bold">65 (9.8 pts)</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>• Electrical / Thermal (20%):</span>
+                  <strong className="text-slate-800 font-bold">91 (18.2 pts)</strong>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span>• Surface condition (15%):</span>
-                <strong className="text-slate-800 font-bold">65 (9.8 pts)</strong>
-              </div>
-              <div className="flex justify-between">
-                <span>• Electrical / Thermal (20%):</span>
-                <strong className="text-slate-800 font-bold">91 (18.2 pts)</strong>
-              </div>
-            </div>
+            )}
             <p className="text-[9px] text-slate-400 font-mono text-center mt-2">
               ISO 55000 / ASME Defensible Metrology Formula Compliant
             </p>
@@ -474,17 +501,29 @@ export default function Report() {
             />
 
             {/* Evidence Overlay Callouts */}
-            <div className="absolute top-4 left-4 bg-slate-900/90 text-white px-3 py-1 rounded-lg text-xs font-mono font-bold border border-slate-700 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
-              <span>DEFECT CALLOUT: 14.2 mm Rim Fracture</span>
-            </div>
+            {!isNonAsset && (
+              <>
+                <div className="absolute top-4 left-4 bg-slate-900/90 text-white px-3 py-1 rounded-lg text-xs font-mono font-bold border border-slate-700 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+                  <span>DEFECT CALLOUT: 14.2 mm Rim Fracture</span>
+                </div>
 
-            <div className="absolute bottom-4 right-4 bg-slate-900/90 text-cyan-300 px-3 py-1 rounded-lg text-xs font-mono font-bold border border-cyan-500/40">
-              ISO 8501-1 Grade C Oxidation (18.4% Area)
-            </div>
+                <div className="absolute bottom-4 right-4 bg-slate-900/90 text-cyan-300 px-3 py-1 rounded-lg text-xs font-mono font-bold border border-cyan-500/40">
+                  ISO 8501-1 Grade C Oxidation (18.4% Area)
+                </div>
+              </>
+            )}
+
+            {isNonAsset && (
+              <div className="absolute inset-0 bg-slate-950/60 flex items-center justify-center p-4">
+                <div className="bg-slate-900/90 text-amber-300 border border-amber-500/40 px-4 py-2 rounded-xl text-xs font-bold shadow-lg text-center">
+                  ⚠️ Non-Industrial Image Detected • Defect Metrology Pins Withheld
+                </div>
+              </div>
+            )}
           </div>
           <p className="text-[11px] text-slate-500 font-mono text-center">
-            Figure 1.0 — Calibrated optical sensor capture with bounding box and sub-millimeter metrology overlay.
+            Figure 1.0 — {isNonAsset ? 'Optical sensor capture. Non-industrial subject detected (defect metrology suppressed).' : 'Calibrated optical sensor capture with bounding box and sub-millimeter metrology overlay.'}
           </p>
         </section>
 
@@ -512,10 +551,17 @@ export default function Report() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {defectsToRender.map((defect, idx) => {
-                  const verificationStatus = data.humanVerifications[defect.id] || 
-                                             data.humanVerifications['defect-crack'] || 
-                                             'Confirmed';
+                {defectsToRender.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="p-6 text-center text-slate-500 font-medium">
+                      No defects recorded. Defect metrology was safely suppressed because the uploaded media is classified as an out-of-scope non-industrial subject ({data.detectedSubject || 'Non-Industrial'}).
+                    </td>
+                  </tr>
+                ) : (
+                  defectsToRender.map((defect, idx) => {
+                    const verificationStatus = data.humanVerifications[defect.id] || 
+                                               data.humanVerifications['defect-crack'] || 
+                                               'Confirmed';
                   return (
                     <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
                       <td className="p-3 font-bold text-slate-900">{defect.name}</td>
@@ -547,7 +593,7 @@ export default function Report() {
                       </td>
                     </tr>
                   );
-                })}
+                }))}
               </tbody>
             </table>
           </div>
