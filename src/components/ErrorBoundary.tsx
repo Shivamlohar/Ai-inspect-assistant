@@ -26,12 +26,18 @@ export class ErrorBoundary extends Component<Props, State> {
   public handleReset = () => {
     this.setState({ hasError: false, error: undefined });
     sessionStorage.removeItem('currentInspection');
-    window.location.hash = '#/';
-    window.location.reload();
+    const basePath = typeof window !== 'undefined' && window.location.pathname.startsWith('/Ai-inspect-assistant')
+      ? '/Ai-inspect-assistant/'
+      : '/';
+    window.location.href = basePath;
   };
 
   public render() {
     if (this.state.hasError) {
+      const homeHref = typeof window !== 'undefined' && window.location.pathname.startsWith('/Ai-inspect-assistant')
+        ? '/Ai-inspect-assistant/'
+        : '/';
+
       return (
         <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center p-6">
           <div className="max-w-md w-full bg-slate-800 border border-slate-700 rounded-3xl p-8 text-center space-y-5 shadow-2xl animate-in fade-in">
@@ -53,7 +59,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 <RotateCcw className="w-4 h-4" /> Reset & Reload App
               </button>
               <a
-                href="#/"
+                href={homeHref}
                 onClick={() => this.setState({ hasError: false })}
                 className="btn-secondary py-2.5 px-4 text-xs font-bold flex items-center justify-center gap-2 cursor-pointer"
               >

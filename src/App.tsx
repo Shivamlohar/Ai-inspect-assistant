@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { HashRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   LayoutDashboard, 
@@ -760,6 +760,31 @@ function MobileNav() {
   );
 }
 
+const getBasename = () => {
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/Ai-inspect-assistant')) {
+    return '/Ai-inspect-assistant';
+  }
+  return '';
+};
+
+function HashCleaner() {
+  const location = useLocation();
+
+  useEffect(() => {
+    // Strip legacy /#/ or /# from URL to maintain clean HTML5 routes
+    if (window.location.hash && (window.location.hash === '#/' || window.location.hash === '#')) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    } else if (window.location.hash && window.location.hash.startsWith('#/')) {
+      const cleanPath = window.location.hash.replace(/^#\/?/, '/');
+      const basename = window.location.pathname.startsWith('/Ai-inspect-assistant') ? '/Ai-inspect-assistant' : '';
+      const fullPath = (basename + cleanPath).replace(/\/+/g, '/');
+      window.history.replaceState(null, '', fullPath + window.location.search);
+    }
+  }, [location]);
+
+  return null;
+}
+
 function App() {
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -793,7 +818,8 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <Router>
+      <Router basename={getBasename()}>
+        <HashCleaner />
         <div className="flex flex-col min-h-screen bg-background text-slate-800">
           <TopNav 
             onOpenAlerts={() => setIsAlertsOpen(true)} 

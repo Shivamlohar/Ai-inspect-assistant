@@ -1,19 +1,19 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
     <title>AI Inspection Assistance - Redirecting...</title>
     <script type="text/javascript">
-      // GitHub Pages Single Page App Redirect for HashRouter
+      // GitHub Pages Single Page App Redirect (HTML5 pushState without hash)
       var pathSegmentsToKeep = 1; // repo name segment: /Ai-inspect-assistant/
       var l = window.location;
-      var pathParts = l.pathname.split('/');
-      var basePath = pathParts.slice(0, 1 + pathSegmentsToKeep).join('/');
-      var targetRoute = pathParts.slice(1 + pathSegmentsToKeep).join('/');
-      var query = l.search ? l.search : '';
-      var cleanHash = l.hash ? l.hash.replace(/^#\/?/, '') : '';
-      var finalHash = '#/' + (targetRoute ? targetRoute : '') + query + (cleanHash ? (targetRoute ? '/' + cleanHash : cleanHash) : '');
-      l.replace(l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') + basePath + '/' + finalHash);
+      l.replace(
+        l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
+        l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') + '/?/' +
+        l.pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/').replace(/&/g, '~and~') +
+        (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
+        l.hash
+      );
     </script>
   </head>
   <body style="background:#0f172a;color:#f8fafc;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">

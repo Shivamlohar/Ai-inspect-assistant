@@ -329,6 +329,14 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Canonical URL redirect: remove trailing slash from SPA paths (e.g. /inspect/ -> /inspect)
+  if (reqPath.length > 1 && reqPath.endsWith('/') && !path.extname(reqPath)) {
+    const cleanUrl = reqPath.slice(0, -1) + (rawUrl.includes('?') ? '?' + rawUrl.split('?')[1] : '');
+    res.writeHead(301, { 'Location': cleanUrl });
+    res.end();
+    return;
+  }
+
   // 7. Path Traversal Canonicalization Shield
   const normalizedSubPath = path.normalize(reqPath === '/' ? '/index.html' : reqPath).replace(/^(\.\.[\/\\])+/, '');
   let safeFilePath = path.resolve(DIST_DIR, '.' + normalizedSubPath);
