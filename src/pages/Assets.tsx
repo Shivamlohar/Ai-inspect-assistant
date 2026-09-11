@@ -16,7 +16,7 @@ export default function Assets() {
       status: 'At Risk',
       date: '10 Sep 2026',
       badge: 'badge-risk',
-      image: 'https://images.unsplash.com/photo-1545464197-09d3b8417c82?q=80&w=600&auto=format&fit=crop'
+      image: 'https://images.unsplash.com/photo-1545558014-8692077e9b5c?q=80&w=600&auto=format&fit=crop'
     },
     {
       id: 'TRANS-204',
@@ -27,7 +27,7 @@ export default function Assets() {
       status: 'Attention',
       date: '10 Sep 2026',
       badge: 'badge-attention',
-      image: 'https://images.unsplash.com/photo-1613398774005-728b49911e3b?q=80&w=600&auto=format&fit=crop'
+      image: 'https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?q=80&w=600&auto=format&fit=crop'
     },
     {
       id: 'PIPE-201',
@@ -38,7 +38,7 @@ export default function Assets() {
       status: 'Attention',
       date: '09 Sep 2026',
       badge: 'badge-attention',
-      image: 'https://images.unsplash.com/photo-1579730537021-39655f4625b3?q=80&w=600&auto=format&fit=crop'
+      image: 'https://images.unsplash.com/photo-1504917599217-d4dc5ebe6122?q=80&w=600&auto=format&fit=crop'
     },
     {
       id: 'TOWER-44',
@@ -49,7 +49,7 @@ export default function Assets() {
       status: 'Healthy',
       date: '01 Sep 2026',
       badge: 'badge-healthy',
-      image: 'https://images.unsplash.com/photo-1581092334812-78d10b7b13df?q=80&w=600&auto=format&fit=crop'
+      image: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?q=80&w=600&auto=format&fit=crop'
     },
     {
       id: 'DAM-01',
@@ -60,7 +60,7 @@ export default function Assets() {
       status: 'Critical',
       date: '10 Sep 2026',
       badge: 'badge-critical',
-      image: 'https://images.unsplash.com/photo-1599839619722-39751411ea63?q=80&w=600&auto=format&fit=crop'
+      image: 'https://images.unsplash.com/photo-1578328819058-b69f3a3b0f6b?q=80&w=600&auto=format&fit=crop'
     }
   ];
 
@@ -120,7 +120,11 @@ export default function Assets() {
                 src={asset.image} 
                 alt={asset.name} 
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90"
-                onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  target.onerror = null;
+                  target.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><rect width="600" height="400" fill="%231e293b"/><circle cx="300" cy="200" r="40" stroke="%2306b6d4" stroke-width="4" fill="none"/><path d="M280 200h40M300 180v40" stroke="%2306b6d4" stroke-width="3"/></svg>';
+                }}
               />
               <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-xs px-2.5 py-1 rounded-md text-xs font-black text-slate-800 shadow-sm uppercase tracking-wider">
                 {asset.type}

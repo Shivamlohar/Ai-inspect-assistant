@@ -132,7 +132,7 @@ export default function Dashboard() {
       status: 'At Risk',
       statusClass: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20',
       scoreRing: '#f97316',
-      image: 'https://images.unsplash.com/photo-1545464197-09d3b8417c82?q=80&w=200&auto=format&fit=crop'
+      image: 'https://images.unsplash.com/photo-1545558014-8692077e9b5c?q=80&w=300&auto=format&fit=crop'
     },
     {
       name: 'Transformer T-204',
@@ -143,7 +143,7 @@ export default function Dashboard() {
       status: 'Attention',
       statusClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
       scoreRing: '#f59e0b',
-      image: 'https://images.unsplash.com/photo-1613398774005-728b49911e3b?q=80&w=200&auto=format&fit=crop'
+      image: 'https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?q=80&w=300&auto=format&fit=crop'
     },
     {
       name: 'Rotor Hub M-401',
@@ -154,7 +154,7 @@ export default function Dashboard() {
       status: 'Healthy',
       statusClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20',
       scoreRing: '#10b981',
-      image: 'https://images.unsplash.com/photo-1466611653911-95081537e5b7?q=80&w=200&auto=format&fit=crop'
+      image: 'https://images.unsplash.com/photo-1466611653911-95081537e5b7?q=80&w=300&auto=format&fit=crop'
     },
     {
       name: 'Cell Tower #44',
@@ -165,7 +165,7 @@ export default function Dashboard() {
       status: 'Healthy',
       statusClass: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20',
       scoreRing: '#06b6d4',
-      image: 'https://images.unsplash.com/photo-1581092334812-78d10b7b13df?q=80&w=200&auto=format&fit=crop'
+      image: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?q=80&w=300&auto=format&fit=crop'
     },
   ];
 
@@ -707,12 +707,17 @@ export default function Dashboard() {
                   >
                     <td className="p-4 pl-6">
                       <div className="flex items-center gap-3">
-                        <div className="overflow-hidden rounded-xl w-10 h-10 shrink-0 border border-slate-200 dark:border-slate-700 shadow-xs">
+                        <div className="overflow-hidden rounded-xl w-10 h-10 shrink-0 border border-slate-200 dark:border-slate-700 shadow-xs bg-slate-800">
                           <img 
                             src={row.image} 
                             alt={row.name}
                             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                             loading="lazy"
+                            onError={(e) => {
+                              const target = e.currentTarget;
+                              target.onerror = null;
+                              target.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40"><rect width="40" height="40" fill="%231e293b"/><path d="M10 28L20 12L30 28Z" fill="none" stroke="%2338bdf8" stroke-width="2.5"/><circle cx="20" cy="20" r="3" fill="%2338bdf8"/></svg>';
+                            }}
                           />
                         </div>
                         <div>
