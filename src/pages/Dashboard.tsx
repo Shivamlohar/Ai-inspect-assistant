@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion, type Variants } from 'framer-motion';
 import { 
   Plus, 
@@ -11,8 +12,20 @@ import {
   TrendingUp, 
   Clock, 
   ShieldAlert,
-  Activity
+  Activity,
+  Save,
+  Trash2,
+  Download,
+  FolderLock,
+  UserCheck
 } from 'lucide-react';
+import { 
+  getActiveOfficer, 
+  getOfficerInspections, 
+  deleteOfficerInspection,
+  type SavedInspectionRecord, 
+  type OfficerProfile 
+} from '../utils/officerStore';
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -39,6 +52,69 @@ const itemVariants: Variants = {
 };
 
 export default function Dashboard() {
+  const navigate = useNavigate();
+  const [officer, setOfficer] = useState<OfficerProfile>(() => getActiveOfficer());
+  const [savedInspections, setSavedInspections] = useState<SavedInspectionRecord[]>(() => getOfficerInspections());
+  const [copiedNotification, setCopiedNotification] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleOfficerChange = (e: any) => {
+      setOfficer(e.detail || getActiveOfficer());
+    };
+    const handleWorkSaved = () => {
+      setSavedInspections(getOfficerInspections());
+    };
+
+    window.addEventListener('officer_state_changed', handleOfficerChange);
+    window.addEventListener('officer_work_saved', handleWorkSaved);
+    return () => {
+      window.removeEventListener('officer_state_changed', handleOfficerChange);
+      window.removeEventListener('officer_work_saved', handleWorkSaved);
+    };
+  }, []);
+
+  const getGreeting = (name: string) => {
+    const hour = new Date().getHours();
+    let timeGreeting = 'Good Morning';
+    if (hour >= 12 && hour < 17) timeGreeting = 'Good Afternoon';
+    else if (hour >= 17) timeGreeting = 'Good Evening';
+    return `${timeGreeting}, ${name}`;
+  };
+
+  const handleDeleteRecord = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirm('Are you sure you want to remove this saved inspection audit?')) {
+      deleteOfficerInspection(id);
+      setSavedInspections(getOfficerInspections());
+    }
+  };
+
+  const handleReviewSaved = (record: SavedInspectionRecord) => {
+    // Populate sessionStorage with the saved inspection data
+    sessionStorage.setItem('currentInspection', JSON.stringify({
+      assetName: record.assetName,
+      mediaUrl: record.imageThumbnail || 'https://images.unsplash.com/photo-1545464197-09d3b8417c82?q=80&w=800&auto=format&fit=crop',
+      mediaType: 'image',
+      mediaName: `${record.assetName.toLowerCase().replace(/\s+/g, '_')}.jpg`,
+      securityHash: record.securityHash,
+      healthScore: record.healthScore,
+      status: record.status,
+      isGemini: record.isGemini,
+      description: record.notes || 'Structural and surface inspection recorded by field officer.'
+    }));
+    navigate('/result');
+  };
+
+  const handleExportAllJSON = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(savedInspections, null, 2));
+    const dlAnchorElem = document.createElement('a');
+    dlAnchorElem.setAttribute("href", dataStr);
+    dlAnchorElem.setAttribute("download", `officer_${officer.id.toLowerCase()}_audits_${new Date().toISOString().slice(0, 10)}.json`);
+    dlAnchorElem.click();
+    setCopiedNotification('All saved audit records exported as JSON file!');
+    setTimeout(() => setCopiedNotification(null), 3000);
+  };
+
   const healthData = [
     { name: 'Healthy', value: 186, color: '#10b981', pct: '75%', strokeDash: 198, offset: 0 },
     { name: 'Attention', value: 34, color: '#f59e0b', pct: '14%', strokeDash: 37, offset: -200 },
@@ -100,6 +176,12 @@ export default function Dashboard() {
       animate="visible"
       className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6 md:space-y-8"
     >
+      {/* Toast Notification */}
+      {copiedNotification && (
+        <div className="fixed top-20 right-6 z-50 bg-slate-900 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2 border border-slate-700">
+          <Save className="w-4 h-4 text-emerald-400" /> {copiedNotification}
+        </div>
+      )}
       
       {/* ==========================================================
           1. EXECUTIVE HERO BANNER WITH FLUID HOVER & SHIMMER
@@ -120,16 +202,17 @@ export default function Dashboard() {
                 FIELD OPS MODE ACTIVE
               </span>
               <span className="text-xs text-slate-400 font-mono hidden sm:inline">
-                • GPS: 37.7749° N, 122.4194° W
+                • {officer.id} • {officer.department}
               </span>
             </div>
 
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-white flex items-center gap-2">
-              Good Morning, Officer #409 <span className="inline-block hover:rotate-12 transition-transform cursor-default">👋</span>
+              {getGreeting(officer.name)} <span className="inline-block hover:rotate-12 transition-transform cursor-default">👋</span>
             </h2>
 
             <p className="text-slate-300 text-sm sm:text-base max-w-2xl font-medium leading-relaxed">
-              AI Metrology & Structural Integrity Engine is online across 5 monitored sectors. All visual diagnostic systems are running at nominal latency.
+              AI Metrology & Structural Integrity Engine is online. You have{' '}
+              <strong className="text-cyan-400 font-black">{savedInspections.length} inspection audits saved</strong> in your local work vault.
             </p>
           </div>
 
@@ -180,7 +263,6 @@ export default function Dashboard() {
             <p className="text-xs text-slate-400 dark:text-slate-400 mt-1 font-medium">Spanning 5 industrial sectors</p>
           </div>
 
-          {/* Animated Glowing Wave Sparkline */}
           <div className="mt-4 pt-2 border-t border-slate-100 dark:border-slate-800">
             <svg className="w-full h-8 overflow-visible" viewBox="0 0 100 25" preserveAspectRatio="none">
               <defs>
@@ -225,7 +307,6 @@ export default function Dashboard() {
             <p className="text-xs text-slate-400 dark:text-slate-400 mt-1 font-medium">Cleared within last 30 days</p>
           </div>
 
-          {/* Animated Glowing Wave Sparkline */}
           <div className="mt-4 pt-2 border-t border-slate-100 dark:border-slate-800">
             <svg className="w-full h-8 overflow-visible" viewBox="0 0 100 25" preserveAspectRatio="none">
               <defs>
@@ -270,7 +351,6 @@ export default function Dashboard() {
             <p className="text-xs text-slate-400 dark:text-slate-400 mt-1 font-medium">Minor wear & micro-fractures</p>
           </div>
 
-          {/* Animated Glowing Wave Sparkline */}
           <div className="mt-4 pt-2 border-t border-slate-100 dark:border-slate-800">
             <svg className="w-full h-8 overflow-visible" viewBox="0 0 100 25" preserveAspectRatio="none">
               <defs>
@@ -315,7 +395,6 @@ export default function Dashboard() {
             <p className="text-xs text-slate-400 dark:text-slate-400 mt-1 font-medium">Immediate mitigation flagged</p>
           </div>
 
-          {/* Animated Glowing Wave Sparkline */}
           <div className="mt-4 pt-2 border-t border-slate-100 dark:border-slate-800">
             <svg className="w-full h-8 overflow-visible" viewBox="0 0 100 25" preserveAspectRatio="none">
               <defs>
@@ -341,7 +420,125 @@ export default function Dashboard() {
       </section>
 
       {/* ==========================================================
-          3. MAIN ANALYTICS ROW: DUAL-RING DONUT + RECENT INSPECTIONS
+          3. OFFICER WORK VAULT & SAVED INSPECTIONS (NEW PERSISTENCE)
+      ========================================================== */}
+      <motion.section variants={itemVariants} className="luminous-card p-6 border-primary/25 shadow-md">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center border border-primary/20">
+              <FolderLock className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-black text-slate-800 dark:text-white">
+                  Officer Saved Work Vault
+                </h3>
+                <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                  {savedInspections.length} Saved
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 font-medium">
+                Inspections saved by {officer.name} ({officer.id}) • Persisted across browser sessions
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {savedInspections.length > 0 && (
+              <button
+                onClick={handleExportAllJSON}
+                className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                title="Export all saved inspections to JSON"
+              >
+                <Download className="w-3.5 h-3.5" /> Export JSON
+              </button>
+            )}
+            <Link
+              to="/inspect"
+              className="px-3.5 py-1.5 rounded-xl bg-primary text-white font-bold text-xs shadow-xs hover:bg-primary/90 transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" /> New Audit
+            </Link>
+          </div>
+        </div>
+
+        {savedInspections.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-5">
+            {savedInspections.map((record) => (
+              <div
+                key={record.id}
+                onClick={() => handleReviewSaved(record)}
+                className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 hover:border-primary/50 transition-all hover:-translate-y-1 cursor-pointer flex flex-col justify-between group shadow-xs"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div>
+                      <h4 className="font-extrabold text-sm text-slate-800 dark:text-white group-hover:text-primary transition-colors line-clamp-1">
+                        {record.assetName}
+                      </h4>
+                      <p className="text-[11px] text-slate-400 font-mono">{record.formattedDate}</p>
+                    </div>
+                    <button
+                      onClick={(e) => handleDeleteRecord(record.id, e)}
+                      className="p-1 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/30 transition cursor-pointer"
+                      title="Delete this saved record"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-3 my-3">
+                    <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center shrink-0">
+                      <span className="text-xs font-black text-slate-800 dark:text-white leading-none">
+                        {record.healthScore}
+                      </span>
+                      <span className="text-[9px] text-slate-400 font-bold">/100</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block ${
+                        record.status === 'Healthy' ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' :
+                        record.status === 'Attention' ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20' :
+                        'bg-rose-500/10 text-rose-600 border border-rose-500/20'
+                      }`}>
+                        {record.status}
+                      </span>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-1">
+                        {record.notes || record.diagnosticSummary || 'Inspection verified by officer.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/50 flex items-center justify-between text-xs font-bold text-primary">
+                  <span>Open Full Analysis</span>
+                  <Eye className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 px-4 space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
+              <UserCheck className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="font-extrabold text-sm text-slate-800 dark:text-white">No Audits Saved in Vault Yet</p>
+              <p className="text-xs text-slate-400 max-w-md mx-auto mt-1">
+                When you run an inspection in the field, simply click <strong>"Save to Officer Log"</strong> on the results page to preserve your telemetry, photos, and fracture data permanently on this device.
+              </p>
+            </div>
+            <Link
+              to="/inspect"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white font-bold text-xs hover:bg-primary/90 transition shadow-sm"
+            >
+              <Plus className="w-3.5 h-3.5" /> Start First Inspection
+            </Link>
+          </div>
+        )}
+      </motion.section>
+
+      {/* ==========================================================
+          4. MAIN ANALYTICS ROW: DUAL-RING DONUT + RECENT INSPECTIONS
       ========================================================== */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         
@@ -360,10 +557,8 @@ export default function Dashboard() {
             <p className="text-xs text-slate-400 font-medium">Real-time condition breakdown</p>
           </div>
 
-          {/* Futuristic Glowing Animated Donut Graphic */}
           <div className="relative my-6 flex items-center justify-center">
             <svg className="w-56 h-56 transform -rotate-90" viewBox="0 0 100 100">
-              {/* Background Track Ring */}
               <circle
                 cx="50"
                 cy="50"
@@ -374,7 +569,6 @@ export default function Dashboard() {
                 className="text-slate-100 dark:text-slate-800"
               />
 
-              {/* Segment 1: Healthy (Cyan/Emerald) */}
               <motion.circle
                 cx="50"
                 cy="50"
@@ -390,7 +584,6 @@ export default function Dashboard() {
                 transition={{ duration: 1.4, ease: [0.34, 1.2, 0.64, 1] }}
               />
 
-              {/* Segment 2: Attention (Amber) */}
               <motion.circle
                 cx="50"
                 cy="50"
@@ -406,7 +599,6 @@ export default function Dashboard() {
                 transition={{ duration: 1.4, delay: 0.2, ease: [0.34, 1.2, 0.64, 1] }}
               />
 
-              {/* Segment 3: Critical (Rose) */}
               <motion.circle
                 cx="50"
                 cy="50"
@@ -422,7 +614,6 @@ export default function Dashboard() {
                 transition={{ duration: 1.4, delay: 0.3, ease: [0.34, 1.2, 0.64, 1] }}
               />
 
-              {/* Inner Decorative Accent Ring */}
               <circle
                 cx="50"
                 cy="50"
@@ -437,7 +628,6 @@ export default function Dashboard() {
               />
             </svg>
 
-            {/* Center Summary Label with Fluid Zoom Entrance */}
             <motion.div 
               initial={{ scale: 0.6, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -452,7 +642,6 @@ export default function Dashboard() {
             </motion.div>
           </div>
 
-          {/* Breakdown Chips with Micro-Interactions */}
           <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
             <div className="grid grid-cols-2 gap-2">
               {healthData.map((item, i) => (
@@ -516,7 +705,6 @@ export default function Dashboard() {
                     key={i} 
                     className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors group"
                   >
-                    {/* Asset name + Image thumbnail */}
                     <td className="p-4 pl-6">
                       <div className="flex items-center gap-3">
                         <div className="overflow-hidden rounded-xl w-10 h-10 shrink-0 border border-slate-200 dark:border-slate-700 shadow-xs">
@@ -536,12 +724,10 @@ export default function Dashboard() {
                       </div>
                     </td>
 
-                    {/* Sub-system / Type */}
                     <td className="p-4 text-slate-500 dark:text-slate-400 text-xs hidden sm:table-cell font-medium">
                       {row.type}
                     </td>
 
-                    {/* Circular Glowing Health Score Ring with Smooth Animation */}
                     <td className="p-4 text-center">
                       <div className="inline-flex items-center justify-center relative w-10 h-10">
                         <svg className="w-10 h-10 transform -rotate-90">
@@ -574,7 +760,6 @@ export default function Dashboard() {
                       </div>
                     </td>
 
-                    {/* Timestamp */}
                     <td className="p-4 text-slate-400 text-xs hidden md:table-cell font-medium">
                       <div className="flex items-center gap-1.5">
                         <Clock className="w-3.5 h-3.5 text-slate-400" />
@@ -582,14 +767,12 @@ export default function Dashboard() {
                       </div>
                     </td>
 
-                    {/* Status Pill */}
                     <td className="p-4">
                       <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${row.statusClass}`}>
                         {row.status}
                       </span>
                     </td>
 
-                    {/* Action Button */}
                     <td className="p-4 pr-6 text-right">
                       <motion.div 
                         whileHover={{ scale: 1.08 }} 
@@ -613,7 +796,7 @@ export default function Dashboard() {
       </div>
 
       {/* ==========================================================
-          4. CRITICAL ATTENTION BANNER (Bridge #102 Fracture Alert)
+          5. CRITICAL ATTENTION BANNER (Bridge #102 Fracture Alert)
       ========================================================== */}
       <motion.section 
         variants={itemVariants}
@@ -655,7 +838,7 @@ export default function Dashboard() {
       </motion.section>
 
       {/* ==========================================================
-          5. LARGE BOTTOM FIELD INSPECTION CALL-TO-ACTION
+          6. LARGE BOTTOM FIELD INSPECTION CALL-TO-ACTION
       ========================================================== */}
       <motion.section variants={itemVariants} className="pt-2 flex justify-center">
         <motion.div 

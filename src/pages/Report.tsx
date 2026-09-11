@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Printer, Download, ShieldCheck, ArrowLeft, CheckCircle2, Lock, Ruler, AlertOctagon, Sparkles } from 'lucide-react';
+import { Printer, Download, ShieldCheck, ArrowLeft, CheckCircle2, Lock, Ruler, AlertOctagon, Sparkles, Save, Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { getActiveOfficer, saveOfficerInspection } from '../utils/officerStore';
 
 export default function Report() {
   const [data, setData] = useState({
@@ -52,12 +53,36 @@ export default function Report() {
     }
   }, []);
 
+  const [officer] = useState(() => getActiveOfficer());
+  const [isSaved, setIsSaved] = useState(false);
+  const [saveToast, setSaveToast] = useState(false);
+
   const handlePrint = () => {
     window.print();
   };
 
   const handleDownload = () => {
     window.print();
+  };
+
+  const handleSaveReportToOfficerLog = () => {
+    const rawScore = parseInt(data.score) || 64;
+    saveOfficerInspection({
+      officerId: officer.id,
+      officerName: officer.name,
+      assetName: data.assetName,
+      assetType: data.isMachine ? 'Mechanical Hub' : 'Civil Infrastructure',
+      healthScore: rawScore,
+      status: (rawScore >= 80 ? 'Healthy' : rawScore >= 60 ? 'Attention' : 'At Risk'),
+      securityHash: data.securityHash,
+      notes: `Formal engineering report generated. Safety Factor: ${data.safetyFactor}. Defect count: ${defectsToRender.length}.`,
+      diagnosticSummary: data.diagnosticSummary || 'Diagnostic engineering metrology verified.',
+      defectsCount: defectsToRender.length,
+      isGemini: data.isGemini
+    });
+    setIsSaved(true);
+    setSaveToast(true);
+    setTimeout(() => setSaveToast(false), 3500);
   };
 
   const defaultMachineDefects = [
@@ -121,15 +146,33 @@ export default function Report() {
   return (
     <div className="p-6 md:p-10 max-w-4xl mx-auto space-y-6 animate-in fade-in duration-300">
       
+      {/* Toast Notification */}
+      {saveToast && (
+        <div className="fixed top-20 right-6 z-50 bg-slate-900 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2 border border-emerald-500/30">
+          <Check className="w-4 h-4 text-emerald-400" /> Formal report successfully archived in Officer Work Vault!
+        </div>
+      )}
+
       {/* Top Controls Bar */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center print:hidden">
         <Link 
           to="/result" 
-          className="inline-flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-slate-800 transition"
+          className="inline-flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-slate-800 transition cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" /> Back to Inspection Result
         </Link>
-        <div className="flex items-center gap-3 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <button
+            onClick={handleSaveReportToOfficerLog}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer ${
+              isSaved
+                ? 'bg-emerald-500/15 text-emerald-600 border border-emerald-500/30'
+                : 'bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-400 text-white shadow-primary/25 hover:scale-105'
+            }`}
+          >
+            <Save className="w-4 h-4" />
+            {isSaved ? 'Archived in Vault ✓' : 'Save to Officer Log'}
+          </button>
           <button 
             onClick={handlePrint}
             className="btn-secondary flex-1 sm:flex-initial cursor-pointer"
@@ -162,6 +205,7 @@ export default function Report() {
           </div>
           <div className="text-left sm:text-right text-xs font-semibold text-slate-500 space-y-0.5">
             <p><span className="text-slate-400">Date:</span> 10 September 2026</p>
+            <p><span className="text-slate-400">Lead Inspector:</span> <strong className="text-slate-800">{officer.name} ({officer.id})</strong></p>
             <p><span className="text-slate-400">Report ID:</span> REP-2026-{data.isMachine ? 'M401-09' : 'B102-09'}</p>
             <p><span className="text-slate-400">Security Audit:</span> PASSED (0 Threats)</p>
           </div>

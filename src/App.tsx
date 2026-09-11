@@ -20,12 +20,17 @@ import {
   Moon, 
   Laptop,
   Activity,
-  Search
+  Search,
+  LogIn,
+  LogOut,
+  User
 } from 'lucide-react';
 import { getGeminiApiKey, setGeminiApiKey, clearGeminiApiKey, testGeminiApiKey } from './services/aiApi';
 import type { ThemeMode } from './utils/theme';
 import { getStoredTheme, applyTheme } from './utils/theme';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import type { OfficerProfile } from './utils/officerStore';
+import { getActiveOfficer, setActiveOfficer, logoutOfficer, getOfficerInspections } from './utils/officerStore';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const NewInspection = lazy(() => import('./pages/NewInspection'));
@@ -368,16 +373,241 @@ function SettingsModal({
   );
 }
 
+function OfficerModal({
+  isOpen,
+  onClose,
+  officer,
+  onOfficerUpdated
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  officer: OfficerProfile;
+  onOfficerUpdated: (profile: OfficerProfile) => void;
+}) {
+  const [isEditing, setIsEditing] = useState(!officer.isLoggedIn);
+  const [name, setName] = useState(officer.name);
+  const [badgeId, setBadgeId] = useState(officer.id);
+  const [department, setDepartment] = useState(officer.department);
+  const [role, setRole] = useState(officer.role);
+
+  useEffect(() => {
+    if (isOpen) {
+      setName(officer.name);
+      setBadgeId(officer.id);
+      setDepartment(officer.department);
+      setRole(officer.role);
+      setIsEditing(!officer.isLoggedIn);
+    }
+  }, [isOpen, officer]);
+
+  if (!isOpen) return null;
+
+  const savedInspections = getOfficerInspections();
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    const initials = name
+      .trim()
+      .split(' ')
+      .map(p => p[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || 'FI';
+
+    const profile: OfficerProfile = {
+      id: badgeId.trim() || 'OFF-409',
+      name: name.trim(),
+      role: role || 'Field Inspector',
+      department: department || 'Civil & Structural Infrastructure',
+      avatarInitials: initials,
+      isLoggedIn: true,
+      loginTime: Date.now()
+    };
+    setActiveOfficer(profile);
+    onOfficerUpdated(profile);
+    setIsEditing(false);
+    onClose();
+  };
+
+  const handleQuickLogin409 = () => {
+    const profile: OfficerProfile = {
+      id: 'OFF-409',
+      name: 'Officer #409',
+      role: 'Lead Field Inspector',
+      department: 'Civil & Structural Infrastructure',
+      avatarInitials: 'FI',
+      isLoggedIn: true,
+      loginTime: Date.now()
+    };
+    setActiveOfficer(profile);
+    onOfficerUpdated(profile);
+    setIsEditing(false);
+    onClose();
+  };
+
+  const handleLogout = () => {
+    logoutOfficer();
+    onOfficerUpdated({ ...officer, isLoggedIn: false });
+    setIsEditing(true);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.92, y: 15 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ type: "spring", duration: 0.35, bounce: 0.18 }}
+        className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl border border-slate-100 dark:border-slate-800 space-y-6 max-h-[90vh] overflow-y-auto"
+      >
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-primary/10 text-primary">
+              <ShieldCheck className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-slate-800 dark:text-white">
+                {isEditing ? 'Officer Sign In' : 'Officer Profile & Work Vault'}
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {isEditing ? 'Sign in to save and preserve inspection audits' : 'Active verified inspection credentials'}
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-slate-400 hover:text-slate-600 transition cursor-pointer">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {isEditing ? (
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 uppercase tracking-wider">
+                Officer / Inspector Full Name
+              </label>
+              <input
+                type="text"
+                required
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="e.g. Officer Shivam Lohar"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm font-semibold outline-none focus:border-primary"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 uppercase tracking-wider">
+                Service Badge / ID #
+              </label>
+              <input
+                type="text"
+                required
+                value={badgeId}
+                onChange={e => setBadgeId(e.target.value)}
+                placeholder="e.g. OFF-409"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm font-semibold outline-none focus:border-primary font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 uppercase tracking-wider">
+                Assigned Department / Sector
+              </label>
+              <select
+                value={department}
+                onChange={e => setDepartment(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm font-semibold outline-none focus:border-primary cursor-pointer"
+              >
+                <option value="Civil & Structural Infrastructure">Civil & Structural Infrastructure</option>
+                <option value="Electrical Substation & Power Grid">Electrical Substation & Power Grid</option>
+                <option value="Mechanical & Turbomachinery">Mechanical & Turbomachinery</option>
+                <option value="Telecom & Tower Facilities">Telecom & Tower Facilities</option>
+                <option value="Oil, Gas & Energy Pipelines">Oil, Gas & Energy Pipelines</option>
+              </select>
+            </div>
+
+            <div className="pt-2 space-y-2.5">
+              <button
+                type="submit"
+                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-400 text-white font-bold text-sm shadow-md shadow-primary/25 transition cursor-pointer"
+              >
+                Sign In & Unlock Work Vault
+              </button>
+
+              <button
+                type="button"
+                onClick={handleQuickLogin409}
+                className="w-full py-2.5 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs transition cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                ⚡ Quick Sign In as Officer #409 (Lead Field Inspector)
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div className="space-y-4">
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700 flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-primary to-cyan-400 text-white font-black text-lg flex items-center justify-center shadow-md shrink-0">
+                {officer.avatarInitials}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-base font-extrabold text-slate-800 dark:text-white leading-tight truncate">
+                    {officer.name}
+                  </h4>
+                  <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 shrink-0">
+                    ACTIVE
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5 truncate">{officer.id} • {officer.role}</p>
+                <p className="text-[11px] text-slate-400 mt-1 truncate">{officer.department}</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-primary/5 dark:bg-primary/10 border border-primary/20 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Local Work Vault</p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">Audits & inspection records saved</p>
+              </div>
+              <span className="text-sm font-black text-primary px-3 py-1 bg-white dark:bg-slate-800 rounded-xl shadow-xs">
+                {savedInspections.length} Saved
+              </span>
+            </div>
+
+            <div className="pt-2 flex items-center gap-3">
+              <button
+                onClick={() => setIsEditing(true)}
+                className="flex-1 py-2.5 px-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs transition cursor-pointer"
+              >
+                Switch / Edit Profile
+              </button>
+              <button
+                onClick={handleLogout}
+                className="py-2.5 px-4 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/20 font-bold text-xs transition cursor-pointer flex items-center gap-1.5"
+              >
+                <LogOut className="w-3.5 h-3.5" /> Log Out
+              </button>
+            </div>
+          </div>
+        )}
+      </motion.div>
+    </div>
+  );
+}
+
 function TopNav({ 
   onOpenAlerts, 
   onOpenSettings,
   currentTheme,
-  onToggleTheme
+  onToggleTheme,
+  officer,
+  onOpenOfficerModal
 }: { 
   onOpenAlerts: () => void; 
-  onOpenSettings: () => void;
-  currentTheme: ThemeMode;
+  onOpenSettings: () => void; 
+  currentTheme: ThemeMode; 
   onToggleTheme: () => void;
+  officer: OfficerProfile;
+  onOpenOfficerModal: () => void;
 }) {
   return (
     <header className="bg-surface border-b border-slate-100 flex items-center justify-between px-6 py-4 sticky top-0 z-20 shadow-xs">
@@ -419,19 +649,6 @@ function TopNav({
           <span className="text-[10px] opacity-75 font-mono bg-emerald-500/15 px-1.5 py-0.5 rounded">42ms</span>
         </div>
 
-        <button
-          onClick={onOpenSettings}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-            getGeminiApiKey() 
-              ? 'bg-ai/10 text-ai border border-ai/25 hover:bg-ai/15' 
-              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-          }`}
-          title="Configure Gemini API Key"
-        >
-          <Key className="w-3.5 h-3.5" />
-          <span className="hidden lg:inline">{getGeminiApiKey() ? 'Gemini 1.5' : 'Connect Key'}</span>
-        </button>
-
         {/* 1-Click Dark/Light Theme Quick Toggle */}
         <button
           onClick={onToggleTheme}
@@ -462,16 +679,34 @@ function TopNav({
           <Settings className="w-5 h-5" />
         </button>
 
-        {/* Profile Pill */}
-        <div className="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-cyan-400 text-white font-bold flex items-center justify-center text-xs shadow-sm">
-            FI
-          </div>
-          <div className="hidden lg:block text-left">
-            <p className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-tight">Field Inspector</p>
-            <p className="text-[10px] text-slate-400">Officer #409</p>
-          </div>
-        </div>
+        {/* Officer Profile Pill or Login Button */}
+        {officer.isLoggedIn ? (
+          <button
+            onClick={onOpenOfficerModal}
+            className="flex items-center gap-2.5 pl-2 border-l border-slate-200 dark:border-slate-800 hover:opacity-85 transition cursor-pointer text-left group"
+            title="Officer Profile & Work Vault"
+          >
+            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-cyan-400 text-white font-bold flex items-center justify-center text-xs shadow-sm group-hover:scale-105 transition-transform">
+              {officer.avatarInitials}
+            </div>
+            <div className="hidden lg:block text-left">
+              <p className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-tight flex items-center gap-1">
+                {officer.name}
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              </p>
+              <p className="text-[10px] text-slate-400 font-mono">{officer.id}</p>
+            </div>
+          </button>
+        ) : (
+          <button
+            onClick={onOpenOfficerModal}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-400 text-white font-bold text-xs shadow-md shadow-primary/25 transition cursor-pointer ml-1"
+            title="Sign In Officer"
+          >
+            <LogIn className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Officer Login</span>
+          </button>
+        )}
       </div>
 
       {/* Mobile Top Actions */}
@@ -495,6 +730,23 @@ function TopNav({
           <Bell className="w-5 h-5" />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-critical rounded-full"></span>
         </button>
+
+        {/* Mobile Officer Button */}
+        <button
+          onClick={onOpenOfficerModal}
+          className="p-1 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+          title="Officer Account"
+        >
+          {officer.isLoggedIn ? (
+            <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-primary to-cyan-400 text-white font-bold flex items-center justify-center text-[10px]">
+              {officer.avatarInitials}
+            </div>
+          ) : (
+            <div className="p-1 rounded-lg bg-primary/10 text-primary">
+              <LogIn className="w-4 h-4" />
+            </div>
+          )}
+        </button>
       </div>
     </header>
   );
@@ -504,12 +756,16 @@ function Sidebar({
   onOpenAlerts, 
   onOpenSettings,
   currentTheme,
-  onToggleTheme
+  onToggleTheme,
+  officer,
+  onOpenOfficerModal
 }: { 
   onOpenAlerts: () => void; 
   onOpenSettings: () => void;
   currentTheme: ThemeMode;
   onToggleTheme: () => void;
+  officer: OfficerProfile;
+  onOpenOfficerModal: () => void;
 }) {
   const location = useLocation();
   
@@ -583,16 +839,24 @@ function Sidebar({
         </div>
       </nav>
 
-      {/* Field Inspector Badge */}
-      <div className="p-4 m-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-xl bg-primary/20 text-primary font-bold flex items-center justify-center text-sm">
-          FI
+      {/* Officer Profile Badge in Sidebar */}
+      <button 
+        onClick={onOpenOfficerModal}
+        className="p-3.5 m-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700/60 flex items-center gap-3 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer text-left"
+        title="Officer Profile & Work Vault"
+      >
+        <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-primary to-cyan-400 text-white font-bold flex items-center justify-center text-xs shadow-xs shrink-0">
+          {officer.isLoggedIn ? officer.avatarInitials : <User className="w-4 h-4" />}
         </div>
-        <div className="text-xs">
-          <p className="font-bold text-slate-800">Gov. Inspector</p>
-          <p className="text-slate-400">Sector 5 Region</p>
+        <div className="text-xs flex-1 truncate">
+          <p className="font-bold text-slate-800 dark:text-white truncate">
+            {officer.isLoggedIn ? officer.name : 'Officer Login'}
+          </p>
+          <p className="text-[10px] text-slate-400 font-mono truncate">
+            {officer.isLoggedIn ? `${officer.id} • ${officer.role}` : 'Click to sign in'}
+          </p>
         </div>
-      </div>
+      </button>
     </aside>
   );
 }
@@ -647,6 +911,17 @@ function App() {
     applyTheme(theme);
   };
 
+  const [isOfficerModalOpen, setIsOfficerModalOpen] = useState(false);
+  const [officer, setOfficer] = useState<OfficerProfile>(() => getActiveOfficer());
+
+  useEffect(() => {
+    const handleOfficerChange = (e: any) => {
+      setOfficer(e.detail || getActiveOfficer());
+    };
+    window.addEventListener('officer_state_changed', handleOfficerChange);
+    return () => window.removeEventListener('officer_state_changed', handleOfficerChange);
+  }, []);
+
   return (
     <ErrorBoundary>
       <Router>
@@ -656,6 +931,8 @@ function App() {
             onOpenSettings={() => setIsSettingsOpen(true)} 
             currentTheme={currentTheme}
             onToggleTheme={handleToggleTheme}
+            officer={officer}
+            onOpenOfficerModal={() => setIsOfficerModalOpen(true)}
           />
           <div className="flex flex-1">
             <Sidebar 
@@ -663,6 +940,8 @@ function App() {
               onOpenSettings={() => setIsSettingsOpen(true)} 
               currentTheme={currentTheme}
               onToggleTheme={handleToggleTheme}
+              officer={officer}
+              onOpenOfficerModal={() => setIsOfficerModalOpen(true)}
             />
             <main className="flex-1 md:ml-64 pb-24 md:pb-12 w-full">
               <Suspense fallback={<PageLoader />}>
@@ -680,6 +959,12 @@ function App() {
           </div>
           <MobileNav />
 
+          <OfficerModal
+            isOpen={isOfficerModalOpen}
+            onClose={() => setIsOfficerModalOpen(false)}
+            officer={officer}
+            onOfficerUpdated={setOfficer}
+          />
           <AlertsModal isOpen={isAlertsOpen} onClose={() => setIsAlertsOpen(false)} />
           <SettingsModal 
             isOpen={isSettingsOpen} 
