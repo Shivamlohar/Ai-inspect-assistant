@@ -1,5 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { 
   LayoutDashboard, 
   Building2, 
@@ -46,8 +47,13 @@ function PageLoader() {
 function AlertsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl border border-slate-100 space-y-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.92, y: 15 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ type: "spring", duration: 0.35, bounce: 0.18 }}
+        className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl border border-slate-100 space-y-6"
+      >
         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
           <div className="flex items-center gap-2">
             <div className="p-2 rounded-xl bg-risk/10 text-risk">
@@ -100,7 +106,7 @@ function AlertsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
             Close Alerts
           </button>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }
@@ -152,8 +158,13 @@ function SettingsModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl border border-slate-100 space-y-6 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.92, y: 15 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ type: "spring", duration: 0.35, bounce: 0.18 }}
+        className="bg-white rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl border border-slate-100 space-y-6 max-h-[90vh] overflow-y-auto"
+      >
         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
           <div className="flex items-center gap-2">
             <div className="p-2 rounded-xl bg-primary/10 text-primary">
@@ -352,7 +363,7 @@ function SettingsModal({
             Done
           </button>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }
@@ -520,9 +531,9 @@ function Sidebar({
             <Link
               key={item.label}
               to={item.path}
-              className={`flex items-center gap-3.5 px-4 py-3 rounded-2xl transition-all font-semibold text-sm ${
+              className={`flex items-center gap-3.5 px-4 py-3 rounded-2xl transition-all duration-200 ease-out font-semibold text-sm hover:translate-x-1 ${
                 isActive 
-                  ? 'bg-primary/10 text-primary shadow-xs' 
+                  ? 'bg-primary/10 text-primary shadow-xs font-bold' 
                   : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
               }`}
             >

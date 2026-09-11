@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { motion, type Variants } from 'framer-motion';
 import { 
   Plus, 
   Building2, 
@@ -13,12 +14,36 @@ import {
   Activity
 } from 'lucide-react';
 
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+      delayChildren: 0.04,
+    },
+  },
+};
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 18 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      type: 'spring' as const,
+      damping: 24,
+      stiffness: 280,
+    },
+  },
+};
+
 export default function Dashboard() {
   const healthData = [
-    { name: 'Healthy', value: 186, color: '#10b981', pct: '75%', strokeDash: '202 270', offset: '0' },
-    { name: 'Attention', value: 34, color: '#f59e0b', pct: '14%', strokeDash: '38 270', offset: '-202' },
-    { name: 'At Risk', value: 16, color: '#f97316', pct: '6%', strokeDash: '16 270', offset: '-240' },
-    { name: 'Critical', value: 12, color: '#f43f5e', pct: '5%', strokeDash: '14 270', offset: '-256' },
+    { name: 'Healthy', value: 186, color: '#10b981', pct: '75%', strokeDash: 198, offset: 0 },
+    { name: 'Attention', value: 34, color: '#f59e0b', pct: '14%', strokeDash: 37, offset: -200 },
+    { name: 'At Risk', value: 16, color: '#f97316', pct: '6%', strokeDash: 16, offset: -239 },
+    { name: 'Critical', value: 12, color: '#f43f5e', pct: '5%', strokeDash: 14, offset: -256 },
   ];
 
   const recentInspections = [
@@ -69,14 +94,22 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6 md:space-y-8 animate-in fade-in duration-300">
+    <motion.div 
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6 md:space-y-8"
+    >
       
       {/* ==========================================================
-          1. EXECUTIVE HERO BANNER (Approved Bionic Glassmorphic Design)
+          1. EXECUTIVE HERO BANNER WITH FLUID HOVER & SHIMMER
       ========================================================== */}
-      <section className="relative overflow-hidden rounded-3xl p-6 md:p-8 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white border border-slate-700/60 shadow-xl">
+      <motion.section 
+        variants={itemVariants}
+        className="relative overflow-hidden rounded-3xl p-6 md:p-8 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white border border-slate-700/60 shadow-xl laser-shimmer"
+      >
         {/* Luminous ambient background lighting */}
-        <div className="absolute -top-24 -right-24 w-96 h-96 bg-cyan-500/20 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute -top-24 -right-24 w-96 h-96 bg-cyan-500/20 rounded-full blur-3xl pointer-events-none animate-float-subtle"></div>
         <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-blue-600/20 rounded-full blur-3xl pointer-events-none"></div>
 
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
@@ -101,28 +134,38 @@ export default function Dashboard() {
           </div>
 
           <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 w-full md:w-auto shrink-0">
-            <Link 
-              to="/inspect" 
-              className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-extrabold text-sm tracking-wide shadow-lg shadow-cyan-500/30 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
-            >
-              <Plus className="w-5 h-5 stroke-[2.5]" /> Start New Inspection
-            </Link>
-            <Link 
-              to="/assets" 
-              className="w-full sm:w-auto px-5 py-3.5 rounded-2xl bg-white/10 hover:bg-white/15 text-white border border-white/20 font-bold text-sm backdrop-blur-md flex items-center justify-center gap-2 transition-all cursor-pointer"
-            >
-              <Building2 className="w-4 h-4" /> View Assets
-            </Link>
+            <motion.div whileHover={{ scale: 1.03, y: -2 }} whileTap={{ scale: 0.97 }} className="w-full sm:w-auto">
+              <Link 
+                to="/inspect" 
+                className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-extrabold text-sm tracking-wide shadow-lg shadow-cyan-500/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <Plus className="w-5 h-5 stroke-[2.5]" /> Start New Inspection
+              </Link>
+            </motion.div>
+
+            <motion.div whileHover={{ scale: 1.03, y: -2 }} whileTap={{ scale: 0.97 }} className="w-full sm:w-auto">
+              <Link 
+                to="/assets" 
+                className="w-full sm:w-auto px-5 py-3.5 rounded-2xl bg-white/10 hover:bg-white/15 text-white border border-white/20 font-bold text-sm backdrop-blur-md flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <Building2 className="w-4 h-4" /> View Assets
+              </Link>
+            </motion.div>
           </div>
         </div>
-      </section>
+      </motion.section>
 
       {/* ==========================================================
-          2. FOUR LUMINOUS STAT CARDS WITH SVG WAVE SPARKLINES
+          2. FOUR LUMINOUS STAT CARDS WITH ANIMATED WAVE SPARKLINES
       ========================================================== */}
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {/* Card 1: Total Assets */}
-        <div className="luminous-card glow-cyan p-5 md:p-6 flex flex-col justify-between hover:-translate-y-1 transition-all">
+        <motion.div 
+          variants={itemVariants}
+          whileHover={{ y: -6, scale: 1.015 }}
+          transition={{ type: 'spring', stiffness: 350, damping: 22 }}
+          className="luminous-card glow-cyan p-5 md:p-6 flex flex-col justify-between cursor-pointer"
+        >
           <div>
             <div className="flex items-center justify-between mb-3">
               <div className="w-11 h-11 rounded-2xl flex items-center justify-center bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
@@ -137,23 +180,37 @@ export default function Dashboard() {
             <p className="text-xs text-slate-400 dark:text-slate-400 mt-1 font-medium">Spanning 5 industrial sectors</p>
           </div>
 
-          {/* Glowing Wave Sparkline */}
+          {/* Animated Glowing Wave Sparkline */}
           <div className="mt-4 pt-2 border-t border-slate-100 dark:border-slate-800">
             <svg className="w-full h-8 overflow-visible" viewBox="0 0 100 25" preserveAspectRatio="none">
               <defs>
                 <linearGradient id="grad-cyan" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.3" />
+                  <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.35" />
                   <stop offset="100%" stopColor="#06b6d4" stopOpacity="0" />
                 </linearGradient>
               </defs>
               <path d="M 0,20 Q 25,5 50,15 T 100,8 L 100,25 L 0,25 Z" fill="url(#grad-cyan)" />
-              <path d="M 0,20 Q 25,5 50,15 T 100,8" fill="none" stroke="#06b6d4" strokeWidth="2" strokeLinecap="round" />
+              <motion.path 
+                d="M 0,20 Q 25,5 50,15 T 100,8" 
+                fill="none" 
+                stroke="#06b6d4" 
+                strokeWidth="2.5" 
+                strokeLinecap="round"
+                initial={{ pathLength: 0, opacity: 0 }}
+                animate={{ pathLength: 1, opacity: 1 }}
+                transition={{ duration: 1.2, ease: "easeOut", delay: 0.1 }}
+              />
             </svg>
           </div>
-        </div>
+        </motion.div>
 
         {/* Card 2: Inspected */}
-        <div className="luminous-card glow-emerald p-5 md:p-6 flex flex-col justify-between hover:-translate-y-1 transition-all">
+        <motion.div 
+          variants={itemVariants}
+          whileHover={{ y: -6, scale: 1.015 }}
+          transition={{ type: 'spring', stiffness: 350, damping: 22 }}
+          className="luminous-card glow-emerald p-5 md:p-6 flex flex-col justify-between cursor-pointer"
+        >
           <div>
             <div className="flex items-center justify-between mb-3">
               <div className="w-11 h-11 rounded-2xl flex items-center justify-center bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
@@ -168,23 +225,37 @@ export default function Dashboard() {
             <p className="text-xs text-slate-400 dark:text-slate-400 mt-1 font-medium">Cleared within last 30 days</p>
           </div>
 
-          {/* Glowing Wave Sparkline */}
+          {/* Animated Glowing Wave Sparkline */}
           <div className="mt-4 pt-2 border-t border-slate-100 dark:border-slate-800">
             <svg className="w-full h-8 overflow-visible" viewBox="0 0 100 25" preserveAspectRatio="none">
               <defs>
                 <linearGradient id="grad-emerald" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.3" />
+                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.35" />
                   <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
                 </linearGradient>
               </defs>
               <path d="M 0,22 Q 25,18 50,10 T 100,5 L 100,25 L 0,25 Z" fill="url(#grad-emerald)" />
-              <path d="M 0,22 Q 25,18 50,10 T 100,5" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" />
+              <motion.path 
+                d="M 0,22 Q 25,18 50,10 T 100,5" 
+                fill="none" 
+                stroke="#10b981" 
+                strokeWidth="2.5" 
+                strokeLinecap="round"
+                initial={{ pathLength: 0, opacity: 0 }}
+                animate={{ pathLength: 1, opacity: 1 }}
+                transition={{ duration: 1.2, ease: "easeOut", delay: 0.2 }}
+              />
             </svg>
           </div>
-        </div>
+        </motion.div>
 
         {/* Card 3: Need Attention */}
-        <div className="luminous-card glow-amber p-5 md:p-6 flex flex-col justify-between hover:-translate-y-1 transition-all">
+        <motion.div 
+          variants={itemVariants}
+          whileHover={{ y: -6, scale: 1.015 }}
+          transition={{ type: 'spring', stiffness: 350, damping: 22 }}
+          className="luminous-card glow-amber p-5 md:p-6 flex flex-col justify-between cursor-pointer"
+        >
           <div>
             <div className="flex items-center justify-between mb-3">
               <div className="w-11 h-11 rounded-2xl flex items-center justify-center bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
@@ -199,23 +270,37 @@ export default function Dashboard() {
             <p className="text-xs text-slate-400 dark:text-slate-400 mt-1 font-medium">Minor wear & micro-fractures</p>
           </div>
 
-          {/* Glowing Wave Sparkline */}
+          {/* Animated Glowing Wave Sparkline */}
           <div className="mt-4 pt-2 border-t border-slate-100 dark:border-slate-800">
             <svg className="w-full h-8 overflow-visible" viewBox="0 0 100 25" preserveAspectRatio="none">
               <defs>
                 <linearGradient id="grad-amber" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.3" />
+                  <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.35" />
                   <stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
                 </linearGradient>
               </defs>
               <path d="M 0,12 Q 30,22 60,8 T 100,14 L 100,25 L 0,25 Z" fill="url(#grad-amber)" />
-              <path d="M 0,12 Q 30,22 60,8 T 100,14" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" />
+              <motion.path 
+                d="M 0,12 Q 30,22 60,8 T 100,14" 
+                fill="none" 
+                stroke="#f59e0b" 
+                strokeWidth="2.5" 
+                strokeLinecap="round"
+                initial={{ pathLength: 0, opacity: 0 }}
+                animate={{ pathLength: 1, opacity: 1 }}
+                transition={{ duration: 1.2, ease: "easeOut", delay: 0.3 }}
+              />
             </svg>
           </div>
-        </div>
+        </motion.div>
 
         {/* Card 4: Critical */}
-        <div className="luminous-card glow-rose p-5 md:p-6 flex flex-col justify-between hover:-translate-y-1 transition-all">
+        <motion.div 
+          variants={itemVariants}
+          whileHover={{ y: -6, scale: 1.015 }}
+          transition={{ type: 'spring', stiffness: 350, damping: 22 }}
+          className="luminous-card glow-rose p-5 md:p-6 flex flex-col justify-between cursor-pointer"
+        >
           <div>
             <div className="flex items-center justify-between mb-3">
               <div className="w-11 h-11 rounded-2xl flex items-center justify-center bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
@@ -230,20 +315,29 @@ export default function Dashboard() {
             <p className="text-xs text-slate-400 dark:text-slate-400 mt-1 font-medium">Immediate mitigation flagged</p>
           </div>
 
-          {/* Glowing Wave Sparkline */}
+          {/* Animated Glowing Wave Sparkline */}
           <div className="mt-4 pt-2 border-t border-slate-100 dark:border-slate-800">
             <svg className="w-full h-8 overflow-visible" viewBox="0 0 100 25" preserveAspectRatio="none">
               <defs>
                 <linearGradient id="grad-rose" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.3" />
+                  <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.35" />
                   <stop offset="100%" stopColor="#f43f5e" stopOpacity="0" />
                 </linearGradient>
               </defs>
               <path d="M 0,18 Q 30,5 60,20 T 100,10 L 100,25 L 0,25 Z" fill="url(#grad-rose)" />
-              <path d="M 0,18 Q 30,5 60,20 T 100,10" fill="none" stroke="#f43f5e" strokeWidth="2" strokeLinecap="round" />
+              <motion.path 
+                d="M 0,18 Q 30,5 60,20 T 100,10" 
+                fill="none" 
+                stroke="#f43f5e" 
+                strokeWidth="2.5" 
+                strokeLinecap="round"
+                initial={{ pathLength: 0, opacity: 0 }}
+                animate={{ pathLength: 1, opacity: 1 }}
+                transition={{ duration: 1.2, ease: "easeOut", delay: 0.4 }}
+              />
             </svg>
           </div>
-        </div>
+        </motion.div>
       </section>
 
       {/* ==========================================================
@@ -252,7 +346,10 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         
         {/* Left Column: Overall Asset Health Futuristic Donut Card */}
-        <section className="luminous-card p-6 lg:col-span-1 flex flex-col justify-between">
+        <motion.section 
+          variants={itemVariants}
+          className="luminous-card p-6 lg:col-span-1 flex flex-col justify-between"
+        >
           <div>
             <div className="flex items-center justify-between mb-1">
               <h3 className="text-lg font-black text-slate-800 dark:text-white">Overall Asset Health</h3>
@@ -263,7 +360,7 @@ export default function Dashboard() {
             <p className="text-xs text-slate-400 font-medium">Real-time condition breakdown</p>
           </div>
 
-          {/* Futuristic Glowing Donut Graphic */}
+          {/* Futuristic Glowing Animated Donut Graphic */}
           <div className="relative my-6 flex items-center justify-center">
             <svg className="w-56 h-56 transform -rotate-90" viewBox="0 0 100 100">
               {/* Background Track Ring */}
@@ -278,7 +375,7 @@ export default function Dashboard() {
               />
 
               {/* Segment 1: Healthy (Cyan/Emerald) */}
-              <circle
+              <motion.circle
                 cx="50"
                 cy="50"
                 r="42"
@@ -288,11 +385,13 @@ export default function Dashboard() {
                 strokeDasharray="198 264"
                 strokeDashoffset="0"
                 strokeLinecap="round"
-                className="transition-all duration-1000 ease-out"
+                initial={{ strokeDashoffset: 264 }}
+                animate={{ strokeDashoffset: 0 }}
+                transition={{ duration: 1.4, ease: [0.34, 1.2, 0.64, 1] }}
               />
 
               {/* Segment 2: Attention (Amber) */}
-              <circle
+              <motion.circle
                 cx="50"
                 cy="50"
                 r="42"
@@ -302,11 +401,13 @@ export default function Dashboard() {
                 strokeDasharray="37 264"
                 strokeDashoffset="-200"
                 strokeLinecap="round"
-                className="transition-all duration-1000 ease-out"
+                initial={{ strokeDashoffset: 264 }}
+                animate={{ strokeDashoffset: -200 }}
+                transition={{ duration: 1.4, delay: 0.2, ease: [0.34, 1.2, 0.64, 1] }}
               />
 
               {/* Segment 3: Critical (Rose) */}
-              <circle
+              <motion.circle
                 cx="50"
                 cy="50"
                 r="42"
@@ -316,7 +417,9 @@ export default function Dashboard() {
                 strokeDasharray="14 264"
                 strokeDashoffset="-242"
                 strokeLinecap="round"
-                className="transition-all duration-1000 ease-out"
+                initial={{ strokeDashoffset: 264 }}
+                animate={{ strokeDashoffset: -242 }}
+                transition={{ duration: 1.4, delay: 0.3, ease: [0.34, 1.2, 0.64, 1] }}
               />
 
               {/* Inner Decorative Accent Ring */}
@@ -329,33 +432,42 @@ export default function Dashboard() {
                 strokeWidth="1.5"
                 strokeDasharray="4 4"
                 opacity="0.4"
+                className="animate-spin"
+                style={{ animationDuration: '40s' }}
               />
             </svg>
 
-            {/* Center Summary Label */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+            {/* Center Summary Label with Fluid Zoom Entrance */}
+            <motion.div 
+              initial={{ scale: 0.6, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.3, type: "spring", stiffness: 300, damping: 20 }}
+              className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none"
+            >
               <span className="text-4xl font-black text-slate-800 dark:text-white tracking-tight">84</span>
               <span className="text-[10px] font-extrabold uppercase tracking-widest text-cyan-600 dark:text-cyan-400">
                 Health Index
               </span>
               <span className="text-[10px] text-slate-400 font-medium">248 Assets</span>
-            </div>
+            </motion.div>
           </div>
 
-          {/* Breakdown Chips */}
+          {/* Breakdown Chips with Micro-Interactions */}
           <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
             <div className="grid grid-cols-2 gap-2">
               {healthData.map((item, i) => (
-                <div 
+                <motion.div 
                   key={i} 
-                  className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/50"
+                  whileHover={{ scale: 1.03, x: 2 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                  className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/50 cursor-pointer"
                 >
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full shadow-xs" style={{ backgroundColor: item.color }}></span>
                     <span className="text-slate-700 dark:text-slate-300 font-semibold text-xs">{item.name}</span>
                   </div>
                   <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{item.pct}</span>
-                </div>
+                </motion.div>
               ))}
             </div>
 
@@ -364,21 +476,26 @@ export default function Dashboard() {
               <span>Sensor telemetry verified across all 5 sectors</span>
             </div>
           </div>
-        </section>
+        </motion.section>
 
         {/* Right Column: Recent Inspections Table with Photo Thumbnails & Circular Rings */}
-        <section className="luminous-card lg:col-span-2 flex flex-col">
+        <motion.section 
+          variants={itemVariants}
+          className="luminous-card lg:col-span-2 flex flex-col"
+        >
           <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
             <div>
               <h3 className="text-lg font-black text-slate-800 dark:text-white">Recent Inspections</h3>
               <p className="text-xs text-slate-400 font-medium">Completed visual & AI sensor metrology audits</p>
             </div>
-            <Link 
-              to="/assets" 
-              className="text-primary hover:text-cyan-600 font-bold flex items-center gap-1 text-xs transition-colors cursor-pointer"
-            >
-              View All Assets <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
+            <motion.div whileHover={{ x: 3 }} transition={{ type: 'spring', stiffness: 400 }}>
+              <Link 
+                to="/assets" 
+                className="text-primary hover:text-cyan-600 font-bold flex items-center gap-1 text-xs transition-colors cursor-pointer"
+              >
+                View All Assets <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </motion.div>
           </div>
 
           <div className="overflow-x-auto flex-1">
@@ -395,18 +512,25 @@ export default function Dashboard() {
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
                 {recentInspections.map((row, i) => (
-                  <tr key={i} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                  <tr 
+                    key={i} 
+                    className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors group"
+                  >
                     {/* Asset name + Image thumbnail */}
                     <td className="p-4 pl-6">
                       <div className="flex items-center gap-3">
-                        <img 
-                          src={row.image} 
-                          alt={row.name}
-                          className="w-10 h-10 rounded-xl object-cover border border-slate-200 dark:border-slate-700 shrink-0 shadow-xs"
-                          loading="lazy"
-                        />
+                        <div className="overflow-hidden rounded-xl w-10 h-10 shrink-0 border border-slate-200 dark:border-slate-700 shadow-xs">
+                          <img 
+                            src={row.image} 
+                            alt={row.name}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                            loading="lazy"
+                          />
+                        </div>
                         <div>
-                          <p className="font-extrabold text-slate-800 dark:text-white text-sm leading-tight">{row.name}</p>
+                          <p className="font-extrabold text-slate-800 dark:text-white text-sm leading-tight group-hover:text-primary transition-colors">
+                            {row.name}
+                          </p>
                           <p className="text-[11px] text-slate-400 font-mono mt-0.5">{row.id}</p>
                         </div>
                       </div>
@@ -417,7 +541,7 @@ export default function Dashboard() {
                       {row.type}
                     </td>
 
-                    {/* Circular Glowing Health Score Ring */}
+                    {/* Circular Glowing Health Score Ring with Smooth Animation */}
                     <td className="p-4 text-center">
                       <div className="inline-flex items-center justify-center relative w-10 h-10">
                         <svg className="w-10 h-10 transform -rotate-90">
@@ -430,15 +554,18 @@ export default function Dashboard() {
                             strokeWidth="3"
                             className="text-slate-100 dark:text-slate-800"
                           />
-                          <circle
+                          <motion.circle
                             cx="20"
                             cy="20"
                             r="16"
                             fill="transparent"
                             stroke={row.scoreRing}
                             strokeWidth="3"
-                            strokeDasharray={`${(row.health / 100) * 100} 100`}
+                            strokeDasharray="100 100"
                             strokeLinecap="round"
+                            initial={{ strokeDashoffset: 100 }}
+                            animate={{ strokeDashoffset: 100 - row.health }}
+                            transition={{ duration: 1.2, delay: 0.1 * i, ease: "easeOut" }}
                           />
                         </svg>
                         <span className="absolute text-xs font-black text-slate-800 dark:text-white">
@@ -464,25 +591,34 @@ export default function Dashboard() {
 
                     {/* Action Button */}
                     <td className="p-4 pr-6 text-right">
-                      <Link 
-                        to="/result" 
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary text-primary hover:text-white font-bold text-xs transition-all shadow-xs cursor-pointer"
+                      <motion.div 
+                        whileHover={{ scale: 1.08 }} 
+                        whileTap={{ scale: 0.92 }} 
+                        className="inline-block"
                       >
-                        <Eye className="w-3.5 h-3.5" /> View
-                      </Link>
+                        <Link 
+                          to="/result" 
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary text-primary hover:text-white font-bold text-xs transition-all shadow-xs cursor-pointer"
+                        >
+                          <Eye className="w-3.5 h-3.5" /> View
+                        </Link>
+                      </motion.div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </section>
+        </motion.section>
       </div>
 
       {/* ==========================================================
           4. CRITICAL ATTENTION BANNER (Bridge #102 Fracture Alert)
       ========================================================== */}
-      <section className="luminous-card border-rose-500/30 bg-rose-500/5 dark:bg-rose-950/20 p-6 md:p-8">
+      <motion.section 
+        variants={itemVariants}
+        className="luminous-card border-rose-500/30 bg-rose-500/5 dark:bg-rose-950/20 p-6 md:p-8 animate-pulse-glow"
+      >
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
           <div className="flex items-start gap-4">
             <div className="bg-rose-500/15 p-3.5 rounded-2xl text-rose-600 dark:text-rose-400 shrink-0 border border-rose-500/25">
@@ -506,27 +642,37 @@ export default function Dashboard() {
               </p>
             </div>
           </div>
-          <Link 
-            to="/result" 
-            className="w-full sm:w-auto px-6 py-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm shadow-lg shadow-rose-600/25 whitespace-nowrap transition-all flex items-center justify-center gap-2 cursor-pointer"
-          >
-            Review Inspection Telemetry
-          </Link>
+
+          <motion.div whileHover={{ scale: 1.04, y: -1 }} whileTap={{ scale: 0.96 }}>
+            <Link 
+              to="/result" 
+              className="w-full sm:w-auto px-6 py-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm shadow-lg shadow-rose-600/25 whitespace-nowrap transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              Review Inspection Telemetry
+            </Link>
+          </motion.div>
         </div>
-      </section>
+      </motion.section>
 
       {/* ==========================================================
           5. LARGE BOTTOM FIELD INSPECTION CALL-TO-ACTION
       ========================================================== */}
-      <section className="pt-2 flex justify-center">
-        <Link 
-          to="/inspect" 
-          className="bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-400 text-white font-black text-base md:text-lg py-4 md:py-5 px-8 md:px-12 rounded-2xl shadow-xl shadow-primary/25 transition-all hover:-translate-y-0.5 flex items-center gap-3 w-full max-w-2xl justify-center tracking-wide cursor-pointer"
+      <motion.section variants={itemVariants} className="pt-2 flex justify-center">
+        <motion.div 
+          whileHover={{ scale: 1.025, y: -3 }} 
+          whileTap={{ scale: 0.975 }}
+          transition={{ type: 'spring', stiffness: 350, damping: 20 }}
+          className="w-full max-w-2xl"
         >
-          <Plus className="w-6 h-6 stroke-[3]" /> START NEW INSPECTION
-        </Link>
-      </section>
+          <Link 
+            to="/inspect" 
+            className="bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-400 text-white font-black text-base md:text-lg py-4 md:py-5 px-8 md:px-12 rounded-2xl shadow-xl shadow-primary/25 transition-all flex items-center gap-3 w-full justify-center tracking-wide cursor-pointer"
+          >
+            <Plus className="w-6 h-6 stroke-[3]" /> START NEW INSPECTION
+          </Link>
+        </motion.div>
+      </motion.section>
 
-    </div>
+    </motion.div>
   );
 }
