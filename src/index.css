@@ -243,3 +243,62 @@
 .dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
   border-color: #1f2937 !important;
 }
+
+/* ==========================================================
+   LUMINOUS BIONIC UI UTILITIES
+   Glowing accents, neon borders, and glassmorphic cards
+========================================================== */
+.luminous-card {
+  background: var(--color-surface);
+  border-radius: 1.25rem;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.dark .luminous-card {
+  background: rgba(17, 24, 39, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.glow-cyan {
+  border-top: 3px solid #06b6d4 !important;
+  box-shadow: 0 -4px 18px -2px rgba(6, 182, 212, 0.25), 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+}
+.dark .glow-cyan {
+  border-top: 3px solid #06b6d4 !important;
+  box-shadow: 0 -6px 24px -2px rgba(6, 182, 212, 0.35), 0 10px 30px -5px rgba(0, 0, 0, 0.5);
+}
+
+.glow-emerald {
+  border-top: 3px solid #10b981 !important;
+  box-shadow: 0 -4px 18px -2px rgba(16, 185, 129, 0.25), 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+}
+.dark .glow-emerald {
+  border-top: 3px solid #10b981 !important;
+  box-shadow: 0 -6px 24px -2px rgba(16, 185, 129, 0.35), 0 10px 30px -5px rgba(0, 0, 0, 0.5);
+}
+
+.glow-amber {
+  border-top: 3px solid #f59e0b !important;
+  box-shadow: 0 -4px 18px -2px rgba(245, 158, 11, 0.25), 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+}
+.dark .glow-amber {
+  border-top: 3px solid #f59e0b !important;
+  box-shadow: 0 -6px 24px -2px rgba(245, 158, 11, 0.35), 0 10px 30px -5px rgba(0, 0, 0, 0.5);
+}
+
+.glow-rose {
+  border-top: 3px solid #f43f5e !important;
+  box-shadow: 0 -4px 18px -2px rgba(244, 63, 94, 0.25), 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+}
+.dark .glow-rose {
+  border-top: 3px solid #f43f5e !important;
+  box-shadow: 0 -6px 24px -2px rgba(244, 63, 94, 0.35), 0 10px 30px -5px rgba(0, 0, 0, 0.5);
+}
+

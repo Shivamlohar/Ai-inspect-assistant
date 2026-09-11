@@ -18,7 +18,8 @@ import {
   Sun, 
   Moon, 
   Laptop,
-  Activity 
+  Activity,
+  Search
 } from 'lucide-react';
 import { getGeminiApiKey, setGeminiApiKey, clearGeminiApiKey, testGeminiApiKey } from './services/aiApi';
 import type { ThemeMode } from './utils/theme';
@@ -367,15 +368,6 @@ function TopNav({
   currentTheme: ThemeMode;
   onToggleTheme: () => void;
 }) {
-  const location = useLocation();
-  const navItems = [
-    { path: '/', label: 'Dashboard' },
-    { path: '/system-check', label: 'System Check' },
-    { path: '/assets', label: 'Assets' },
-    { path: '/inspect', label: 'Inspections' },
-    { path: '/report', label: 'Reports' },
-  ];
-
   return (
     <header className="bg-surface border-b border-slate-100 flex items-center justify-between px-6 py-4 sticky top-0 z-20 shadow-xs">
       <div className="flex items-center gap-3">
@@ -393,39 +385,46 @@ function TopNav({
         </Link>
       </div>
       
-      {/* Desktop Top Nav Links */}
-      <nav className="hidden md:flex items-center gap-5">
-        {navItems.map((item) => (
-          <Link
-            key={item.label}
-            to={item.path}
-            className={`font-semibold text-sm transition-colors ${
-              location.pathname === item.path 
-                ? 'text-primary' 
-                : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            {item.label}
-          </Link>
-        ))}
+      {/* Center Command Search Bar (Desktop) */}
+      <div className="hidden md:flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 text-slate-400 text-xs w-64 lg:w-80 focus-within:w-96 focus-within:border-primary/50 transition-all">
+        <Search className="w-4 h-4 text-slate-400 shrink-0" />
+        <input 
+          type="text" 
+          placeholder="Search assets, telemetry, reports..." 
+          className="bg-transparent border-none outline-none text-xs text-slate-700 dark:text-slate-200 placeholder:text-slate-400 w-full"
+        />
+        <kbd className="text-[10px] font-mono bg-white dark:bg-slate-700 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-600 text-slate-400 shadow-xs shrink-0">Ctrl+K</kbd>
+      </div>
+
+      {/* Top Nav Right Action Cluster */}
+      <div className="hidden md:flex items-center gap-3">
+        {/* Live AI Engine Telemetry Badge */}
+        <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+          <span>{getGeminiApiKey() ? 'Gemini Vision Active' : 'Precision Metrology'}</span>
+          <span className="text-[10px] opacity-75 font-mono bg-emerald-500/15 px-1.5 py-0.5 rounded">42ms</span>
+        </div>
 
         <button
           onClick={onOpenSettings}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
             getGeminiApiKey() 
               ? 'bg-ai/10 text-ai border border-ai/25 hover:bg-ai/15' 
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
           }`}
           title="Configure Gemini API Key"
         >
           <Key className="w-3.5 h-3.5" />
-          <span className="hidden lg:inline">{getGeminiApiKey() ? 'Gemini Active' : 'Connect API Key'}</span>
+          <span className="hidden lg:inline">{getGeminiApiKey() ? 'Gemini 1.5' : 'Connect Key'}</span>
         </button>
 
         {/* 1-Click Dark/Light Theme Quick Toggle */}
         <button
           onClick={onToggleTheme}
-          className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-xl transition cursor-pointer"
+          className="p-2 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
           title={currentTheme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
         >
           {currentTheme === 'dark' ? (
@@ -437,32 +436,32 @@ function TopNav({
 
         <button 
           onClick={onOpenAlerts}
-          className="relative p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-xl transition cursor-pointer"
+          className="relative p-2 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
           title="View Alerts"
         >
           <Bell className="w-5 h-5" />
-          <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-critical rounded-full ring-2 ring-white"></span>
+          <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-critical rounded-full ring-2 ring-white dark:ring-slate-900"></span>
         </button>
 
         <button 
           onClick={onOpenSettings}
-          className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-xl transition cursor-pointer"
+          className="p-2 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
           title="Settings"
         >
           <Settings className="w-5 h-5" />
         </button>
 
         {/* Profile Pill */}
-        <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
-          <div className="w-8 h-8 rounded-full bg-primary/15 text-primary font-bold flex items-center justify-center text-xs">
+        <div className="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-cyan-400 text-white font-bold flex items-center justify-center text-xs shadow-sm">
             FI
           </div>
           <div className="hidden lg:block text-left">
-            <p className="text-xs font-bold text-slate-800 leading-tight">Field Inspector</p>
+            <p className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-tight">Field Inspector</p>
             <p className="text-[10px] text-slate-400">Officer #409</p>
           </div>
         </div>
-      </nav>
+      </div>
 
       {/* Mobile Top Actions */}
       <div className="md:hidden flex items-center gap-1.5">
