@@ -2,6 +2,8 @@ import crypto from 'node:crypto';
 import { db, assetDb, inspectionDb, defectDb, traceDb, datasetDb } from './db/database.js';
 import { queryKnowledgeBase, ingestNewSource, sourceDb } from './rag/ragEngine.js';
 
+export const GEMINI_VISION_MODEL = process.env.GEMINI_VISION_MODEL || 'gemini-2.5-flash';
+
 export function readJsonBody(req) {
   return new Promise((resolve, reject) => {
     let body = '';
@@ -166,14 +168,65 @@ export async function handleApiRequest(req, res, reqPath) {
   if (reqPath === '/api/vision/classify' && req.method === 'POST') {
     try {
       const body = await readJsonBody(req);
-      const { imageBase64, mimeType = 'image/jpeg', fileName = 'asset.jpg' } = body;
-      const apiKey = process.env.GEMINI_API_KEY || req.headers['x-gemini-key'] || '';
+      const { imageBase64, mimeType = 'image/jpeg', inspectionId } = body;
+      const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || req.headers['x-gemini-key'] || '';
+      const reqId = inspectionId || ('INS-2026-' + crypto.randomUUID());
+      const nowIso = new Date().toISOString();
 
       if (apiKey && apiKey.trim().length > 10 && imageBase64) {
         try {
           const pureBase64 = imageBase64.replace(/^data:[^;]+;base64,/, '');
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
-          const prompt = `Classify this image into exactly ONE category: Road, Bridge, Building, Industrial Machinery, Electrical Pole, Pipeline, Solar Panel, Railway Infrastructure, Vehicle / Equipment, Person / Human, Animal, Indoor Room, Landscape, Unknown / Unsupported. If image contains a PERSON, HUMAN, SELFIE, FACE, or PORTRAIT, return category "Person / Human" and isEligible false. Return JSON only: {"category": "...", "confidence": 95, "isEligible": false, "reason": "..."}`;
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_VISION_MODEL}:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
+          
+          const prompt = `You are the first-stage visual content classifier for an engineering asset inspection system.
+
+Analyze ONLY the visual contents of the provided image.
+
+Determine the primary subject and whether the image contains a supported engineering inspection asset.
+
+Supported assets:
+- road
+- bridge
+- building
+- industrial machinery
+- electrical pole
+- pipeline
+- solar panel
+- railway infrastructure
+
+Unsupported primary subjects:
+- person
+- human
+- face
+- selfie
+- portrait
+- group of people
+- animal
+- food
+- room
+- landscape
+- random consumer object
+- screenshot
+- document
+- unknown
+
+Do NOT perform defect detection.
+Do NOT invent cracks.
+Do NOT invent corrosion.
+Do NOT calculate engineering measurements.
+Do NOT assume an engineering asset.
+
+If the image is ambiguous, return UNKNOWN.
+If a person is the dominant subject and no supported asset is clearly the inspection target, return PERSON.
+
+Return strict JSON only matching this schema:
+{
+  "primaryCategory": "person" | "road" | "bridge" | "building" | "industrial machinery" | "electrical pole" | "pipeline" | "solar panel" | "railway infrastructure" | "animal" | "room" | "landscape" | "unknown",
+  "assetType": "road" | "bridge" | "building" | "industrial machinery" | "electrical pole" | "pipeline" | "solar panel" | "railway infrastructure" | null,
+  "confidence": 0.95,
+  "inspectionEligible": false,
+  "reason": "Clear explanation of classification based strictly on visible pixels."
+}`;
 
           const geminiResp = await fetch(url, {
             method: 'POST',
@@ -195,42 +248,55 @@ export async function handleApiRequest(req, res, reqPath) {
             const match = text.match(/\{[\s\S]*\}/);
             if (match) {
               const parsed = JSON.parse(match[0]);
+              const rawCategory = String(parsed.primaryCategory || parsed.category || 'unknown').toLowerCase().trim();
+              
+              const isPerson = rawCategory.includes('person') || rawCategory.includes('human') || rawCategory.includes('selfie') || rawCategory.includes('portrait') || rawCategory.includes('face');
+              const isAnimal = rawCategory.includes('animal') || rawCategory.includes('pet') || rawCategory.includes('dog') || rawCategory.includes('cat');
+              const isRoom = rawCategory.includes('room') || rawCategory.includes('indoor') || rawCategory.includes('furniture');
+              const isLandscape = rawCategory.includes('landscape') || rawCategory.includes('nature') || rawCategory.includes('foliage');
+              const isUnsupported = isPerson || isAnimal || isRoom || isLandscape || rawCategory.includes('unknown') || rawCategory.includes('screenshot') || rawCategory.includes('document');
+
+              const finalCategory = isPerson ? 'person' : (isAnimal ? 'animal' : (isRoom ? 'room' : (isLandscape ? 'landscape' : (isUnsupported ? 'unknown' : rawCategory))));
+              const isEligible = Boolean(!isUnsupported && parsed.inspectionEligible !== false);
+
+              const confVal = typeof parsed.confidence === 'number' 
+                ? (parsed.confidence > 1 ? parsed.confidence / 100 : parsed.confidence)
+                : 0.85;
+
               sendJson(res, 200, {
                 success: true,
-                ...parsed,
-                modelUsed: 'Google Gemini 1.5 Flash Vision (gemini-1.5-flash)'
+                primaryCategory: finalCategory,
+                assetType: isEligible ? (parsed.assetType || finalCategory) : null,
+                confidence: Math.round(confVal * 100) / 100,
+                inspectionEligible: isEligible,
+                reason: parsed.reason || (isEligible ? 'Supported engineering asset identified.' : 'Subject is not an eligible engineering inspection asset.'),
+                modelName: 'Google Gemini Vision',
+                modelVersion: GEMINI_VISION_MODEL,
+                inspectionId: reqId,
+                classificationTimestamp: nowIso
               });
               return true;
             }
           }
         } catch (gErr) {
-          console.warn('[SERVER GEMINI CLASSIFY FAILED, FALLING BACK]:', gErr.message);
+          console.warn('[SERVER GEMINI CLASSIFY FAILED]:', gErr.message);
         }
       }
 
-      // Local Pattern & Text/Metadata Heuristic Fallback
-      const lowerFile = (fileName || '').toLowerCase();
-      const isPersonName = lowerFile.includes('person') || lowerFile.includes('selfie') || lowerFile.includes('portrait') || lowerFile.includes('human') || lowerFile.includes('face') || lowerFile.includes('man') || lowerFile.includes('woman') || lowerFile.includes('boy') || lowerFile.includes('girl');
-
-      if (isPersonName) {
-        sendJson(res, 200, {
-          success: true,
-          category: 'Person / Human',
-          confidence: 96,
-          isEligible: false,
-          reason: 'The uploaded image contains a person / unsupported subject. Structural and industrial inspection cannot be performed on non-infrastructure images.',
-          modelUsed: 'Local Computer Vision Pattern Classifier'
-        });
-        return true;
-      }
-
+      // Controlled Classification Failure (Section 26)
+      // If the configured vision model is unavailable or cannot classify:
+      // DO NOT fallback to bridge, civil infrastructure, or industrial machinery.
       sendJson(res, 200, {
         success: true,
-        category: 'Unknown / Unsupported',
-        confidence: 50,
-        isEligible: false,
-        reason: 'Visual subject requires confirmation before automated flaw metrology can be engaged.',
-        modelUsed: 'Local Computer Vision Heuristic'
+        primaryCategory: 'unknown',
+        assetType: null,
+        confidence: 0,
+        inspectionEligible: false,
+        reason: 'Visual classification service unavailable.',
+        modelName: 'None (Service Unavailable)',
+        modelVersion: GEMINI_VISION_MODEL,
+        inspectionId: reqId,
+        classificationTimestamp: nowIso
       });
       return true;
     } catch (err) {
@@ -263,15 +329,18 @@ export async function handleApiRequest(req, res, reqPath) {
       const inspectionId = payload.inspectionId || ('INSP-' + Date.now());
 
       // HARD GATE: Verify inspection eligibility
+      const catLower = String(payload.detectedCategory || '').toLowerCase();
       const isEligible = Boolean(
         payload.inspectionEligible && 
         payload.inspectionStatus !== 'NOT_APPLICABLE' && 
         payload.inspectionStatus !== 'NOT SUPPORTED' &&
-        payload.detectedCategory !== 'Person / Human' &&
-        payload.detectedCategory !== 'Animal' &&
-        payload.detectedCategory !== 'Indoor Room' &&
-        payload.detectedCategory !== 'Landscape' &&
-        payload.detectedCategory !== 'Unknown / Unsupported'
+        !catLower.includes('person') &&
+        !catLower.includes('human') &&
+        !catLower.includes('animal') &&
+        !catLower.includes('room') &&
+        !catLower.includes('landscape') &&
+        !catLower.includes('unknown') &&
+        !catLower.includes('unsupported')
       );
 
       // Ensure asset exists in DB only if genuine inspectable asset

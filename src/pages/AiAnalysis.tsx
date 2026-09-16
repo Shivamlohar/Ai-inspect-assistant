@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sparkles, CheckCircle2, CircleDashed, ArrowRight, ShieldCheck } from 'lucide-react';
-import { getGeminiApiKey, analyzeAssetWithGemini } from '../services/aiApi';
 import { runInspectionPipeline } from '../services/inspectionPipeline';
 
 export default function AiAnalysis() {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(0);
   const [assetName, setAssetName] = useState('Industrial Machine #M-401');
-  const [isGeminiActive, setIsGeminiActive] = useState(false);
+  const [isGeminiActive] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string>('Validating image and asset context...');
 
   useEffect(() => {
@@ -31,47 +30,9 @@ export default function AiAnalysis() {
         return;
       }
 
-      const apiKey = getGeminiApiKey();
-      const shouldRunGemini = Boolean(
-        parsed.geminiPending && 
-        apiKey && 
-        apiKey.trim().length > 10 && 
-        parsed.imageBase64
-      );
-
-      let modelResult: any = null;
-
-      if (shouldRunGemini) {
-        setIsGeminiActive(true);
-        setStatusMessage('Connecting to Google Gemini 1.5 Flash Vision Model...');
-
-        try {
-          // Call live Gemini Vision API
-          const geminiResult = await analyzeAssetWithGemini(
-            apiKey,
-            parsed.imageBase64,
-            parsed.mimeType || 'image/jpeg',
-            parsed.description || ''
-          );
-
-          if (!isCancelled) {
-            modelResult = geminiResult;
-            if (geminiResult.isIndustrialAsset === false) {
-              setStatusMessage('Identified: ' + (geminiResult.detectedSubject || 'Subject not an engineering asset'));
-            } else {
-              setStatusMessage('Gemini Vision observation complete. Finalizing pipeline...');
-            }
-          }
-        } catch (apiError: any) {
-          console.warn('Gemini vision call failed, continuing with built-in pipeline:', apiError);
-          setStatusMessage('Running built-in asset validation & inspection pipeline...');
-        }
-      }
-
-      if (isCancelled) return;
-
       // Execute comprehensive inspection pipeline (Section 2 - 14)
       try {
+        setStatusMessage('Evaluating visual scene & asset eligibility gate...');
         const pipelineResult = await runInspectionPipeline({
           fileName: parsed.mediaName || 'asset_scan.jpg',
           mediaUrl: parsed.mediaUrl || parsed.imageBase64 || '',
@@ -79,23 +40,25 @@ export default function AiAnalysis() {
           userSelectedAsset: parsed.assetName || '',
           userAssetId: parsed.assetId || '',
           userNotes: parsed.description || parsed.userNotes || '',
-          modelResult,
           isDemoMode: Boolean(parsed.isDemoData)
         });
 
         if (!isCancelled) {
+          if (!pipelineResult.inspectionEligible) {
+            setStatusMessage(`Identified: ${pipelineResult.detectedCategory} (Inspection Not Applicable)`);
+          } else {
+            setStatusMessage('Inspection pipeline complete.');
+          }
+
           const updatedPayload = {
             ...parsed,
             ...pipelineResult,
             geminiPending: false,
-            isGemini: Boolean(modelResult),
-            geminiResult: modelResult,
             pipelineResult
           };
 
           sessionStorage.setItem('currentInspection', JSON.stringify(updatedPayload));
           sessionStorage.setItem('currentInspectionResult', JSON.stringify(pipelineResult));
-          setStatusMessage('Inspection pipeline complete.');
         }
       } catch (pipelineErr) {
         console.error('Inspection pipeline error:', pipelineErr);

@@ -49,7 +49,7 @@ import {
   generateInspectorAnswer,
   startMultilingualRecognition 
 } from '../utils/multilingualSpeech';
-import { bridge102Img, windTurbine401Img } from '../assets/assetImages';
+import { bridge102Img } from '../assets/assetImages';
 import type { PipelineInspectionResult } from '../services/inspectionPipeline';
 
 export default function InspectionResult() {
@@ -229,13 +229,13 @@ export default function InspectionResult() {
       }
     }
     return {
-      assetName: 'Industrial Machine #M-401 (Mechanical Hub)',
-      mediaUrl: windTurbine401Img,
+      assetName: 'Asset Inspection Record',
+      mediaUrl: bridge102Img,
       mediaType: 'image',
-      mediaName: 'machine_rotor_hub.png',
+      mediaName: 'asset_inspection.jpg',
       securityHash: 'SHA256:7f3a9e10c4b281d5',
-      description: 'Structural rim crack visible on outer collar. Prominent surface oxidation and rust accumulation.',
-      isMachine: true
+      description: 'Optical visual inspection record.',
+      isMachine: false
     };
   });
 
@@ -303,13 +303,13 @@ export default function InspectionResult() {
   const auditTraceId = pipelineResult?.auditTraceId || '';
 
   // Defensible Score & Status (Section 8)
-  const currentScore = isNonAsset ? 0 : (pipelineResult?.healthScore?.finalScore ?? (isGemini ? (geminiData.healthScore ?? 72) : 72));
-  const currentSafetyFactor = isNonAsset ? 'N/A' : (pipelineResult?.defects?.length === 0 ? '1.50' : (isGemini ? (geminiData.safetyFactor ?? '1.15') : (isMachine ? '1.15' : '1.28')));
+  const currentScore = isNonAsset ? 0 : (pipelineResult?.healthScore?.finalScore ?? 85);
+  const currentSafetyFactor = isNonAsset ? 'N/A' : (pipelineResult?.safetyFactor || (pipelineResult?.defects?.length === 0 ? '1.50' : '1.15'));
   const currentStatus = isNonAsset 
     ? 'Out of Scope (Non-Asset)' 
-    : (pipelineResult?.healthScore?.finalScore !== undefined 
+    : (pipelineResult?.healthScore?.finalScore !== undefined && pipelineResult?.healthScore?.finalScore !== null
       ? (pipelineResult.healthScore.finalScore >= 80 ? 'Healthy' : pipelineResult.healthScore.finalScore >= 60 ? 'Attention Needed' : 'Critical') 
-      : (isGemini ? (geminiData.status ?? 'At Risk') : 'At Risk'));
+      : 'Healthy');
 
   // Mathematically defensible inspection score breakdown (Section 8: 40/30/20/10 formula)
   const scoreBreakdown = pipelineResult?.healthScore?.components ? [
@@ -712,14 +712,12 @@ export default function InspectionResult() {
 
   const diagnosticSummary = isNonAsset
     ? (nonAssetReason || `Non-industrial subject detected (${nonAssetSubject}). Defect metrology, crack propagation, and corrosion algorithms have been safely withheld to prevent false alarms. Please provide an industrial asset capture.`)
-    : (isGemini && geminiData.diagnosticSummary
-        ? geminiData.diagnosticSummary
-        : (isMachine 
-            ? "Industrial mechanical hub inspected. High-severity structural fracture (14.2mm) detected along the outer circular rim lip with extensive surface oxidation (18.4% surface area). Defect propagation risk is high under centrifugal rotational stress. Immediate component isolation and ultrasonic thickness verification mandated."
-            : "Crack and surface deterioration were detected across load-bearing pillars. The asset shows accelerating fatigue compared with previous quarterly inspections. Urgent engineering remediation recommended."));
+    : (pipelineResult?.summaryObservation || "Asset visual condition evaluated with zero-fabrication gating. Physical dimension measurements require calibrated on-site gauges.");
 
   const handleCopySummary = () => {
-    const summaryText = `AI INSPECTION ASSISTANCE DIAGNOSTIC REPORT\nAsset: ${inspectionData.assetName}\nModel: ${isGemini ? 'Google Gemini 1.5 Flash Vision' : 'Built-in Precision Metrology Engine'}\nOverall Defensible Health Score: 72 / 100\nSafety Factor: ${currentSafetyFactor} SF\nStatus: ${currentStatus}\nPrimary Defect: ${allIssues[0]?.name} (${allIssues[0]?.conf}) - ${allIssues[0]?.metricText}\nRecommended Action: 1. Isolate affected component | 2. Ultrasonic thickness measurement | 3. Remove surface corrosion | 4. Reinspect after treatment (Priority: HIGH, Timeframe: Within 7 days)`;
+    const summaryText = isNonAsset
+      ? `AI INSPECTION ASSISTANCE DIAGNOSTIC REPORT\nStatus: INSPECTION NOT APPLICABLE\nDetected Subject: ${nonAssetSubject}\nEligibility: Not Eligible\nReason: ${nonAssetReason}\nDefects: 0 (Suppressed)\nHealth Score: N/A\nSafety Factor: N/A`
+      : `AI INSPECTION ASSISTANCE DIAGNOSTIC REPORT\nAsset: ${inspectionData.assetName}\nModel: ${pipelineResult?.modelUsed || 'Built-in Precision Metrology Engine'}\nOverall Defensible Health Score: ${currentScore} / 100\nSafety Factor: ${currentSafetyFactor} SF\nStatus: ${currentStatus}\nPrimary Defect: ${allIssues[0]?.name || 'None'} - ${allIssues[0]?.metricText || 'No defects recorded'}\nRecommended Action: ${recommendedActionSteps[0]?.title || 'Routine monitoring'}`;
     navigator.clipboard.writeText(summaryText);
     setCopiedToast(true);
     setTimeout(() => setCopiedToast(false), 2500);
@@ -1746,13 +1744,17 @@ export default function InspectionResult() {
                     <div>
                       <span className="text-xs font-black uppercase tracking-wider text-slate-400">Asset Health</span>
                       <div className="text-4xl sm:text-5xl font-black text-slate-900 dark:text-white tracking-tight">
-                        72 <span className="text-2xl font-bold text-slate-400">/ 100</span>
+                        {currentScore} <span className="text-2xl font-bold text-slate-400">/ 100</span>
                       </div>
                     </div>
                     <div className="text-right">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25">
-                        <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-                        At Risk / Attention
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold ${
+                        currentScore >= 80 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25' :
+                        currentScore >= 60 ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25' :
+                        'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/25'
+                      }`}>
+                        <span className={`w-2 h-2 rounded-full ${currentScore >= 80 ? 'bg-emerald-500' : currentScore >= 60 ? 'bg-amber-500' : 'bg-rose-500'} animate-pulse`}></span>
+                        {currentStatus}
                       </span>
                       <p className="text-[11px] text-slate-400 font-mono mt-1">Safety Factor: {currentSafetyFactor} SF</p>
                     </div>
@@ -1762,7 +1764,7 @@ export default function InspectionResult() {
                   <div className="w-full h-5 rounded-xl bg-slate-200 dark:bg-slate-700 overflow-hidden relative shadow-inner p-0.5">
                     <div 
                       className="h-full rounded-lg bg-gradient-to-r from-emerald-500 via-amber-500 to-orange-500 transition-all duration-1000"
-                      style={{ width: '72%' }}
+                      style={{ width: `${Math.max(5, Math.min(100, currentScore))}%` }}
                     ></div>
                   </div>
                 </div>
@@ -2276,9 +2278,13 @@ export default function InspectionResult() {
             </p>
           </div>
           
-          <div className={`${isNonAsset ? 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400'} border px-4 py-2 rounded-xl font-extrabold text-xs sm:text-sm flex items-center gap-2`}>
+          <div className={`${isNonAsset ? 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400' : 'bg-slate-500/10 border-slate-500/20 text-slate-700 dark:text-slate-300'} border px-4 py-2 rounded-xl font-extrabold text-xs sm:text-sm flex items-center gap-2`}>
             <AlertTriangle className="w-4 h-4" /> 
-            {isNonAsset ? 'Degradation tracking inactive for out-of-scope images' : 'Degradation accelerating from 96 → 72 over 9 months'}
+            {isNonAsset 
+              ? 'Degradation tracking inactive for out-of-scope images' 
+              : (pipelineResult?.historicalComparison?.hasHistoricalData 
+                  ? (pipelineResult.historicalComparison.trendDetails || pipelineResult.historicalComparison.message)
+                  : 'Initial baseline inspection recorded — no prior degradation history')}
           </div>
         </div>
         

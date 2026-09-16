@@ -104,7 +104,7 @@ export interface PipelineInspectionResult {
   classificationConfidence: number; // 0 - 100
   classificationConfidenceLabel: string;
   inspectionEligible: boolean;
-  inspectionStatus: 'SUPPORTED' | 'NOT SUPPORTED' | 'MANUAL_VERIFICATION_REQUIRED';
+  inspectionStatus: 'SUPPORTED' | 'NOT SUPPORTED' | 'NOT_APPLICABLE' | 'MANUAL_VERIFICATION_REQUIRED';
   ineligibilityReason?: string;
   inputType: InspectionInputType;
   inputSourceLabel: string; // "Uploaded Image" | "Uploaded Video" | "Real-Time Camera"
@@ -112,9 +112,9 @@ export interface PipelineInspectionResult {
   inspectionTimestamp: string; // ISO 8601
   formattedDate: string;
   defects: VisualDefect[];
-  healthScore: HealthScoreBreakdown;
+  healthScore: HealthScoreBreakdown | null;
   recommendedSteps: RecommendedNextStep[];
-  historicalComparison: HistoricalComparisonResult;
+  historicalComparison: HistoricalComparisonResult | null;
   sensorTelemetry: SensorTelemetryData;
   summaryObservation: string;
   engineeringNotice: string;
@@ -140,4 +140,23 @@ export interface PipelineInspectionResult {
   isDemoData: boolean;
   modelUsed: string;
   mediaUrl: string;
+  // Section 12 & 29 Hard Gate Audit & Compliance Fields
+  success?: boolean;
+  safetyFactor?: string | null;
+  reportAvailable?: boolean;
+  defectDetectorCalled?: boolean;
+  healthScoreEngineCalled?: boolean;
+  historicalComparatorCalled?: boolean;
+  ragCalled?: boolean;
+  classification?: {
+    primaryCategory: string;
+    assetType: string | null;
+    confidence: number;
+    inspectionEligible: boolean;
+    reason?: string;
+  };
+  inspection?: {
+    status: string;
+    reason: string;
+  };
 }

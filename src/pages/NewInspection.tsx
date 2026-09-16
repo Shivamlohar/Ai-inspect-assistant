@@ -35,7 +35,6 @@ import {
   pipelinePlImg,
   pressureVesselImg
 } from '../assets/assetImages';
-import { classifyAsset, checkInspectionEligibility } from '../services/inspectionPipeline';
 import { classifyVisualInput, type VisionClassificationResult } from '../services/inspectionPipeline/visionClassifier';
 
 export default function NewInspection() {
@@ -298,42 +297,38 @@ export default function NewInspection() {
         visualResult = await classifyVisualInput(dataUrl, fileName);
       }
 
-      const classification = classifyAsset(fileName, selectedAsset, description, undefined, visualResult);
-      const eligibility = checkInspectionEligibility(classification.category, classification.confidence);
-
       setIsAiScanning(false);
 
-      if (!eligibility.isEligible) {
+      if (visualResult && (!visualResult.isEligible || visualResult.category === 'Person / Human' || visualResult.category === 'Unknown / Unsupported' || visualResult.category === 'Animal' || visualResult.category === 'Indoor Room' || visualResult.category === 'Landscape')) {
         setIsNonIndustrial(true);
-        setNonIndustrialSubject(classification.category);
-        setNonIndustrialReason(eligibility.reason);
-        setSelectedAsset(`${classification.category} (Non-Inspectable)`);
+        setNonIndustrialSubject(visualResult.category);
+        setNonIndustrialReason(visualResult.reason || 'This image does not contain a supported engineering inspection asset.');
+        setSelectedAsset(`${visualResult.category} (Non-Inspectable)`);
         setAiDetectionResult({
-          category: `${classification.category} (${classification.confidenceLabel})`,
-          description: eligibility.reason,
+          category: `${visualResult.category} (${visualResult.confidenceLabel || visualResult.confidence + '%'})`,
+          description: visualResult.reason || 'Inspection Not Applicable — Automated metrology suppressed',
           defects: [],
-          confidence: `${classification.confidence}% Confidence`,
+          confidence: `${visualResult.confidence}% Confidence`,
           measurements: 'Inspection Not Applicable — Automated metrology suppressed'
         });
-        setSecurityNotice(`⚠️ Scope Alert: ${classification.category} detected. Defect metrology disengaged.`);
+        setSecurityNotice(`⚠️ Scope Alert: ${visualResult.category} detected. Defect metrology disengaged.`);
         return;
       }
 
-      setIsNonIndustrial(false);
-      setNonIndustrialSubject('');
-      setNonIndustrialReason('');
+      if (visualResult && visualResult.isEligible) {
+        setIsNonIndustrial(false);
+        setNonIndustrialSubject('');
+        setNonIndustrialReason('');
+        setSelectedAsset(visualResult.category);
 
-      if (!selectedAsset || selectedAsset.includes('Auto-detect') || selectedAsset.includes('Non-Industrial') || selectedAsset.includes('Non-Inspectable')) {
-        setSelectedAsset(classification.category);
+        setAiDetectionResult({
+          category: visualResult.category,
+          description: visualResult.reason || 'Supported engineering asset verified.',
+          defects: ['Visual anomaly scan queued for full pipeline'],
+          confidence: `${visualResult.confidence}% Confidence (${visualResult.confidenceLabel})`,
+          measurements: 'Evidence-based visual inspection ready'
+        });
       }
-
-      setAiDetectionResult({
-        category: classification.category,
-        description: classification.reasoning,
-        defects: ['Visual anomaly scan queued for full pipeline'],
-        confidence: `${classification.confidence}% Confidence (${classification.confidenceLabel})`,
-        measurements: 'Evidence-based visual inspection ready'
-      });
     } catch (scanErr) {
       console.warn('Pre-scan error:', scanErr);
       setIsAiScanning(false);
@@ -343,6 +338,17 @@ export default function NewInspection() {
   const handleFileSelection = (file: File) => {
     setCameraError(null);
     setSecurityNotice(null);
+
+    // Section 15: Every new upload must reset previous state
+    sessionStorage.removeItem('currentInspection');
+    sessionStorage.removeItem('currentInspectionResult');
+    sessionStorage.removeItem('selectedAsset');
+    clearSessionDraft();
+    setAiDetectionResult(null);
+    setIsNonIndustrial(false);
+    setNonIndustrialSubject('');
+    setNonIndustrialReason('');
+    setSelectedAsset('');
 
     // Strict Anti-Malware & File Integrity Verification
     const secResult = validateAndSanitizeFile(file);
@@ -1211,19 +1217,67 @@ export default function NewInspection() {
             </div>
           </div>
 
-          <div className="flex flex-col items-center text-center space-y-5">
-            <p className="text-slate-600 text-sm max-w-lg">
-              The AI will segment cracks, calculate surface rust percentage, and determine the structural health score for <strong className="text-slate-900">{selectedAsset}</strong>.
-            </p>
+          {isNonIndustrial ? (
+            <div className="flex flex-col items-center text-center space-y-4 py-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-black uppercase tracking-wider">
+                <AlertTriangle className="w-4 h-4" /> INSPECTION NOT APPLICABLE
+              </div>
+              <h3 className="text-2xl font-black text-slate-800 dark:text-white">
+                INSPECTION NOT APPLICABLE
+              </h3>
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 max-w-md text-sm text-left space-y-2">
+                <p className="text-slate-800 dark:text-slate-200">
+                  <span className="font-bold text-slate-500">Detected:</span> <span className="font-extrabold text-amber-600 dark:text-amber-400">{nonIndustrialSubject || 'Person / Human'}</span>
+                </p>
+                <p className="text-slate-800 dark:text-slate-200">
+                  <span className="font-bold text-slate-500">Eligibility:</span> <span className="font-extrabold text-rose-600 dark:text-rose-400">Not Eligible</span>
+                </p>
+                <p className="text-slate-800 dark:text-slate-200">
+                  <span className="font-bold text-slate-500">Reason:</span> {nonIndustrialReason || 'This image does not contain a supported engineering inspection asset.'}
+                </p>
+              </div>
+              <p className="text-xs text-slate-500 max-w-md">
+                Civil infrastructure and industrial defect detection cannot be executed on non-engineering subjects.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setMediaFile(null);
+                    setIsNonIndustrial(false);
+                    setNonIndustrialSubject('');
+                    setNonIndustrialReason('');
+                    setAiDetectionResult(null);
+                    imageInputRef.current?.click();
+                  }}
+                  className="bg-primary hover:bg-primary/90 text-white font-bold text-base py-3.5 px-8 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <RotateCcw className="w-4 h-4" /> Upload Another Image
+                </button>
+                <button
+                  type="button"
+                  onClick={handleStartInspection}
+                  className="btn-secondary py-3.5 px-6 text-sm font-bold text-slate-600 dark:text-slate-300"
+                >
+                  View Ineligibility Dossier
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center text-center space-y-5">
+              <p className="text-slate-600 text-sm max-w-lg">
+                The AI will segment cracks, calculate surface rust percentage, and determine the structural health score for <strong className="text-slate-900">{selectedAsset || 'the detected asset'}</strong>.
+              </p>
 
-            <button 
-              type="button"
-              onClick={handleStartInspection}
-              className="bg-ai hover:bg-ai/90 text-white font-extrabold text-lg py-5 px-12 rounded-2xl shadow-xl shadow-ai/35 transition-all hover:-translate-y-0.5 w-full sm:w-auto flex items-center justify-center gap-3 cursor-pointer"
-            >
-              <Sparkles className="w-6 h-6 stroke-[2.5]" /> Start AI Inspection
-            </button>
-          </div>
+              <button 
+                type="button"
+                onClick={handleStartInspection}
+                className="bg-ai hover:bg-ai/90 text-white font-extrabold text-lg py-5 px-12 rounded-2xl shadow-xl shadow-ai/35 transition-all hover:-translate-y-0.5 w-full sm:w-auto flex items-center justify-center gap-3 cursor-pointer"
+              >
+                <Sparkles className="w-6 h-6 stroke-[2.5]" /> Start AI Inspection
+              </button>
+            </div>
+          )}
         </section>
 
       </div>

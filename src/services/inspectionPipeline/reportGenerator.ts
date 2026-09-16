@@ -50,7 +50,7 @@ export function generateReportSummary(inspection: PipelineInspectionResult): Gen
     statusLabel: inspection.inspectionStatus === 'NOT SUPPORTED' 
       ? 'Inspection Not Applicable' 
       : (inspection.inspectionStatus === 'MANUAL_VERIFICATION_REQUIRED' ? 'Manual Verification Required' : 'Inspection Completed'),
-    healthScoreText: inspection.healthScore.isAvailable 
+    healthScoreText: inspection.healthScore?.isAvailable 
       ? `${inspection.healthScore.finalScore} / 100` 
       : 'Health score unavailable',
     defectsCount: inspection.defects.length,

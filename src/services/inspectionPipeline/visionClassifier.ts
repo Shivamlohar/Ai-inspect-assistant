@@ -5,7 +5,6 @@
  */
 
 import type { AssetCategory } from './types';
-import { getGeminiApiKey } from '../aiApi';
 
 export interface VisionClassificationResult {
   category: AssetCategory;
@@ -285,166 +284,87 @@ function createUnknownResult(reason: string): VisionClassificationResult {
     source: 'local_biometric_cv'
   };
 }
+export function mapCategoryStringToAssetCategory(cat: string): AssetCategory {
+  const c = (cat || '').toLowerCase().trim();
+  if (c.includes('person') || c.includes('human') || c.includes('selfie') || c.includes('portrait') || c.includes('face') || c.includes('group of people')) return 'Person / Human';
+  if (c.includes('bridge') || c.includes('viaduct') || c.includes('overpass')) return 'Bridge';
+  if (c.includes('road') || c.includes('pavement') || c.includes('highway') || c.includes('asphalt') || c.includes('street')) return 'Road';
+  if (c.includes('machinery') || c.includes('machine') || c.includes('motor') || c.includes('pump') || c.includes('turbine') || c.includes('engine') || c.includes('compressor') || c.includes('gearbox')) return 'Industrial Machinery';
+  if (c.includes('building') || c.includes('beam') || c.includes('pillar') || c.includes('concrete structure') || c.includes('masonry') || c.includes('slab')) return 'Building';
+  if (c.includes('pole') || c.includes('electrical pole') || c.includes('utility pole') || c.includes('pylon') || c.includes('transformer')) return 'Electrical Pole';
+  if (c.includes('pipeline') || c.includes('pipe') || c.includes('gas line')) return 'Pipeline';
+  if (c.includes('solar') || c.includes('photovoltaic') || c.includes('pv module')) return 'Solar Panel';
+  if (c.includes('rail') || c.includes('railway') || c.includes('train track')) return 'Railway Infrastructure';
+  if (c.includes('vehicle') || c.includes('truck') || c.includes('equipment') || c.includes('crane')) return 'Vehicle / Equipment';
+  if (c.includes('animal') || c.includes('dog') || c.includes('cat') || c.includes('pet')) return 'Animal';
+  if (c.includes('room') || c.includes('indoor') || c.includes('furniture')) return 'Indoor Room';
+  if (c.includes('landscape') || c.includes('nature') || c.includes('foliage') || c.includes('mountain')) return 'Landscape';
+  return 'Unknown / Unsupported';
+}
 
 /**
  * First-Stage Vision Classifier Orchestrator
- * Prioritizes Google Gemini 1.5 Flash Vision API when configured,
- * and seamlessly falls back to Local Optical Biometric Pixel Analysis.
+ * Canonical classification runs server-side via POST /api/vision/classify
+ * using the configured GEMINI_VISION_MODEL with zero browser API key exposure.
  */
 export async function classifyVisualInput(
   mediaUrlOrBase64: string,
-  fileName: string = 'asset.jpg',
+  _fileName: string = 'asset.jpg',
   mimeType: string = 'image/jpeg'
 ): Promise<VisionClassificationResult> {
-  const apiKey = getGeminiApiKey();
-
-  // Tier 1: If Gemini API Key exists, call Gemini Vision
-  if (apiKey && apiKey.trim().length > 10 && mediaUrlOrBase64) {
+  // Tier 1: Canonical Backend Vision Classifier (Server-Side Proxy)
+  if (typeof fetch !== 'undefined' && mediaUrlOrBase64) {
     try {
-      const pureBase64 = mediaUrlOrBase64.replace(/^data:[^;]+;base64,/, '');
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
+      const pureBase64 = mediaUrlOrBase64.startsWith('data:') 
+        ? mediaUrlOrBase64 
+        : (mediaUrlOrBase64.length > 200 ? `data:${mimeType};base64,${mediaUrlOrBase64}` : mediaUrlOrBase64);
 
-      const prompt = `
-You are a First-Stage Vision Classifier for an Industrial & Civil Infrastructure Asset Inspection System.
-TASK: Inspect the image pixels and classify the primary subject into EXACTLY ONE category:
-1. "Road"
-2. "Bridge"
-3. "Building"
-4. "Industrial Machinery"
-5. "Electrical Pole"
-6. "Pipeline"
-7. "Solar Panel"
-8. "Railway Infrastructure"
-9. "Vehicle / Equipment"
-10. "Person / Human"
-11. "Animal"
-12. "Indoor Room"
-13. "Landscape"
-14. "Unknown / Unsupported"
-
-CRITICAL INSTRUCTIONS:
-- If the image shows a PERSON, HUMAN, SELFIE, FACE, PORTRAIT, or BODY:
-  You MUST return "Person / Human". Set "isEligible": false. Do NOT classify a person as a machine, bridge, or building!
-- If the image shows civil infrastructure or industrial equipment:
-  Select the matching supported category and set "isEligible": true.
-
-Return ONLY valid JSON matching this schema:
-{
-  "category": "One of the 14 categories",
-  "confidence": 95,
-  "isEligible": false,
-  "subjectDescription": "Short 1-sentence description of the visual subject",
-  "reason": "Clear explanation of classification"
-}
-`;
-
-      const response = await fetch(url, {
+      const serverResp = await fetch('/api/vision/classify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                { text: prompt },
-                { inline_data: { mime_type: mimeType.startsWith('image/') ? mimeType : 'image/jpeg', data: pureBase64 } }
-              ]
-            }
-          ],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 500
-          }
+          imageBase64: pureBase64,
+          mimeType
         })
       });
 
-      if (response.ok) {
-        const resData = await response.json();
-        const text = resData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        const match = text.match(/\{[\s\S]*\}/);
-        if (match) {
-          const parsed = JSON.parse(match[0]);
-          const cat = parsed.category as AssetCategory;
-          const conf = typeof parsed.confidence === 'number' ? parsed.confidence : 92;
-          const eligible = Boolean(parsed.isEligible && cat !== 'Person / Human' && cat !== 'Animal' && cat !== 'Indoor Room' && cat !== 'Landscape' && cat !== 'Unknown / Unsupported' && conf >= 70);
+      if (serverResp.ok) {
+        const data = await serverResp.json();
+        if (data && data.success) {
+          const mappedCat = mapCategoryStringToAssetCategory(data.primaryCategory || data.category);
+          const confNum = typeof data.confidence === 'number' 
+            ? Math.round(data.confidence <= 1 ? data.confidence * 100 : data.confidence)
+            : 85;
+
+          const isEligible = Boolean(data.inspectionEligible && mappedCat !== 'Person / Human' && mappedCat !== 'Animal' && mappedCat !== 'Indoor Room' && mappedCat !== 'Landscape' && mappedCat !== 'Unknown / Unsupported');
 
           return {
-            category: cat,
-            confidence: conf,
-            confidenceLabel: `${conf}%`,
-            isEligible: eligible,
-            subjectDescription: parsed.subjectDescription || cat,
-            reason: eligible
-              ? parsed.reason || 'Supported engineering asset verified for inspection.'
-              : parsed.reason || 'This image does not contain a supported infrastructure or industrial asset for visual inspection.',
-            modelUsed: 'Google Gemini 1.5 Flash Vision (gemini-1.5-flash)',
+            category: mappedCat,
+            confidence: confNum,
+            confidenceLabel: `${confNum}%`,
+            isEligible,
+            subjectDescription: data.assetType || data.primaryCategory || mappedCat,
+            reason: data.reason || (isEligible 
+              ? 'Supported engineering asset identified by visual classifier.' 
+              : 'Subject is not an eligible engineering inspection asset.'),
+            modelUsed: `${data.modelName || 'Google Gemini Vision'} (${data.modelVersion || 'gemini-2.5-flash'})`,
             source: 'cloud_vision_api'
           };
         }
       }
-    } catch (geminiErr) {
-      console.warn('Gemini 1.5 Flash Vision classification failed, falling back to local biometric CV:', geminiErr);
+    } catch (serverErr) {
+      console.warn('[VISION CLASSIFIER] Backend server call unavailable, attempting auxiliary offline inspection:', serverErr);
     }
   }
 
-  // Tier 2: Local Optical Biometric & Pixel Analysis
+  // Tier 2: Auxiliary Offline Biometric & Pixel Analysis (Browser Canvas)
+  // Low-confidence auxiliary signal only (Section 10)
   if (typeof window !== 'undefined' && mediaUrlOrBase64) {
     const localResult = await classifyImageVisualLocal(mediaUrlOrBase64);
     return localResult;
   }
 
-  // Tier 3: Metadata / text heuristic fallback if image decoding is unavailable
-  const cleanName = (fileName || '').toLowerCase();
-  if (cleanName.includes('person') || cleanName.includes('selfie') || cleanName.includes('portrait') || cleanName.includes('human') || cleanName.includes('face') || cleanName.includes('man') || cleanName.includes('woman') || cleanName.includes('boy') || cleanName.includes('girl')) {
-    return {
-      category: 'Person / Human',
-      confidence: 96,
-      confidenceLabel: '96%',
-      isEligible: false,
-      subjectDescription: 'Person / Human',
-      reason: 'The uploaded image contains a person / unsupported subject. Structural and industrial inspection cannot be performed on non-infrastructure images.',
-      modelUsed: 'Local Pattern Classifier',
-      source: 'metadata_inference'
-    };
-  }
-
-  if (cleanName.includes('bridge') || cleanName.includes('viaduct') || cleanName.includes('pier')) {
-    return {
-      category: 'Bridge',
-      confidence: 88,
-      confidenceLabel: '88%',
-      isEligible: true,
-      subjectDescription: 'Bridge / Civil Overpass Structure',
-      reason: 'Engineering infrastructure features identify bridge asset.',
-      modelUsed: 'Local Pattern Classifier',
-      source: 'metadata_inference'
-    };
-  }
-
-  if (cleanName.includes('motor') || cleanName.includes('pump') || cleanName.includes('machine') || cleanName.includes('compressor') || cleanName.includes('gearbox')) {
-    return {
-      category: 'Industrial Machinery',
-      confidence: 88,
-      confidenceLabel: '88%',
-      isEligible: true,
-      subjectDescription: 'Industrial Machine / Rotary Equipment',
-      reason: 'Key mechanical features identify industrial machinery asset.',
-      modelUsed: 'Local Pattern Classifier',
-      source: 'metadata_inference'
-    };
-  }
-
-  if (cleanName.includes('road') || cleanName.includes('pothole') || cleanName.includes('asphalt') || cleanName.includes('highway')) {
-    return {
-      category: 'Road',
-      confidence: 88,
-      confidenceLabel: '88%',
-      isEligible: true,
-      subjectDescription: 'Road / Pavement Infrastructure',
-      reason: 'Transportation surface features identify road asset.',
-      modelUsed: 'Local Pattern Classifier',
-      source: 'metadata_inference'
-    };
-  }
-
-  return createUnknownResult('Visual data could not be processed');
+  // Tier 3: Controlled Classification Failure (Section 26)
+  // Never guess based on filename keywords
+  return createUnknownResult('Visual classification service unavailable.');
 }

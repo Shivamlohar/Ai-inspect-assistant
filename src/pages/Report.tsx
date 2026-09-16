@@ -496,17 +496,26 @@ export default function Report() {
             />
 
             {/* Evidence Overlay Callouts */}
-            {!isNonAsset && (
+            {!isNonAsset && defectsToRender.length > 0 && (
               <>
                 <div className="absolute top-4 left-4 bg-slate-900/90 text-white px-3 py-1 rounded-lg text-xs font-mono font-bold border border-slate-700 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
-                  <span>DEFECT CALLOUT: 14.2 mm Rim Fracture</span>
+                  <span>DEFECT: {defectsToRender[0].name}</span>
                 </div>
 
-                <div className="absolute bottom-4 right-4 bg-slate-900/90 text-cyan-300 px-3 py-1 rounded-lg text-xs font-mono font-bold border border-cyan-500/40">
-                  ISO 8501-1 Grade C Oxidation (18.4% Area)
-                </div>
+                {defectsToRender[1] && (
+                  <div className="absolute bottom-4 right-4 bg-slate-900/90 text-cyan-300 px-3 py-1 rounded-lg text-xs font-mono font-bold border border-cyan-500/40">
+                    {defectsToRender[1].name}
+                  </div>
+                )}
               </>
+            )}
+
+            {!isNonAsset && defectsToRender.length === 0 && (
+              <div className="absolute top-4 left-4 bg-slate-900/90 text-emerald-400 px-3 py-1 rounded-lg text-xs font-mono font-bold border border-emerald-500/40 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span>NO VISIBLE ANOMALIES RECORDED</span>
+              </div>
             )}
 
             {isNonAsset && (

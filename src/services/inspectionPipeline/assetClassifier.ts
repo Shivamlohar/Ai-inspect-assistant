@@ -13,52 +13,6 @@ export interface AssetClassificationResult {
   reasoning: string;
 }
 
-const CATEGORY_KEYWORDS: Record<AssetCategory, string[]> = {
-  'Road': [
-    'road', 'asphalt', 'pavement', 'highway', 'street', 'pothole', 'lane', 'tarmac', 'driveway', 'curb'
-  ],
-  'Bridge': [
-    'bridge', 'pier', 'girder', 'viaduct', 'overpass', 'trestle', 'abutment', 'deck', 'suspension bridge'
-  ],
-  'Building': [
-    'building', 'beam', 'ceiling', 'wall', 'slab', 'lintel', 'pillar', 'column', 'concrete',
-    'rebar', 'foundation', 'masonry', 'brick', 'plaster', 'roof', 'facade', 'structure', 'joint'
-  ],
-  'Industrial Machinery': [
-    'machine', 'machinery', 'motor', 'pump', 'engine', 'compressor', 'gearbox', 'turbine',
-    'lathe', 'cnc', 'rotor', 'flange', 'spindle', 'bearing', 'shaft', 'impeller', 'boiler'
-  ],
-  'Electrical Pole': [
-    'electrical pole', 'utility pole', 'power pole', 'power line', 'transformer', 'insulator',
-    'substation', 'switchgear', 'transmission tower', 'pylon', 'electric wire'
-  ],
-  'Pipeline': [
-    'pipeline', 'pipe', 'pipes', 'oil pipe', 'gas line', 'manifold', 'flange valve', 'tank', 'vessel', 'conduit'
-  ],
-  'Solar Panel': [
-    'solar panel', 'solar', 'photovoltaic', 'pv module', 'solar array', 'solar cell'
-  ],
-  'Railway Infrastructure': [
-    'railway', 'rail', 'tracks', 'train track', 'sleeper', 'rail tie', 'ballast', 'switch rail', 'catenary'
-  ],
-  'Vehicle / Equipment': [
-    'vehicle', 'truck', 'excavator', 'forklift', 'crane', 'bulldozer', 'loader', 'fleet vehicle'
-  ],
-  'Person / Human': [
-    'person', 'human', 'selfie', 'portrait', 'man', 'woman', 'child', 'face', 'people', 'girl', 'boy'
-  ],
-  'Animal': [
-    'animal', 'pet', 'pets', 'dog', 'puppy', 'cat', 'kitten', 'bird', 'wildlife', 'rodent', 'hamster', 'horse', 'cow'
-  ],
-  'Indoor Room': [
-    'room', 'bedroom', 'living room', 'kitchen', 'office desk', 'furniture', 'couch', 'sofa', 'interior room', 'apartment'
-  ],
-  'Landscape': [
-    'landscape', 'mountain', 'forest', 'nature', 'beach', 'sea', 'sky', 'sunset', 'trees', 'scenery'
-  ],
-  'Unknown / Unsupported': []
-};
-
 import { classifyVisualInput, analyzeImagePixelsForBiometrics, type VisionClassificationResult } from './visionClassifier';
 
 export { classifyVisualInput, analyzeImagePixelsForBiometrics };
@@ -67,9 +21,9 @@ export { classifyVisualInput, analyzeImagePixelsForBiometrics };
  * Classifies an asset based on visual heuristics, text context, or model feedback.
  */
 export function classifyAsset(
-  fileName: string,
+  _fileName: string,
   userSelectedAsset: string = '',
-  userNotes: string = '',
+  _userNotes: string = '',
   modelClassification?: { category: string; confidence: number },
   visualClassification?: VisionClassificationResult
 ): AssetClassificationResult {
@@ -106,103 +60,66 @@ export function classifyAsset(
                        userSelectedAsset.toLowerCase().includes('unspecified');
 
   const cleanSelectedAsset = isAutoDetect ? '' : userSelectedAsset;
-  const combined = ` ${fileName} ${cleanSelectedAsset} ${userNotes} `.toLowerCase();
 
-  // 3. Check for explicit non-inspectable subjects first (Person, Animal, Indoor Room, Landscape)
-  const nonInspectableOrder: AssetCategory[] = ['Person / Human', 'Animal', 'Indoor Room', 'Landscape'];
-  for (const cat of nonInspectableOrder) {
-    const keywords = CATEGORY_KEYWORDS[cat];
-    for (const kw of keywords) {
-      const regex = new RegExp(`\\b${kw}\\b`, 'i');
-      if (regex.test(combined)) {
-        return {
-          category: cat,
-          confidence: 96,
-          confidenceLabel: '96%',
-          source: 'visual_heuristic',
-          reasoning: `Visual indicators and context identify a non-inspectable subject (${kw}).`
-        };
-      }
-    }
+  // 3. If visual classification was explicitly unknown, honor uncertainty (Rule 9)
+  if (visualClassification && visualClassification.category === 'Unknown / Unsupported') {
+    return {
+      category: 'Unknown / Unsupported',
+      confidence: 40,
+      confidenceLabel: '40%',
+      source: 'visual_heuristic',
+      reasoning: visualClassification.reason || 'Visual characteristics unverified. Inspection blocked by zero-fabrication policy.'
+    };
   }
 
-  // 4. Check inspectable industrial & civil categories in file name and user notes
-  const inspectableOrder: AssetCategory[] = [
-    'Solar Panel',
-    'Railway Infrastructure',
-    'Electrical Pole',
-    'Pipeline',
-    'Road',
-    'Bridge',
-    'Building',
-    'Industrial Machinery',
-    'Vehicle / Equipment'
-  ];
-
-  for (const cat of inspectableOrder) {
-    const keywords = CATEGORY_KEYWORDS[cat];
-    for (const kw of keywords) {
-      const regex = new RegExp(`\\b${kw}\\b`, 'i');
-      if (regex.test(combined)) {
-        return {
-          category: cat,
-          confidence: 88,
-          confidenceLabel: '88%',
-          source: 'visual_heuristic',
-          reasoning: `Key engineering features identify asset as ${cat} (${kw}).`
-        };
-      }
-    }
-  }
-
-  // 5. Fallback if user explicitly selected a pre-registered asset (only if not Auto-detect)
+  // 4. If user explicitly specified a verified engineering asset in metadata (post-classification confirmation only)
   if (cleanSelectedAsset && cleanSelectedAsset.trim().length > 3) {
     const clean = cleanSelectedAsset.toLowerCase();
     if (clean.includes('motor') || clean.includes('pump') || clean.includes('compressor') || clean.includes('gearbox')) {
       return {
         category: 'Industrial Machinery',
-        confidence: 85,
-        confidenceLabel: '85%',
+        confidence: 75,
+        confidenceLabel: '75%',
         source: 'metadata_inference',
-        reasoning: `Matched against registered industrial machine registry.`
+        reasoning: `User-specified asset registry metadata (${cleanSelectedAsset}).`
+      };
+    }
+    if (clean.includes('bridge') || clean.includes('viaduct') || clean.includes('pier')) {
+      return {
+        category: 'Bridge',
+        confidence: 75,
+        confidenceLabel: '75%',
+        source: 'metadata_inference',
+        reasoning: `User-specified asset registry metadata (${cleanSelectedAsset}).`
       };
     }
     if (clean.includes('pillar') || clean.includes('beam') || clean.includes('joint') || clean.includes('concrete')) {
       return {
         category: 'Building',
-        confidence: 85,
-        confidenceLabel: '85%',
+        confidence: 75,
+        confidenceLabel: '75%',
         source: 'metadata_inference',
-        reasoning: `Matched against registered structural infrastructure registry.`
+        reasoning: `User-specified structural metadata (${cleanSelectedAsset}).`
       };
     }
     if (clean.includes('tank') || clean.includes('pipe') || clean.includes('vessel')) {
       return {
         category: 'Pipeline',
-        confidence: 85,
-        confidenceLabel: '85%',
+        confidence: 75,
+        confidenceLabel: '75%',
         source: 'metadata_inference',
-        reasoning: `Matched against registered storage and pipeline registry.`
-      };
-    }
-    if (clean.includes('panel') || clean.includes('transformer')) {
-      return {
-        category: 'Electrical Pole',
-        confidence: 85,
-        confidenceLabel: '85%',
-        source: 'metadata_inference',
-        reasoning: `Matched against electrical asset registry.`
+        reasoning: `User-specified piping metadata (${cleanSelectedAsset}).`
       };
     }
   }
 
-  // 6. Unknown / Low Confidence Fallback
+  // 5. Unknown / Low Confidence Fallback (Rule 1 & Rule 9: Never guess engineering asset from filename)
   return {
     category: 'Unknown / Unsupported',
-    confidence: 42,
-    confidenceLabel: '42%',
-    source: 'visual_heuristic',
-    reasoning: 'Image does not exhibit clear characteristics of any supported infrastructure category.'
+    confidence: 40,
+    confidenceLabel: '40%',
+    source: 'metadata_inference',
+    reasoning: 'Visual content cannot be confirmed as a supported engineering asset. Inspection suppressed.'
   };
 }
 
