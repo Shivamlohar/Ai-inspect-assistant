@@ -13,7 +13,7 @@ export interface AssetClassificationResult {
   reasoning: string;
 }
 
-import { classifyVisualInput, analyzeImagePixelsForBiometrics, type VisionClassificationResult } from './visionClassifier';
+import { classifyVisualInput, analyzeImagePixelsForBiometrics, type VisionClassificationResult } from './visionClassifier.ts';
 
 export { classifyVisualInput, analyzeImagePixelsForBiometrics };
 

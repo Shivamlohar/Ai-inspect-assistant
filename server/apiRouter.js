@@ -30,7 +30,7 @@ export function sendJson(res, statusCode, data) {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, x-gemini-key',
     'Cache-Control': 'no-store'
   });
   res.end(JSON.stringify(data));
@@ -42,7 +42,7 @@ export async function handleApiRequest(req, res, reqPath) {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With'
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, x-gemini-key'
     });
     res.end();
     return true;
@@ -176,7 +176,6 @@ export async function handleApiRequest(req, res, reqPath) {
       if (apiKey && apiKey.trim().length > 10 && imageBase64) {
         try {
           const pureBase64 = imageBase64.replace(/^data:[^;]+;base64,/, '');
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_VISION_MODEL}:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
           
           const prompt = `You are the first-stage visual content classifier for an engineering asset inspection system.
 
@@ -185,14 +184,14 @@ Analyze ONLY the visual contents of the provided image.
 Determine the primary subject and whether the image contains a supported engineering inspection asset.
 
 Supported assets:
-- road
-- bridge
-- building
-- industrial machinery
-- electrical pole
-- pipeline
-- solar panel
-- railway infrastructure
+- road (pavements, highways, asphalt, streets)
+- bridge (viaducts, overpasses, piers, abutments)
+- building (civil structures, concrete beams, columns, slabs, masonry)
+- industrial machinery (motors, pumps, generators, compressors, turbines, gearboxes, plant equipment, mechanical systems)
+- electrical pole (utility poles, transmission towers, transformers)
+- pipeline (oil/gas pipes, industrial conduits, flanges)
+- solar panel (photovoltaic arrays, PV modules)
+- railway infrastructure (tracks, ties, catenary, rails)
 
 Unsupported primary subjects:
 - person
@@ -210,14 +209,12 @@ Unsupported primary subjects:
 - document
 - unknown
 
-Do NOT perform defect detection.
-Do NOT invent cracks.
-Do NOT invent corrosion.
-Do NOT calculate engineering measurements.
-Do NOT assume an engineering asset.
-
-If the image is ambiguous, return UNKNOWN.
-If a person is the dominant subject and no supported asset is clearly the inspection target, return PERSON.
+CRITICAL CLASSIFICATION RULES:
+1. Industrial machinery components (such as electric motors, copper stator windings, rust, brass fittings, metallic casings, industrial nameplates, and orange/amber paint) are INDUSTRIAL MACHINERY and MUST NEVER be classified as a person.
+2. Only classify as "person" if an actual living human, human face, or human body is the primary visual subject.
+3. If the primary subject is an engineering asset with incidental people in the background, classify as the engineering asset.
+4. Do NOT perform defect detection. Do NOT invent cracks or corrosion.
+5. If the image is ambiguous or unsupported, return UNKNOWN.
 
 Return strict JSON only matching this schema:
 {
@@ -228,21 +225,47 @@ Return strict JSON only matching this schema:
   "reason": "Clear explanation of classification based strictly on visible pixels."
 }`;
 
-          const geminiResp = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{
-                parts: [
-                  { text: prompt },
-                  { inline_data: { mime_type: mimeType.startsWith('image/') ? mimeType : 'image/jpeg', data: pureBase64 } }
-                ]
-              }],
-              generationConfig: { temperature: 0.1, maxOutputTokens: 400 }
-            })
-          });
+          // Candidate models: prefer configured GEMINI_VISION_MODEL, fallback if needed
+          const candidateModels = [GEMINI_VISION_MODEL];
+          if (!candidateModels.includes('gemini-1.5-flash')) {
+            candidateModels.push('gemini-1.5-flash');
+          }
+          if (!candidateModels.includes('gemini-2.0-flash')) {
+            candidateModels.push('gemini-2.0-flash');
+          }
 
-          if (geminiResp.ok) {
+          let geminiResp = null;
+          let activeModel = GEMINI_VISION_MODEL;
+
+          for (const modelName of candidateModels) {
+            try {
+              const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
+              const resp = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents: [{
+                    parts: [
+                      { text: prompt },
+                      { inline_data: { mime_type: mimeType.startsWith('image/') ? mimeType : 'image/jpeg', data: pureBase64 } }
+                    ]
+                  }],
+                  generationConfig: { temperature: 0.1, maxOutputTokens: 400 }
+                })
+              });
+              if (resp.ok) {
+                geminiResp = resp;
+                activeModel = modelName;
+                break;
+              } else {
+                console.warn(`[GEMINI CLASSIFY] Model ${modelName} returned status ${resp.status}`);
+              }
+            } catch (err) {
+              console.warn(`[GEMINI CLASSIFY] Error with model ${modelName}:`, err.message);
+            }
+          }
+
+          if (geminiResp && geminiResp.ok) {
             const resJson = await geminiResp.json();
             const text = resJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
             const match = text.match(/\{[\s\S]*\}/);
@@ -250,28 +273,82 @@ Return strict JSON only matching this schema:
               const parsed = JSON.parse(match[0]);
               const rawCategory = String(parsed.primaryCategory || parsed.category || 'unknown').toLowerCase().trim();
               
-              const isPerson = rawCategory.includes('person') || rawCategory.includes('human') || rawCategory.includes('selfie') || rawCategory.includes('portrait') || rawCategory.includes('face');
+              const isPerson = rawCategory === 'person' || rawCategory === 'human' || rawCategory === 'selfie' || rawCategory === 'portrait' || rawCategory === 'face' || rawCategory.includes('people') || (rawCategory.includes('person') && !rawCategory.includes('machinery') && !rawCategory.includes('motor'));
+              const isMachinery = rawCategory.includes('machin') || rawCategory.includes('motor') || rawCategory.includes('pump') || rawCategory.includes('compressor') || rawCategory.includes('turbine') || rawCategory.includes('engine') || rawCategory.includes('gearbox');
               const isAnimal = rawCategory.includes('animal') || rawCategory.includes('pet') || rawCategory.includes('dog') || rawCategory.includes('cat');
               const isRoom = rawCategory.includes('room') || rawCategory.includes('indoor') || rawCategory.includes('furniture');
               const isLandscape = rawCategory.includes('landscape') || rawCategory.includes('nature') || rawCategory.includes('foliage');
-              const isUnsupported = isPerson || isAnimal || isRoom || isLandscape || rawCategory.includes('unknown') || rawCategory.includes('screenshot') || rawCategory.includes('document');
+              const isRoad = rawCategory.includes('road') || rawCategory.includes('highway') || rawCategory.includes('asphalt') || rawCategory.includes('pavement');
+              const isBridge = rawCategory.includes('bridge') || rawCategory.includes('viaduct');
+              const isBuilding = rawCategory.includes('building') || rawCategory.includes('concrete structure') || rawCategory.includes('beam') || rawCategory.includes('column');
+              const isPole = rawCategory.includes('pole') || rawCategory.includes('utility');
+              const isPipe = rawCategory.includes('pipe') || rawCategory.includes('pipeline');
+              const isSolar = rawCategory.includes('solar') || rawCategory.includes('photovoltaic');
+              const isRail = rawCategory.includes('rail') || rawCategory.includes('train');
 
-              const finalCategory = isPerson ? 'person' : (isAnimal ? 'animal' : (isRoom ? 'room' : (isLandscape ? 'landscape' : (isUnsupported ? 'unknown' : rawCategory))));
-              const isEligible = Boolean(!isUnsupported && parsed.inspectionEligible !== false);
+              let finalCategory = 'unknown';
+              let isEligible = false;
+              let assetType = null;
+
+              if (isPerson) {
+                finalCategory = 'person';
+                isEligible = false;
+                assetType = null;
+              } else if (isMachinery) {
+                finalCategory = 'industrial machinery';
+                isEligible = true;
+                assetType = 'industrial machinery';
+              } else if (isBridge) {
+                finalCategory = 'bridge';
+                isEligible = true;
+                assetType = 'bridge';
+              } else if (isRoad) {
+                finalCategory = 'road';
+                isEligible = true;
+                assetType = 'road';
+              } else if (isBuilding) {
+                finalCategory = 'building';
+                isEligible = true;
+                assetType = 'building';
+              } else if (isPole) {
+                finalCategory = 'electrical pole';
+                isEligible = true;
+                assetType = 'electrical pole';
+              } else if (isPipe) {
+                finalCategory = 'pipeline';
+                isEligible = true;
+                assetType = 'pipeline';
+              } else if (isSolar) {
+                finalCategory = 'solar panel';
+                isEligible = true;
+                assetType = 'solar panel';
+              } else if (isRail) {
+                finalCategory = 'railway infrastructure';
+                isEligible = true;
+                assetType = 'railway infrastructure';
+              } else if (isAnimal) {
+                finalCategory = 'animal';
+              } else if (isRoom) {
+                finalCategory = 'room';
+              } else if (isLandscape) {
+                finalCategory = 'landscape';
+              } else {
+                finalCategory = 'unknown';
+              }
 
               const confVal = typeof parsed.confidence === 'number' 
                 ? (parsed.confidence > 1 ? parsed.confidence / 100 : parsed.confidence)
-                : 0.85;
+                : 0.90;
 
               sendJson(res, 200, {
                 success: true,
                 primaryCategory: finalCategory,
-                assetType: isEligible ? (parsed.assetType || finalCategory) : null,
+                assetType: isEligible ? (assetType || parsed.assetType || finalCategory) : null,
                 confidence: Math.round(confVal * 100) / 100,
                 inspectionEligible: isEligible,
-                reason: parsed.reason || (isEligible ? 'Supported engineering asset identified.' : 'Subject is not an eligible engineering inspection asset.'),
+                reason: parsed.reason || (isEligible ? 'Supported engineering asset identified.' : (isPerson ? 'Primary visual subject is a person / human.' : 'Subject is not an eligible engineering inspection asset.')),
                 modelName: 'Google Gemini Vision',
-                modelVersion: GEMINI_VISION_MODEL,
+                modelVersion: activeModel,
                 inspectionId: reqId,
                 classificationTimestamp: nowIso
               });
@@ -292,7 +369,7 @@ Return strict JSON only matching this schema:
         assetType: null,
         confidence: 0,
         inspectionEligible: false,
-        reason: 'Visual classification service unavailable.',
+        reason: apiKey ? 'Visual classification model unavailable.' : 'Visual classification service requires server GEMINI_API_KEY.',
         modelName: 'None (Service Unavailable)',
         modelVersion: GEMINI_VISION_MODEL,
         inspectionId: reqId,
@@ -343,22 +420,23 @@ Return strict JSON only matching this schema:
         !catLower.includes('unsupported')
       );
 
-      // Ensure asset exists in DB only if genuine inspectable asset
-      const existingAsset = assetDb.getById(payload.assetId);
-      if (!existingAsset && payload.assetId && isEligible) {
+      // Ensure asset exists in DB before inserting foreign-keyed inspection record
+      const resolvedAssetId = payload.assetId || (isEligible ? 'MACH-M401' : 'NON-ASSET-01');
+      const existingAsset = assetDb.getById(resolvedAssetId);
+      if (!existingAsset) {
         assetDb.create({
-          asset_id: payload.assetId,
-          asset_type: payload.detectedCategory || 'Industrial Machinery',
-          name: payload.assetName || payload.assetId,
-          location: 'Field Site',
-          material: 'Reinforced Material'
+          asset_id: resolvedAssetId,
+          asset_type: payload.detectedCategory || (isEligible ? 'Industrial Machinery' : 'Non-Inspectable Subject'),
+          name: payload.assetName || (isEligible ? 'Asset Inspection' : 'Non-Inspectable Subject'),
+          location: isEligible ? 'Field Site' : 'Out of Scope',
+          material: isEligible ? 'Reinforced Material' : 'Non-Structural'
         });
       }
 
       // Persist inspection to SQLite with strict zero-fabrication gating
       inspectionDb.create({
         id: inspectionId,
-        asset_id: payload.assetId || (isEligible ? 'ASSET-GEN' : 'NON-ASSET-01'),
+        asset_id: resolvedAssetId,
         asset_name: payload.assetName || (isEligible ? 'Asset Inspection' : 'Non-Inspectable Subject'),
         inspection_date: payload.inspectionTimestamp || new Date().toISOString(),
         input_type: payload.inputType || 'static_image',

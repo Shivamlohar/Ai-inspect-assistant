@@ -114,7 +114,7 @@ function seedInitialData() {
 
 export const assetDb = {
   getAll: () => db.prepare('SELECT * FROM assets ORDER BY asset_type, name').all(),
-  getById: (id) => db.prepare('SELECT * FROM assets WHERE asset_id = ? OR id = ?').get(id, id),
+  getById: (id) => (!id ? null : db.prepare('SELECT * FROM assets WHERE asset_id = ? OR id = ?').get(id, id)),
   create: (asset) => {
     return db.prepare(`
       INSERT INTO assets (id, asset_id, asset_type, name, location, material, installation_date, operational_status, created_at)
@@ -163,6 +163,7 @@ export const inspectionDb = {
     );
   },
   getById: (id) => {
+    if (!id) return null;
     const inspection = db.prepare('SELECT * FROM inspections WHERE id = ?').get(id);
     if (!inspection) return null;
     const defects = db.prepare('SELECT * FROM defects WHERE inspection_id = ?').all(id);

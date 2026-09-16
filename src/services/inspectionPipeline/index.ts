@@ -4,17 +4,17 @@
  * transparent scoring, and evidence-based reporting.
  */
 
-import type { PipelineInspectionResult, InspectionInputType } from './types';
-import { validateImageQuality } from './imageValidator';
-import { classifyAsset, type AssetClassificationResult } from './assetClassifier';
-import { checkInspectionEligibility } from './inspectionEligibility';
-import { detectDefects } from './defectDetector';
-import { calculateAssetHealthScore } from './healthScoreCalculator';
-import { compareWithHistoricalAudits } from './historicalComparator';
-import { generateRecommendedSteps } from './recommendationEngine';
-import { retrieveInspectionKnowledge } from './knowledgeRetriever';
-import { validateEvidence } from './evidenceValidator';
-import { classifyVisualInput, type VisionClassificationResult } from './visionClassifier';
+import type { PipelineInspectionResult, InspectionInputType } from './types.ts';
+import { validateImageQuality } from './imageValidator.ts';
+import { classifyAsset, type AssetClassificationResult } from './assetClassifier.ts';
+import { checkInspectionEligibility } from './inspectionEligibility.ts';
+import { detectDefects } from './defectDetector.ts';
+import { calculateAssetHealthScore } from './healthScoreCalculator.ts';
+import { compareWithHistoricalAudits } from './historicalComparator.ts';
+import { generateRecommendedSteps } from './recommendationEngine.ts';
+import { retrieveInspectionKnowledge } from './knowledgeRetriever.ts';
+import { validateEvidence } from './evidenceValidator.ts';
+import { classifyVisualInput, type VisionClassificationResult } from './visionClassifier.ts';
 
 export interface PipelineExecutionOptions {
   fileName?: string;

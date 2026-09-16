@@ -6,6 +6,15 @@
 
 import type { AssetCategory } from './types';
 
+function getStoredApiKey(): string {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem('gemini_api_key') || '';
+    }
+  } catch {}
+  return '';
+}
+
 export interface VisionClassificationResult {
   category: AssetCategory;
   confidence: number; // 0 - 100
@@ -123,23 +132,17 @@ export function analyzeImagePixelsForBiometrics(
   const skinRatio = skinPixelCount / totalPixels;
   const portraitRoiRatio = portraitRoiTotalPixels > 0 ? (portraitRoiSkinCount / portraitRoiTotalPixels) : 0;
 
-  // Decision Thresholds:
-  // A selfie / portrait or person photo typically has:
-  // - Over 13% skin tone in the portrait ROI, OR
-  // - Over 18% total skin tone in the frame
-  const isPerson = (portraitRoiRatio >= 0.13 && skinRatio >= 0.07) || (skinRatio >= 0.18);
-  const confidence = isPerson 
-    ? Math.min(99, Math.round(85 + (portraitRoiRatio * 25) + (skinRatio * 15))) 
-    : Math.max(30, Math.round((1 - portraitRoiRatio) * 80));
-
+  // Decision Thresholds (Non-Negotiable Architecture):
+  // Skin-tone detection must NOT be used as the primary person classifier.
+  // Pixel color space histograms cannot distinguish between copper motor stator coils,
+  // rust, brass fittings, amber machinery paint, or warm workshop lighting and human skin.
+  // Human/person classification is exclusively determined by multimodal vision AI models.
   return {
-    isPerson,
-    confidence,
+    isPerson: false,
+    confidence: 0,
     skinRatio: Math.round(skinRatio * 100) / 100,
     portraitRoiRatio: Math.round(portraitRoiRatio * 100) / 100,
-    reason: isPerson
-      ? `Visual biometric analysis detected human skin tone (${Math.round(portraitRoiRatio * 100)}% ROI density, ${Math.round(skinRatio * 100)}% overall) matching portrait/person framing.`
-      : 'No significant human biometric skin tone patterns detected.'
+    reason: 'Pixel color analysis cannot certify person presence. Server-side multimodal vision AI model required.'
   };
 }
 
@@ -170,28 +173,10 @@ export async function classifyImageVisualLocal(
           ctx.drawImage(loadedImg, 0, 0, 160, 160);
           const imageData = ctx.getImageData(0, 0, 160, 160);
 
-          // 1. Biometric skin tone & portrait check
-          const bio = analyzeImagePixelsForBiometrics(imageData);
-
-          if (bio.isPerson) {
-            resolve({
-              category: 'Person / Human',
-              confidence: bio.confidence,
-              confidenceLabel: `${bio.confidence}%`,
-              isEligible: false,
-              subjectDescription: 'Human / Person (Portrait or Selfie)',
-              reason: 'The uploaded image contains a person / unsupported subject. Structural and industrial inspection cannot be performed on non-infrastructure images.',
-              modelUsed: 'Local Computer Vision Biometric & Skin-Tone Classifier',
-              source: 'local_biometric_cv',
-              skinToneRatio: bio.skinRatio,
-              portraitRatio: bio.portraitRoiRatio
-            });
-            return;
-          }
-
-          // 2. Environmental vegetation check (Landscape)
           let greenPixels = 0;
           let lowSatGrayPixels = 0;
+          let metallicGrayCount = 0;
+          let mechanicalPixelCount = 0;
           const total = 160 * 160;
           const data = imageData.data;
 
@@ -213,8 +198,19 @@ export async function classifyImageVisualLocal(
             if (s < 0.16 && max > 40 && max < 210) {
               lowSatGrayPixels++;
             }
+
+            // Metallic casing / cast iron / machined metal
+            if (s < 0.25 && max > 45 && max < 225) {
+              metallicGrayCount++;
+            }
+
+            // High contrast machinery features (copper windings, brass, amber/orange paint, mechanical parts)
+            if ((r > 75 && g > 35 && b < 60) || (s < 0.32 && max > 55)) {
+              mechanicalPixelCount++;
+            }
           }
 
+          // 1. Environmental vegetation check (Landscape)
           if (greenPixels / total > 0.38) {
             resolve({
               category: 'Landscape',
@@ -229,7 +225,7 @@ export async function classifyImageVisualLocal(
             return;
           }
 
-          // 3. Concrete / Asphalt Civil infrastructure signatures
+          // 2. Concrete / Asphalt Civil infrastructure signatures
           if (lowSatGrayPixels / total > 0.45) {
             resolve({
               category: 'Building',
@@ -244,7 +240,22 @@ export async function classifyImageVisualLocal(
             return;
           }
 
-          // Default fallback
+          // 3. Industrial Machinery / Mechanical features
+          if (mechanicalPixelCount / total > 0.30 || metallicGrayCount / total > 0.38) {
+            resolve({
+              category: 'Industrial Machinery',
+              confidence: 82,
+              confidenceLabel: '82%',
+              isEligible: true,
+              subjectDescription: 'Industrial Machinery / Mechanical Asset Component',
+              reason: 'Optical texture and metallic profile consistent with industrial machinery casing, motor, or mechanical plant equipment.',
+              modelUsed: 'Local Computer Vision Mechanical Texture Classifier',
+              source: 'local_biometric_cv'
+            });
+            return;
+          }
+
+          // Default fallback (Never assume person or guess without verification)
           resolve(createUnknownResult('Visual characteristics unverified'));
         } catch (err: any) {
           console.warn('Local optical image analysis error:', err);
@@ -319,9 +330,15 @@ export async function classifyVisualInput(
         ? mediaUrlOrBase64 
         : (mediaUrlOrBase64.length > 200 ? `data:${mimeType};base64,${mediaUrlOrBase64}` : mediaUrlOrBase64);
 
+      const clientKey = getStoredApiKey();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (clientKey) {
+        headers['x-gemini-key'] = clientKey;
+      }
+
       const serverResp = await fetch('/api/vision/classify', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           imageBase64: pureBase64,
           mimeType

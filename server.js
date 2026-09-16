@@ -3,6 +3,32 @@ import fs from 'fs';
 import path from 'path';
 import zlib from 'zlib';
 import { fileURLToPath } from 'url';
+
+// Load environment variables from .env if present (Server-side Gemini configuration)
+try {
+  if (typeof process.loadEnvFile === 'function') {
+    process.loadEnvFile();
+  }
+} catch {
+  try {
+    const envPath = path.resolve(process.cwd(), '.env');
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, 'utf8');
+      for (const line of content.split('\n')) {
+        const trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith('#') && trimmed.includes('=')) {
+          const idx = trimmed.indexOf('=');
+          const k = trimmed.slice(0, idx).trim();
+          const v = trimmed.slice(idx + 1).trim().replace(/^['"]|['"]$/g, '');
+          if (k && !process.env[k]) {
+            process.env[k] = v;
+          }
+        }
+      }
+    }
+  } catch {}
+}
+
 import { initDatabase } from './server/db/database.js';
 import { seedAuthoritativeKnowledgeBase } from './server/rag/knowledgeBase.js';
 import { handleApiRequest } from './server/apiRouter.js';
