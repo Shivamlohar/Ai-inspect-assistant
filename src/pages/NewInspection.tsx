@@ -5,6 +5,8 @@ import {
   Image as ImageIcon, 
   Video, 
   Mic, 
+  Volume2,
+  Loader2,
   Sparkles, 
   AlertCircle, 
   RotateCcw, 
@@ -102,6 +104,16 @@ export default function NewInspection() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [description, setDescription] = useState('');
+  const [micError, setMicError] = useState<string | null>(null);
+  const [audioLevel, setAudioLevel] = useState<number>(0);
+  const [isMicPermissionPending, setIsMicPermissionPending] = useState(false);
+
+  // Audio & Speech refs
+  const recognitionRef = useRef<any>(null);
+  const audioStreamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const animFrameRef = useRef<number | null>(null);
+  const baseTextRef = useRef<string>('');
 
   // Preset sample media for quick testing
   const samplePresets = [
@@ -288,6 +300,28 @@ export default function NewInspection() {
     }
     return () => clearInterval(interval);
   }, [isRecording]);
+
+  // Clean up audio streams and speech recognition on component unmount
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.onend = null;
+          recognitionRef.current.onerror = null;
+          recognitionRef.current.stop();
+        } catch (e) {}
+      }
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+      }
+      if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach(track => track.stop());
+      }
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        try { audioContextRef.current.close(); } catch (e) {}
+      }
+    };
+  }, []);
 
   const runAiPreScan = async (fileName: string, dataUrl?: string) => {
     setIsAiScanning(true);
@@ -543,54 +577,215 @@ export default function NewInspection() {
     stopCamera();
   };
 
-  // Voice recording toggle with Multilingual Speech Recognition
-  const toggleRecording = () => {
-    if (!isRecording) {
-      setIsRecording(true);
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        try {
-          const recognition = new SpeechRecognition();
-          recognition.continuous = false;
-          recognition.interimResults = true;
-          // Set recognition language: Hindi for Hindi & Hinglish, English for English
-          recognition.lang = selectedLang === 'en' ? 'en-US' : 'hi-IN';
+  // Stop recording and clean up audio resources cleanly
+  const stopRecording = () => {
+    setIsRecording(false);
+    setIsMicPermissionPending(false);
+    setAudioLevel(0);
 
-          recognition.onresult = (event: any) => {
-            const transcript = event.results[0][0].transcript;
-            setDescription(transcript);
-          };
-
-          recognition.onend = () => {
-            setIsRecording(false);
-          };
-
-          recognition.onerror = () => {
-            setIsRecording(false);
-          };
-
-          recognition.start();
-          return;
-        } catch (e) {
-          console.warn('SpeechRecognition fallback');
-        }
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.onend = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.stop();
+      } catch (e) {
+        // Safe ignore
       }
+      recognitionRef.current = null;
+    }
 
-      // Fallback speech simulation tailored to selected language
-      setTimeout(() => {
-        setIsRecording(false);
-        if (selectedLang === 'hi') {
-          setDescription('निरीक्षक अवलोकन: दृश्य निरीक्षण नोट रिकॉर्ड किया गया।');
-        } else {
-          setDescription('Inspector observation recorded for visual audit.');
-        }
-      }, 2500);
-    } else {
-      setIsRecording(false);
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+
+    if (audioStreamRef.current) {
+      try {
+        audioStreamRef.current.getTracks().forEach(track => track.stop());
+      } catch (e) {}
+      audioStreamRef.current = null;
+    }
+
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      try {
+        audioContextRef.current.close();
+      } catch (e) {}
+      audioContextRef.current = null;
     }
   };
 
+  // Voice recording toggle with Multilingual Speech Recognition and live audio meter
+  const toggleRecording = async () => {
+    if (isRecording || isMicPermissionPending) {
+      stopRecording();
+      return;
+    }
+
+    setMicError(null);
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      setMicError(
+        selectedLang === 'hi'
+          ? 'इस ब्राउज़र में स्पीच रिकग्निशन समर्थित नहीं है। कृपया Google Chrome, Edge, या Safari का उपयोग करें, या नीचे त्वरित नोट्स पर क्लिक करें।'
+          : 'Speech recognition is not natively supported in this browser. Please use Chrome, Edge, or Safari, or click the quick observation tags below.'
+      );
+      return;
+    }
+
+    // Request microphone permission explicitly via getUserMedia
+    setIsMicPermissionPending(true);
+    let mediaStream: MediaStream | null = null;
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioStreamRef.current = mediaStream;
+      }
+    } catch (err: any) {
+      setIsMicPermissionPending(false);
+      const isDenied = err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError';
+      const msg = isDenied
+        ? (selectedLang === 'hi'
+            ? 'माइक्रोफ़ोन अनुमति अस्वीकृत है। ब्राउज़र एड्रेस बार में लॉक/आइकॉन पर क्लिक करके माइक्रोफ़ोन को Allow करें।'
+            : 'Microphone access denied. Please click the lock or site settings icon in your browser URL bar, set "Microphone" to Allow, and try again.')
+        : (selectedLang === 'hi'
+            ? `माइक्रोफ़ोन त्रुटि: ${err.message || 'ऑडियो हार्डवेयर उपलब्ध नहीं है'}`
+            : `Microphone device error: ${err.message || 'Audio device not accessible'}`);
+      setMicError(msg);
+      return;
+    }
+
+    setIsMicPermissionPending(false);
+
+    // Initialize Web Audio visualizer meter for live sound wave feedback
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioCtx && mediaStream) {
+        const audioCtx = new AudioCtx();
+        audioContextRef.current = audioCtx;
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 64;
+        analyser.smoothingTimeConstant = 0.4;
+        const source = audioCtx.createMediaStreamSource(mediaStream);
+        source.connect(analyser);
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        const updateAudioMeter = () => {
+          if (!audioStreamRef.current) return;
+          analyser.getByteFrequencyData(dataArray);
+          let sum = 0;
+          for (let i = 0; i < dataArray.length; i++) {
+            sum += dataArray[i];
+          }
+          const avg = sum / dataArray.length;
+          setAudioLevel(Math.min(100, Math.round((avg / 100) * 100)));
+          animFrameRef.current = requestAnimationFrame(updateAudioMeter);
+        };
+        updateAudioMeter();
+      }
+    } catch (audioErr) {
+      console.warn('Audio meter initialization skipped:', audioErr);
+    }
+
+    // Start continuous multilingual speech recognition
+    try {
+      const recognition = new SpeechRecognition();
+      recognitionRef.current = recognition;
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = selectedLang === 'hi' ? 'hi-IN' : 'en-US';
+
+      baseTextRef.current = description.trim();
+
+      recognition.onstart = () => {
+        setIsRecording(true);
+        setMicError(null);
+      };
+
+      recognition.onresult = (event: any) => {
+        let interimText = '';
+        let finalText = '';
+
+        for (let i = 0; i < event.results.length; i++) {
+          const res = event.results[i];
+          if (res.isFinal) {
+            finalText += (finalText ? ' ' : '') + res[0].transcript.trim();
+          } else {
+            interimText += (interimText ? ' ' : '') + res[0].transcript.trim();
+          }
+        }
+
+        const base = baseTextRef.current ? baseTextRef.current + ' ' : '';
+        const combined = (base + finalText).trim();
+        const liveOutput = (combined ? combined + (interimText ? ' ' : '') : '') + interimText;
+        setDescription(liveOutput.trim());
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn('SpeechRecognition error:', event.error);
+        if (event.error === 'no-speech') {
+          return; // Ignore pauses in continuous mode
+        }
+        if (event.error === 'not-allowed') {
+          setMicError(
+            selectedLang === 'hi'
+              ? 'माइक्रोफ़ोन अनुमति ब्राउज़र द्वारा ब्लॉक कर दी गई है। कृपया साइट सेटिंग्स में अनुमति दें।'
+              : 'Microphone permission blocked. Please allow microphone access in browser site settings.'
+          );
+        } else if (event.error === 'network') {
+          setMicError(
+            selectedLang === 'hi'
+              ? 'नेटवर्क त्रुटि: स्पीच सर्विस से संपर्क नहीं हो पाया। इंटरनेट कनेक्शन जांचें।'
+              : 'Network error: speech service could not be reached. Check your internet connection.'
+          );
+        } else if (event.error !== 'aborted') {
+          setMicError(`Voice error (${event.error}). You can also type notes or use quick tags below.`);
+        }
+        stopRecording();
+      };
+
+      recognition.onend = () => {
+        stopRecording();
+      };
+
+      recognition.start();
+    } catch (e: any) {
+      console.error('Failed to initialize speech recognition:', e);
+      setMicError(`Unable to start voice recording: ${e.message || 'Unknown error'}`);
+      stopRecording();
+    }
+  };
+
+  // Quick observation chips
+  const quickObservationTags = selectedLang === 'hi'
+    ? [
+        { label: '+ सतह पर दरार (Crack)', text: 'सतह पर स्पष्ट दरार (Surface Crack) दिखाई दे रही है।' },
+        { label: '+ जंग / संक्षारण (Corrosion)', text: 'धातु आवरण पर गंभीर जंग और संक्षारण (Corrosion/Oxidation) मौजूद है।' },
+        { label: '+ कंपन / आवाज़ (Vibration)', text: 'उपकरण में असामान्य कंपन और बेयरिंग ध्वनि रिकॉर्ड की गई।' },
+        { label: '+ तेल / रिसाव (Fluid Leak)', text: 'सील और फ्लैंज के पास द्रव/तेल रिसाव (Fluid/Oil Leakage) देखा गया।' },
+        { label: '+ वेल्ड जोड़ क्षति (Weld Defect)', text: 'संरचनात्मक वेल्ड सीम में विखंडन और दरार उपस्थित है।' },
+        { label: '+ सामान्य स्थिति (Healthy)', text: 'उपकरण का दृश्य निरीक्षण संतोषजनक, सभी घटक सामान्य सीमा में हैं।' }
+      ]
+    : [
+        { label: '+ Surface Crack', text: 'Visible hairline fracture and surface cracking observed on the component.' },
+        { label: '+ Severe Corrosion', text: 'Significant rust, oxidation, and surface corrosion detected on structural casing.' },
+        { label: '+ Abnormal Vibration', text: 'Abnormal mechanical vibration and acoustic anomaly detected during operation.' },
+        { label: '+ Fluid Leakage', text: 'Active lubricant or hydraulic fluid weepage identified near mechanical seal.' },
+        { label: '+ Weld Seam Defect', text: 'Structural weld seam degradation and stress concentration noticed.' },
+        { label: '+ Nominal Condition', text: 'Component operating within nominal parameters. Zero visible defect identified.' }
+      ];
+
+  const handleAddObservationTag = (tagText: string) => {
+    setDescription(prev => {
+      const trimmed = prev.trim();
+      if (!trimmed) return tagText;
+      return `${trimmed}\n• ${tagText}`;
+    });
+  };
+
   const handleStartInspection = () => {
+    stopRecording();
     clearSessionDraft();
     const apiKey = getGeminiApiKey();
     const hasGemini = Boolean(apiKey && apiKey.trim().length > 10 && mediaFile?.base64);
@@ -1139,7 +1334,12 @@ export default function NewInspection() {
                 <button
                   key={lang.code}
                   type="button"
-                  onClick={() => setSelectedLang(lang.code)}
+                  onClick={() => {
+                    setSelectedLang(lang.code);
+                    if (isRecording) {
+                      stopRecording();
+                    }
+                  }}
                   className={`px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 cursor-pointer ${
                     selectedLang === lang.code
                       ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
@@ -1152,27 +1352,124 @@ export default function NewInspection() {
               ))}
             </div>
 
+            {/* Permission Prompt Banner */}
+            {isMicPermissionPending && (
+              <div className="w-full max-w-lg p-3 rounded-2xl bg-blue-500/10 border border-blue-500/30 text-blue-600 dark:text-blue-400 text-xs font-semibold flex items-center justify-center gap-2 animate-pulse">
+                <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                <span>Requesting microphone permission... Please click "Allow" in your browser prompt.</span>
+              </div>
+            )}
+
+            {/* Microphone Error Alert with Retry */}
+            {micError && (
+              <div className="w-full max-w-xl p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-left space-y-2">
+                <div className="flex items-start gap-2.5 text-amber-700 dark:text-amber-400 text-xs font-bold">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="font-bold">{micError}</p>
+                    <p className="text-[11px] font-normal text-slate-500 dark:text-slate-400 mt-1">
+                      Tip: In Chrome or Edge, click the icon next to <code>http://localhost:10000</code> in your URL bar and toggle "Microphone" to ON.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={toggleRecording}
+                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition shrink-0 cursor-pointer shadow-xs"
+                  >
+                    Retry Permission
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Microphone Button with Audio Meter Visualizer */}
             <div className="flex flex-col items-center gap-3">
-              <button 
-                type="button"
-                onClick={toggleRecording}
-                className={`w-24 h-24 rounded-3xl flex items-center justify-center transition-all cursor-pointer ${
-                  isRecording 
-                    ? 'bg-critical text-white shadow-2xl shadow-critical/40 scale-105 animate-pulse' 
-                    : 'bg-primary text-white shadow-xl shadow-primary/30 hover:scale-105 hover:bg-primary/90'
-                }`}
-                title="Tap to speak"
-              >
-                <Mic className="w-10 h-10" />
-              </button>
+              <div className="relative flex items-center justify-center">
+                {/* Audio pulsing rings when recording */}
+                {isRecording && (
+                  <>
+                    <div 
+                      className="absolute -inset-4 rounded-3xl bg-critical/20 animate-ping pointer-events-none"
+                      style={{ opacity: Math.max(0.2, audioLevel / 100) }}
+                    />
+                    <div 
+                      className="absolute -inset-2 rounded-3xl bg-critical/30 pointer-events-none transition-transform duration-75"
+                      style={{ transform: `scale(${1 + (audioLevel / 100) * 0.2})` }}
+                    />
+                  </>
+                )}
+
+                <button 
+                  type="button"
+                  onClick={toggleRecording}
+                  disabled={isMicPermissionPending}
+                  className={`w-24 h-24 rounded-3xl flex items-center justify-center transition-all cursor-pointer relative z-10 ${
+                    isRecording 
+                      ? 'bg-critical text-white shadow-2xl shadow-critical/50 scale-105' 
+                      : 'bg-primary text-white shadow-xl shadow-primary/30 hover:scale-105 hover:bg-primary/90'
+                  } ${isMicPermissionPending ? 'opacity-70 cursor-wait' : ''}`}
+                  title={isRecording ? 'Tap to stop recording' : 'Tap to speak observation notes'}
+                >
+                  {isMicPermissionPending ? (
+                    <Loader2 className="w-10 h-10 animate-spin" />
+                  ) : (
+                    <Mic className="w-10 h-10" />
+                  )}
+                </button>
+              </div>
+
+              {/* Live Soundwave Equalizer Bars when Recording */}
+              {isRecording && (
+                <div className="flex items-center gap-1 h-5 px-3 py-1 rounded-full bg-critical/10 border border-critical/20">
+                  {[0.4, 0.8, 1.0, 0.7, 0.5].map((scale, i) => (
+                    <span 
+                      key={i}
+                      className="w-1 bg-critical rounded-full transition-all duration-75"
+                      style={{ 
+                        height: `${Math.max(4, Math.round(scale * (audioLevel * 0.18 + 6)))}px` 
+                      }}
+                    />
+                  ))}
+                  <span className="text-[11px] font-black text-critical ml-1.5 uppercase tracking-wider">
+                    {audioLevel > 15 ? 'Receiving Voice' : 'Listening...'}
+                  </span>
+                </div>
+              )}
 
               <div className="space-y-0.5">
-                <p className={`font-black text-base ${isRecording ? 'text-critical' : 'text-slate-700'}`}>
-                  {isRecording ? `Recording... (${recordingSeconds}s) Tap to Stop` : 'Tap to Start Speaking'}
+                <p className={`font-black text-base ${isRecording ? 'text-critical' : 'text-slate-700 dark:text-slate-200'}`}>
+                  {isRecording 
+                    ? `🔴 Recording... (${recordingSeconds}s) • Tap to Stop` 
+                    : 'Tap to Start Speaking'}
                 </p>
                 <p className="text-xs text-slate-400 font-medium">
-                  Voice automatically converted to inspection transcript
+                  {isRecording 
+                    ? `Speech converted live in ${selectedLang === 'hi' ? 'हिंदी (Hindi)' : 'English (US)'}`
+                    : 'Voice automatically transcribed to inspector notes • Continuous mode'}
                 </p>
+              </div>
+            </div>
+
+            {/* Quick Observation Presets (1-Tap Insertion) */}
+            <div className="w-full text-left space-y-2 pt-2">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-400 uppercase tracking-wider">
+                <span className="flex items-center gap-1.5">
+                  <Volume2 className="w-3.5 h-3.5 text-primary" />
+                  {selectedLang === 'hi' ? 'त्वरित निरीक्षण नोट्स (1-टैप प्रविष्टि)' : 'Quick Observation Presets (1-Tap Add)'}
+                </span>
+                <span className="text-[10px] text-slate-400 font-normal">Click any tag to append</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {quickObservationTags.map((tag, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleAddObservationTag(tag.text)}
+                    className="text-xs px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-primary/10 hover:text-primary dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-300 font-semibold transition-all cursor-pointer shadow-2xs hover:scale-[1.02] active:scale-[0.98]"
+                  >
+                    {tag.label}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -1192,7 +1489,11 @@ export default function NewInspection() {
               </div>
               <textarea name="description" id="textarea-description" 
                 className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-slate-800 font-medium text-base min-h-[110px] focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all resize-none"
-                placeholder="Example: Crack visible on the left side. Some corrosion is also present."
+                placeholder={
+                  selectedLang === 'hi'
+                    ? 'उदाहरण: बाईं तरफ स्पष्ट दरार दिखाई दे रही है। मोटर शाफ्ट पर जंग भी मौजूद है...'
+                    : 'Example: Crack visible on the left housing. Bearings show noticeable vibration and surface rust...'
+                }
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               ></textarea>

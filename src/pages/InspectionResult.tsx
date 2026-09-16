@@ -930,7 +930,7 @@ export default function InspectionResult() {
           {/* Active Model / API Badge */}
           <div className="inline-flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-4 py-2 rounded-xl text-xs font-mono text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 mx-auto">
             <span className="font-bold text-primary">Active Vision Model:</span>
-            <span>{pipelineResult?.modelUsed || 'Google Gemini 1.5 Flash Vision / Local Biometric CV'}</span>
+            <span>{pipelineResult?.modelUsed ? (pipelineResult.modelUsed.includes('Biometric') ? 'Conservative Local Fallback' : pipelineResult.modelUsed) : 'Google Gemini 2.5 Flash (Gemini Vision — Asset Classification)'}</span>
           </div>
 
           {/* User Guidance Callout */}

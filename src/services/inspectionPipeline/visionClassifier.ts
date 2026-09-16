@@ -219,8 +219,8 @@ export async function classifyImageVisualLocal(
               isEligible: false,
               subjectDescription: 'Natural Landscape / Foliage',
               reason: 'Natural vegetation and landscape detected. Structural defect metrology is not applicable.',
-              modelUsed: 'Local Computer Vision Environmental Chrominance Classifier',
-              source: 'local_biometric_cv'
+              modelUsed: 'Conservative Local Fallback',
+              source: 'local_cv'
             });
             return;
           }
@@ -234,8 +234,8 @@ export async function classifyImageVisualLocal(
               isEligible: true,
               subjectDescription: 'Concrete / Masonry Infrastructure Structure',
               reason: 'High density of structural low-saturation material consistent with concrete or asphalt infrastructure.',
-              modelUsed: 'Local Computer Vision Structural Texture Classifier',
-              source: 'local_biometric_cv'
+              modelUsed: 'Conservative Local Fallback',
+              source: 'local_cv'
             });
             return;
           }
@@ -249,8 +249,8 @@ export async function classifyImageVisualLocal(
               isEligible: true,
               subjectDescription: 'Industrial Machinery / Mechanical Asset Component',
               reason: 'Optical texture and metallic profile consistent with industrial machinery casing, motor, or mechanical plant equipment.',
-              modelUsed: 'Local Computer Vision Mechanical Texture Classifier',
-              source: 'local_biometric_cv'
+              modelUsed: 'Conservative Local Fallback',
+              source: 'local_cv'
             });
             return;
           }
@@ -286,13 +286,13 @@ export async function classifyImageVisualLocal(
 function createUnknownResult(reason: string): VisionClassificationResult {
   return {
     category: 'Unknown / Unsupported',
-    confidence: 45,
-    confidenceLabel: '45%',
+    confidence: 40,
+    confidenceLabel: '40%',
     isEligible: false,
     subjectDescription: 'Unverified Subject',
     reason: `Image content cannot be certified as a supported civil or industrial asset (${reason}). Defect metrology suppressed.`,
-    modelUsed: 'Local Computer Vision Heuristic Classifier',
-    source: 'local_biometric_cv'
+    modelUsed: 'Conservative Local Fallback',
+    source: 'local_cv'
   };
 }
 export function mapCategoryStringToAssetCategory(cat: string): AssetCategory {
