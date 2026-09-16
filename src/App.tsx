@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react
 import { motion, AnimatePresence } from 'framer-motion';
 import { AnimatedBackground } from './components/AnimatedBackground';
 import { PageTransition } from './components/PageTransition';
+import { InspectionIntro, shouldShowIntro } from './components/InspectionIntro';
 import { 
   LayoutDashboard, 
   Building2, 
@@ -1311,6 +1312,7 @@ function AppShell({
 }
 
 function App() {
+  const [showIntro, setShowIntro] = useState<boolean>(() => shouldShowIntro());
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [currentTheme, setCurrentTheme] = useState<ThemeMode>(() => getStoredTheme());
@@ -1343,6 +1345,7 @@ function App() {
 
   return (
     <ErrorBoundary>
+      {showIntro && <InspectionIntro onComplete={() => setShowIntro(false)} />}
       <Router basename={getBasename()}>
         <HashCleaner />
         <AppShell
