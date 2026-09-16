@@ -48,6 +48,7 @@ import {
   startMultilingualRecognition 
 } from '../utils/multilingualSpeech';
 import { bridge102Img, windTurbine401Img } from '../assets/assetImages';
+import type { PipelineInspectionResult } from '../services/inspectionPipeline';
 
 export default function InspectionResult() {
   const [viewMode, setViewMode] = useState<'ORIGINAL' | 'AI_OVERLAY' | 'COMPARE'>('AI_OVERLAY');
@@ -236,317 +237,219 @@ export default function InspectionResult() {
     };
   });
 
+  const [pipelineResult] = useState<PipelineInspectionResult | null>(() => {
+    try {
+      const stored = sessionStorage.getItem('currentInspectionResult');
+      if (stored) return JSON.parse(stored);
+      const raw = sessionStorage.getItem('currentInspection');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.pipelineResult) return parsed.pipelineResult;
+      }
+    } catch (e) {
+      console.error('Error parsing pipelineResult:', e);
+    }
+    return null;
+  });
+
   const isMachine = inspectionData.isMachine;
   const isGemini = Boolean(inspectionData.isGemini && inspectionData.geminiResult);
   const geminiData = inspectionData.geminiResult;
 
-  // Domain Relevance & False Positive Prevention
-  const isNonAsset = !forceInspectOverride && ((inspectionData as any).isIndustrialAsset === false || 
-                     (geminiData && geminiData.isIndustrialAsset === false) ||
-                     (inspectionData as any).status === 'NON_ASSET' ||
-                     (geminiData && geminiData.status === 'NON_ASSET') ||
-                     (inspectionData as any).assetName?.toLowerCase().includes('non-industrial') ||
-                     (inspectionData as any).assetCategory?.toLowerCase().includes('non-industrial'));
+  // Domain Relevance & Inspection Eligibility (Section 2 & 16)
+  const isNonAsset = !forceInspectOverride && (
+    pipelineResult ? !pipelineResult.inspectionEligible : (
+      (inspectionData as any).isIndustrialAsset === false || 
+      (geminiData && geminiData.isIndustrialAsset === false) ||
+      (inspectionData as any).status === 'NON_ASSET' ||
+      (geminiData && geminiData.status === 'NON_ASSET') ||
+      (inspectionData as any).assetName?.toLowerCase().includes('non-industrial') ||
+      (inspectionData as any).assetCategory?.toLowerCase().includes('non-industrial')
+    )
+  );
 
-  const nonAssetSubject = (inspectionData as any).detectedSubject || (geminiData && geminiData.detectedSubject) || 'Non-Industrial Subject';
-  const nonAssetReason = (inspectionData as any).rejectionReason || (geminiData && geminiData.rejectionReason) || 'The uploaded image does not appear to be an industrial machine, civil infrastructure, power asset, or structural component. Defect metrology has been safely suppressed.';
+  const nonAssetSubject = pipelineResult?.detectedCategory || 
+                         (inspectionData as any).detectedSubject || 
+                         (geminiData && geminiData.detectedSubject) || 
+                         'Non-Industrial Subject';
 
-  // Defensible Score: 72 / 100 as per engineering compliance benchmark & Screenshots 2 & 5
-  const currentScore = isNonAsset ? 0 : (isGemini ? (geminiData.healthScore ?? 72) : 72);
-  const currentSafetyFactor = isNonAsset ? 'N/A' : (isGemini ? (geminiData.safetyFactor ?? '1.15') : (isMachine ? '1.15' : '1.28'));
-  const currentStatus = isNonAsset ? 'Out of Scope (Non-Asset)' : (isGemini ? (geminiData.status ?? 'At Risk') : 'At Risk');
+  const nonAssetReason = pipelineResult?.ineligibilityReason || 
+                        (inspectionData as any).rejectionReason || 
+                        (geminiData && geminiData.rejectionReason) || 
+                        'The uploaded image does not appear to be an industrial machine, civil infrastructure, power asset, or structural component. Defect metrology has been safely suppressed.';
 
-  // Mathematically defensible inspection score breakdown (Screenshots 2 & 5)
-  const scoreBreakdown = [
+  const isDemoData = Boolean(pipelineResult?.isDemoData || (inspectionData as any).isDemoData);
+  const inspectionModeTitle = pipelineResult?.inspectionModeTitle || (inspectionData.mediaType === 'video' ? 'Real-Time AI Inspection' : 'AI Visual Inspection');
+
+  // Defensible Score & Status (Section 8)
+  const currentScore = isNonAsset ? 0 : (pipelineResult?.healthScore?.finalScore ?? (isGemini ? (geminiData.healthScore ?? 72) : 72));
+  const currentSafetyFactor = isNonAsset ? 'N/A' : (pipelineResult?.defects?.length === 0 ? '1.50' : (isGemini ? (geminiData.safetyFactor ?? '1.15') : (isMachine ? '1.15' : '1.28')));
+  const currentStatus = isNonAsset 
+    ? 'Out of Scope (Non-Asset)' 
+    : (pipelineResult?.healthScore?.finalScore !== undefined 
+      ? (pipelineResult.healthScore.finalScore >= 80 ? 'Healthy' : pipelineResult.healthScore.finalScore >= 60 ? 'Attention Needed' : 'Critical') 
+      : (isGemini ? (geminiData.status ?? 'At Risk') : 'At Risk'));
+
+  // Mathematically defensible inspection score breakdown (Section 8: 40/30/20/10 formula)
+  const scoreBreakdown = pipelineResult?.healthScore?.components ? [
     { 
-      name: 'Structural integrity', 
+      name: 'Visual condition', 
       weight: 40, 
-      score: 82, 
-      contribution: 32.8,
+      score: pipelineResult.healthScore.components.visualCondition.score, 
+      contribution: pipelineResult.healthScore.components.visualCondition.contribution,
       color: '#10b981',
-      status: 'Acceptable Baseline',
-      desc: 'Shear capacity verified; tensile rim micro-crack localized'
+      status: 'Weighted 40%',
+      desc: 'Surface visual integrity & artifact evaluation'
     },
     { 
-      name: 'Corrosion', 
-      weight: 25, 
-      score: 54, 
-      contribution: 13.5,
+      name: 'Defect count penalty', 
+      weight: 30, 
+      score: pipelineResult.healthScore.components.defectCondition.score, 
+      contribution: pipelineResult.healthScore.components.defectCondition.contribution,
+      color: '#f97316',
+      status: 'Weighted 30%',
+      desc: `${pipelineResult.defects.length} visual defect candidate(s) detected`
+    },
+    { 
+      name: 'Defect severity penalty', 
+      weight: 20, 
+      score: pipelineResult.healthScore.components.severityPenalty.score, 
+      contribution: pipelineResult.healthScore.components.severityPenalty.contribution,
+      color: '#f59e0b',
+      status: 'Weighted 20%',
+      desc: 'Worst-case visual severity classification'
+    },
+    { 
+      name: 'Model confidence', 
+      weight: 10, 
+      score: pipelineResult.healthScore.components.confidenceFactor.score, 
+      contribution: pipelineResult.healthScore.components.confidenceFactor.contribution,
+      color: '#06b6d4',
+      status: 'Weighted 10%',
+      desc: `Classification confidence: ${pipelineResult.classificationConfidenceLabel}`
+    },
+  ] : [
+    { 
+      name: 'Visual condition', 
+      weight: 40, 
+      score: 80, 
+      contribution: 32,
+      color: '#10b981',
+      status: 'Baseline',
+      desc: 'Visual surface evaluation'
+    },
+    { 
+      name: 'Defect count penalty', 
+      weight: 30, 
+      score: 70, 
+      contribution: 21,
       color: '#f97316',
       status: 'Action Required',
-      desc: 'ISO 8501-1 Grade C oxidation; pitting depth 0.65mm'
+      desc: 'Visual anomaly density'
     },
     { 
-      name: 'Surface condition', 
-      weight: 15, 
-      score: 65, 
-      contribution: 9.75,
-      color: '#f59e0b',
-      status: 'Moderate Wear',
-      desc: 'Surface roughness Ra = 3.2μm across mechanical collar'
-    },
-    { 
-      name: 'Electrical / Thermal', 
+      name: 'Defect severity penalty', 
       weight: 20, 
-      score: 91, 
-      contribution: 18.2,
+      score: 65, 
+      contribution: 13,
+      color: '#f59e0b',
+      status: 'Moderate',
+      desc: 'Visual severity grading'
+    },
+    { 
+      name: 'Model confidence', 
+      weight: 10, 
+      score: 85, 
+      contribution: 8.5,
       color: '#06b6d4',
       status: 'Optimal',
-      desc: 'Thermal dissipation & insulation resistance within spec'
+      desc: 'Classifier certainty factor'
     },
   ];
 
-  const weightedSum = scoreBreakdown.reduce((acc, curr) => acc + curr.contribution, 0);
-
-  const historyData = [
-    { name: 'JAN 2026', score: 96 },
-    { name: 'APR 2026', score: 88 },
-    { name: 'JUL 2026', score: 78 },
-    { name: 'SEP 2026', score: currentScore },
+  // History Data - Only genuine historical points or single baseline (Section 12)
+  const historyData = (pipelineResult?.historicalComparison?.hasHistoricalData && pipelineResult.historicalComparison.previousAudit) ? [
+    { name: pipelineResult.historicalComparison.previousAudit.date, score: pipelineResult.historicalComparison.previousAudit.score },
+    { name: 'Today', score: currentScore },
+  ] : [
+    { name: 'Baseline', score: currentScore },
   ];
 
-  // Actionable Recommended Action Steps (Screenshot 3)
-  const recommendedActionSteps = [
-    {
-      step: 1,
-      title: 'Isolate affected component',
-      detail: 'Initiate Lockout/Tagout (LOTO) protocol. Disconnect electrical power and depressurize local hydraulic load circuits.',
-      timing: 'Immediate (0-2 hrs)'
-    },
-    {
-      step: 2,
-      title: 'Perform ultrasonic thickness measurement (UTM)',
-      detail: 'Deploy calibrated high-frequency UTM probe at 5 designated grid points along fracture boundary to determine wall thickness remaining.',
-      timing: 'Day 1'
-    },
-    {
-      step: 3,
-      title: 'Remove surface corrosion',
-      detail: 'Grit-blast affected recessed chamber to ISO 8501-1 Sa 2.5 bare-metal standard. Grind micro-crack tips to arrest propagation.',
-      timing: 'Day 2'
-    },
-    {
-      step: 4,
-      title: 'Apply structural composite sleeve reinforcement',
-      detail: 'Install high-modulus carbon/epoxy composite sleeve reinforcement over collar crack zone to restore nominal hoop stress rating.',
-      timing: 'Day 3-5'
-    },
-    {
-      step: 5,
-      title: 'Reinspect after treatment',
-      detail: 'Conduct secondary multimodal AI visual scan, verify dimensional clearance, and recalibrate acoustic vibration baseline.',
-      timing: 'Day 7'
-    },
-  ];
+  // Actionable Recommended Action Steps (Section 10: 5-step safe workflow)
+  const recommendedActionSteps = (pipelineResult?.recommendedSteps && pipelineResult.recommendedSteps.length > 0)
+    ? pipelineResult.recommendedSteps
+    : [
+        {
+          step: 1,
+          title: 'Review visual defect annotations',
+          detail: 'Review all AI visual anomaly locations with on-site inspection personnel to verify field context.',
+          timing: 'Immediate'
+        },
+        {
+          step: 2,
+          title: 'Capture high-resolution close-ups',
+          detail: 'Take focused optical photos under even lighting with a reference scale marker placed adjacent to candidate areas.',
+          timing: 'Day 1'
+        },
+        {
+          step: 3,
+          title: 'Perform calibrated physical measurement',
+          detail: 'Deploy calibrated mechanical or optical gauge to obtain certified dimensional measurements.',
+          timing: 'Day 2'
+        },
+        {
+          step: 4,
+          title: 'Qualified engineer assessment',
+          detail: 'Submit image dossier and physical measurements to a certified professional engineer for formal sign-off.',
+          timing: 'Day 3-5'
+        },
+        {
+          step: 5,
+          title: 'Execute verified maintenance protocol',
+          detail: 'Implement repair protocol only as specified and authorized by the qualified structural engineer.',
+          timing: 'Post-Approval'
+        }
+      ];
 
-  const defaultMachineIssues = [
-    { 
-      id: 'CRACK', 
-      name: 'RIM CRACK / FRACTURE', 
-      severity: 'High Severity', 
-      confidenceVal: 96,
-      conf: '96% Confidence', 
-      color: 'critical' as const, 
-      icon: '🔴', 
-      tag: 'Critical Defect',
-      measurements: {
-        length: '14.2 mm',
-        width: '1.4 mm',
-        depth: '2.8 mm',
-        propagation: '+0.4 mm / 100 operating hours'
-      },
-      metricText: 'Length: 14.2 mm • Width: 1.4 mm • Depth: 2.8 mm'
-    },
-    { 
-      id: 'RUST', 
-      name: 'SURFACE OXIDATION & RUST', 
-      severity: 'Medium Severity', 
-      confidenceVal: 89,
-      conf: '89% Confidence', 
-      color: 'attention' as const, 
-      icon: '🟡', 
-      tag: 'Attention Needed',
-      measurements: {
-        area: '18.4% Surface Coverage (84.6 cm²)',
-        pitting: '0.65 mm Pitting Depth',
-        isoGrade: 'ISO 8501-1 Grade C Degradation'
-      },
-      metricText: 'Area: 18.4% (84.6 cm²) • Pitting Depth: 0.65 mm'
-    },
-    { 
-      id: 'WEAR', 
-      name: 'CENTER BORE SPLINE WEAR', 
-      severity: 'Low Severity', 
-      confidenceVal: 84,
-      conf: '84% Confidence', 
-      color: 'healthy' as const, 
-      icon: '🟢', 
-      tag: 'Monitor',
-      measurements: {
-        clearance: '+0.045 mm Radial Clearance',
-        tolerance: 'ISO ±0.015 mm Spec',
-        deviation: '+0.030 mm Tolerance Breach'
-      },
-      metricText: 'Radial Wear: +0.045 mm (Tolerance Spec: ±0.015 mm)'
-    },
-  ];
-
-    const defaultCivilCrackIssues = [
-    { 
-      id: 'CRACK', 
-      name: 'STRUCTURAL BEAM / SLAB FRACTURE', 
-      severity: 'High Severity', 
-      confidenceVal: 97,
-      conf: '97% Confidence', 
-      color: 'critical' as const, 
-      icon: '🔴', 
-      tag: 'Critical Defect',
-      measurements: {
-        length: '1.85 m Vertical Span',
-        width: '4.2 mm Aperture Width',
-        depth: '28.0 mm Penetration Depth',
-        propagation: '+1.2 mm / month'
-      },
-      metricText: 'Aperture: 4.2 mm • Span: 1.85 m • Depth: 28 mm'
-    },
-    { 
-      id: 'RUST', 
-      name: 'CONCRETE SPALLING & DELAMINATION', 
-      severity: 'Medium Severity', 
-      confidenceVal: 91,
-      conf: '91% Confidence', 
-      color: 'attention' as const, 
-      icon: '🟡', 
-      tag: 'Attention Needed',
-      measurements: {
-        area: '18.5% Delaminated Plaster Zone',
-        pitting: '14.0 mm Mortar Spalling Depth',
-        isoGrade: 'IS 456 / EN 1504 Grade 3 Deterioration'
-      },
-      metricText: 'Area: 18.5% • Spalling Depth: 14 mm'
-    },
-    { 
-      id: 'WEAR', 
-      name: 'TENSILE STRESS / REBAR RISK', 
-      severity: 'Low Severity', 
-      confidenceVal: 86,
-      conf: '86% Confidence', 
-      color: 'healthy' as const, 
-      icon: '🟢', 
-      tag: 'Monitor',
-      measurements: {
-        clearance: 'Tension Zone Ingress',
-        tolerance: 'Safety Margin: 1.12',
-        deviation: 'Moisture Intrusion Detected'
-      },
-      metricText: 'Safety Factor: 1.12 • Moisture Ingress Monitored'
-    }
-  ];
-
-  const defaultInfraIssues = [
-    { 
-      id: 'CRACK', 
-      name: 'STRUCTURAL PIER CRACK', 
-      severity: 'High Severity', 
-      confidenceVal: 94,
-      conf: '94% Confidence', 
-      color: 'critical' as const, 
-      icon: '🔴', 
-      tag: 'Critical Defect',
-      measurements: {
-        length: '18.6 mm',
-        width: '2.1 mm',
-        depth: '4.5 mm',
-        propagation: '+0.8 mm / maintenance cycle'
-      },
-      metricText: 'Length: 18.6 mm • Width: 2.1 mm • Depth: 4.5 mm'
-    },
-    { 
-      id: 'RUST', 
-      name: 'CONCRETE SPALLING', 
-      severity: 'Medium Severity', 
-      confidenceVal: 87,
-      conf: '87% Confidence', 
-      color: 'attention' as const, 
-      icon: '🟡', 
-      tag: 'Attention Needed',
-      measurements: {
-        area: '12.1% Surface Area (142 cm²)',
-        pitting: '12.0 mm Delamination Depth',
-        isoGrade: 'EN 1504 Structural Concrete Grade 2'
-      },
-      metricText: 'Area: 12.1% (142 cm²) • Depth: 12 mm'
-    },
-    { 
-      id: 'WEAR', 
-      name: 'REBAR CORROSION EXPOSURE', 
-      severity: 'Low Severity', 
-      confidenceVal: 81,
-      conf: '81% Confidence', 
-      color: 'healthy' as const, 
-      icon: '🟢', 
-      tag: 'Monitor',
-      measurements: {
-        clearance: '3 Exposed Reinforcement Bars',
-        tolerance: 'Section Loss: 8.2%',
-        deviation: 'Passive Layer Depleted'
-      },
-      metricText: '3 Exposed Rebars • Cross-section Loss: 8.2%'
-    },
-  ];
-
-  const baseIssues = isNonAsset ? [] : ((isGemini && Array.isArray(geminiData.defects) && geminiData.defects.length > 0)
-    ? geminiData.defects.map((d: any, idx: number) => ({
-        id: d.id || `DEFECT_${idx}`,
-        name: d.name || 'Structural Defect',
-        severity: d.severity || 'Medium Severity',
-        confidenceVal: d.confidenceVal || 88,
-        conf: d.conf || '88% Confidence',
-        color: (d.color === 'critical' || d.color === 'attention' || d.color === 'healthy') ? d.color : 'attention',
-        icon: d.icon || '🟡',
-        tag: d.tag || d.severity || 'Anomaly',
-        metricText: d.metricText || 'Geometric variance detected',
-        measurements: d.measurements || {}
-      }))
-    : (isMachine ? defaultMachineIssues : (
-        (inspectionData.assetName?.toLowerCase().includes('beam') || 
-         inspectionData.assetName?.toLowerCase().includes('ceiling') || 
-         inspectionData.assetName?.toLowerCase().includes('slab') ||
-         inspectionData.description?.toLowerCase().includes('crack'))
-        ? defaultCivilCrackIssues
-        : defaultInfraIssues
-      )));
+  const baseIssues = isNonAsset ? [] : (
+    (pipelineResult?.defects && pipelineResult.defects.length > 0)
+      ? pipelineResult.defects.map((d: any, idx: number) => ({
+          id: d.id || `DEFECT_${idx}`,
+          name: d.name,
+          severity: d.severity === 'HIGH' ? 'High Severity' : d.severity === 'MEDIUM' ? 'Medium Severity' : 'Low Severity',
+          confidenceVal: d.confidence,
+          conf: `${d.confidence}% Confidence`,
+          color: d.color,
+          icon: d.icon,
+          tag: d.severity === 'HIGH' ? 'Visual Anomaly (High)' : d.severity === 'MEDIUM' ? 'Visual Anomaly' : 'Monitor',
+          metricText: d.metricText,
+          measurements: {}
+        }))
+      : (isGemini && Array.isArray(geminiData?.defects) && geminiData.defects.length > 0)
+        ? geminiData.defects.map((d: any, idx: number) => ({
+            id: d.id || `DEFECT_${idx}`,
+            name: d.name || 'Visual Defect',
+            severity: d.severity || 'Medium Severity',
+            confidenceVal: d.confidenceVal || 85,
+            conf: d.conf || '85% Confidence',
+            color: (d.color === 'critical' || d.color === 'attention' || d.color === 'healthy') ? d.color : 'attention',
+            icon: d.icon || '🟡',
+            tag: d.tag || d.severity || 'Anomaly',
+            metricText: d.metricText || 'Visual indication observed',
+            measurements: d.measurements || {}
+          }))
+        : []
+  );
 
   const allIssues = isNonAsset ? [] : [...baseIssues, ...customFindings];
 
   const visibleIssues = allIssues.filter((issue: any) => issue.confidenceVal >= confidenceThreshold || issue.isHumanAdded);
 
-  const primaryDefect = isNonAsset ? null : (allIssues[0] || {
-    name: isMachine ? 'RIM CRACK / FRACTURE' : 'STRUCTURAL PIER CRACK',
-    conf: '96% Conf',
-    metricText: '14.2 mm • 96% Conf',
-    severity: 'High Severity',
-    icon: '🔴',
-    color: 'critical' as const
-  });
+  const primaryDefect = isNonAsset ? null : (allIssues[0] || null);
 
-  const secondaryDefect = isNonAsset ? null : (allIssues[1] || {
-    name: isMachine ? 'SURFACE OXIDATION & RUST' : 'CONCRETE SPALLING',
-    conf: '89% Conf',
-    metricText: '18.4% Area • Pitting 0.65mm',
-    severity: 'Medium Severity',
-    icon: '🟡',
-    color: 'attention' as const
-  });
+  const secondaryDefect = isNonAsset ? null : (allIssues[1] || null);
 
-  const tertiaryDefect = isNonAsset ? null : (allIssues[2] || {
-    name: isMachine ? 'CENTER BORE SPLINE WEAR' : 'REBAR CORROSION EXPOSURE',
-    conf: '84% Conf',
-    metricText: '+0.045 mm Clearance',
-    severity: 'Low Severity',
-    icon: '🟢',
-    color: 'healthy' as const
-  });
+  const tertiaryDefect = isNonAsset ? null : (allIssues[2] || null);
 
   // Auto-save inspection audit to active officer's persistent work vault on mount
   useEffect(() => {
@@ -595,85 +498,60 @@ export default function InspectionResult() {
             ? 'Condition: Improving (post-maintenance gain)' 
             : 'Condition: Stable',
           detail: `Comparison against past audit by ${past.officerName}. Delta score: ${diffText}. Defect count delta: ${visibleIssues.length - past.defectsCount}.`,
-          failureHorizon: currentScore < 70 ? '~2.8 months' : '~5.4 months'
+          failureHorizon: currentScore < 70 ? 'Intervention recommended' : 'Monitor in normal cycle'
         };
       }
     }
 
-    const name = (inspectionData.assetName || '').toLowerCase();
-    if (name.includes('bridge') || name.includes('pier') || name.includes('dam') || name.includes('concrete')) {
+    // If pipelineResult has historical record from officerStore
+    if (pipelineResult?.historicalComparison?.hasHistoricalData && pipelineResult.historicalComparison.previousAudit) {
+      const prev = pipelineResult.historicalComparison.previousAudit;
+      const diff = pipelineResult.historicalComparison.deltaScore ?? 0;
+      const diffText = diff >= 0 ? `+${diff} pts` : `${diff} pts`;
       return {
-        pastDate: 'June 2026',
-        pastDefect: 'Concrete hairline micro-fracture — 4.8 mm length',
-        pastScore: '89 / 100 Score',
-        currentDate: 'September 2026',
-        currentDefect: 'Shear crack expanded — 18.6 mm length (+13.8 mm growth)',
-        currentScore: '72 / 100 (-17 pts)',
-        condition: 'Condition: Deteriorating (recommended action: schedule epoxy resin pressure injection)',
-        detail: 'Crack propagation rate measured at +4.6 mm per quarter. Tensile stress concentration increasing along pier base.',
-        failureHorizon: '~3.8 months'
-      };
-    } else if (name.includes('transformer') || name.includes('substation') || name.includes('electric')) {
-      return {
-        pastDate: 'June 2026',
-        pastDefect: 'Winding thermal baseline — 62°C nominal operating temp',
-        pastScore: '92 / 100 Score',
-        currentDate: 'September 2026',
-        currentDefect: 'Cooling radiator hotspot — 84°C peak (+22°C variance)',
-        currentScore: '74 / 100 (-18 pts)',
-        condition: 'Condition: Attention Required (recommended action: flush radiator fins & sample dielectric oil)',
-        detail: 'Thermal runaway risk detected near radiator upper manifold. Dielectric breakdown margin narrowing.',
-        failureHorizon: '~5.1 months'
-      };
-    } else if (name.includes('pipeline') || name.includes('pipe') || name.includes('gas') || name.includes('oil')) {
-      return {
-        pastDate: 'June 2026',
-        pastDefect: 'Minor flange pitting — 0.4 mm wall loss',
-        pastScore: '90 / 100 Score',
-        currentDate: 'September 2026',
-        currentDefect: 'Localized wall thinning — 1.8 mm loss with weeping seal',
-        currentScore: '68 / 100 (-22 pts)',
-        condition: 'Condition: Critical Deterioration (recommended action: depressurize and install bolted clamp sleeve)',
-        detail: 'Corrosive hydrogen sulfide pitting accelerating. Hoop stress safety margin reduced below 1.25.',
-        failureHorizon: '~2.9 months'
-      };
-    } else {
-      // Mechanical / default machine
-      return {
-        pastDate: 'June 2026',
-        pastDefect: 'Corrosion detected — 12% surface area',
-        pastScore: '91 / 100 Score',
-        currentDate: 'September 2026',
-        currentDefect: 'Corrosion expanded — 31% surface area (+19% expansion)',
-        currentScore: '72 / 100 (-19 pts)',
-        condition: 'Condition: Deteriorating (recommended action: schedule recoating)',
-        detail: 'Surface oxidation velocity measured at +6.3% per month. Mechanical wear accelerating under elevated thermal friction.',
-        failureHorizon: '~4.2 months'
+        pastDate: prev.date,
+        pastDefect: `${prev.defectsCount} defect(s) recorded`,
+        pastScore: `${prev.score} / 100 Score`,
+        currentDate: 'Today (Live)',
+        currentDefect: `${visibleIssues.length} active defect(s) • Status: ${currentStatus}`,
+        currentScore: `${currentScore} / 100 (${diffText})`,
+        condition: diff < 0 ? 'Condition: Deteriorating (scheduled review advised)' : 'Condition: Stable',
+        detail: `Verified historical audit comparison for ${pipelineResult.assetId}. Score delta: ${diffText}.`,
+        failureHorizon: currentScore < 70 ? 'Intervention recommended' : 'Standard monitoring'
       };
     }
+
+    // Default when no prior records exist: HONEST BASELINE
+    return {
+      pastDate: 'None',
+      pastDefect: 'No historical inspection available for this asset',
+      pastScore: 'N/A',
+      currentDate: 'Today (Live)',
+      currentDefect: `${visibleIssues.length} visual defect(s) recorded`,
+      currentScore: `${currentScore} / 100 (Initial Baseline)`,
+      condition: 'Condition: Initial Baseline Recorded',
+      detail: 'No previous audit records found in work vault for this asset ID. Current inspection serves as the baseline for subsequent rate of deterioration tracking.',
+      failureHorizon: 'Baseline Established (Trend analysis requires subsequent inspection)'
+    };
   };
 
   const compData = getComparisonData();
 
   // Multilingual Voice AI Copilot State
-  const initialLang: InspectionLanguage = ((inspectionData as any).language as InspectionLanguage) || 'hinglish';
+  const initialLang: InspectionLanguage = ((inspectionData as any).language === 'hi' ? 'hi' : 'en');
   const [copilotLang, setCopilotLang] = useState<InspectionLanguage>(initialLang);
   const [copilotInput, setCopilotInput] = useState('');
   const [copilotAnswer, setCopilotAnswer] = useState<string>(() => {
     if (isNonAsset) {
       if (initialLang === 'hi') {
         return `नमस्ते! आपकी अपलोड की गई छवि किसी औद्योगिक मशीन या सिविल ढांचे (ब्रिज/पाइपलाइन) की नहीं है (${nonAssetSubject})। इसलिए गलत रिपोर्ट से बचने के लिए क्रैक और जंग के डिफेक्ट पिन बंद कर दिए गए हैं। कृपया कोई औद्योगिक छवि अपलोड करें।`;
-      } else if (initialLang === 'hinglish') {
-        return `Hello Inspector! Aapki uploaded photo ek non-industrial subject hai (${nonAssetSubject}) aur kisi machine ya civil structure ki nahi lagti. False positive se bachne ke liye AI defect metrology suppress kar di gayi hai.`;
       }
       return `Hello Inspector! The uploaded image is identified as an out-of-scope non-industrial subject (${nonAssetSubject}). Defect metrology and risk pins have been suppressed to prevent false positives.`;
     }
     if (initialLang === 'hi') {
       return 'नमस्ते! मैं आपका एआई वॉयस कॉपायलट हूं। आप मुझसे इस एसेट की स्थिति, कमियों या मरम्मत के बारे में हिंदी में पूछ सकते हैं।';
-    } else if (initialLang === 'hinglish') {
-      return 'Hello Inspector! Main aapka AI Voice Copilot hoon. Aap mujhse is asset ke defects, health score ya repair steps ke baare me Hindi ya English me pooch sakte hain.';
     }
-    return 'Greetings Inspector! I am your AI Voice Copilot. Feel free to ask about structural defects, safety score, or recommended remediation in English, Hindi, or Hinglish.';
+    return 'Greetings Inspector! I am your AI Voice Copilot. Feel free to ask about structural defects, safety score, or recommended remediation in English or Hindi.';
   });
   const [isCopilotListening, setIsCopilotListening] = useState(false);
   const [isSpeakingVoice, setIsSpeakingVoice] = useState(false);
@@ -684,12 +562,6 @@ export default function InspectionResult() {
       'एसेट का हेल्थ स्कोर और स्थिति कैसी है?',
       'विफलता का समय (फेलियर) कब तक है?',
       'तत्काल क्या कदम उठाएं?'
-    ],
-    hinglish: [
-      'Defects summary batao',
-      'Overall health score kaisa hai?',
-      'Failure risk kab tak aayega?',
-      'Immediate repair action kya chahiye?'
     ],
     en: [
       'Summarize top defects',
@@ -747,8 +619,6 @@ export default function InspectionResult() {
           setIsCopilotListening(false);
           const fallbackQ = copilotLang === 'hi' 
             ? 'मुख्य समस्याएं क्या हैं?' 
-            : copilotLang === 'hinglish' 
-            ? 'Defects summary batao' 
             : 'Summarize top defects';
           setCopilotInput(fallbackQ);
           handleAskCopilot(fallbackQ);
@@ -931,14 +801,27 @@ export default function InspectionResult() {
       {/* Asset Header Info */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2 border-b border-slate-200 dark:border-slate-800">
         <div>
-          <div className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 mb-2">
-            <CheckCircle2 className="w-3.5 h-3.5" /> Inspection Completed
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <span className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+              <CheckCircle2 className="w-3.5 h-3.5" /> {isNonAsset ? 'Scan Evaluated' : `${inspectionModeTitle} Completed`}
+            </span>
+            {isDemoData && (
+              <span className="inline-flex items-center gap-1 text-xs font-black uppercase tracking-wider bg-amber-500/15 text-amber-600 dark:text-amber-400 px-3 py-1 rounded-full border border-amber-500/30">
+                🔶 DEMO DATA
+              </span>
+            )}
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
+              👁️ AI Visual Observation
+            </span>
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+              ⚠️ Qualified Engineer Verification Required
+            </span>
           </div>
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
-            {inspectionData.assetName}
+            {isNonAsset ? nonAssetSubject : inspectionData.assetName}
           </h1>
           <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium mt-1">
-            Media Telemetry: <strong className="text-slate-700 dark:text-slate-200 font-mono">{inspectionData.mediaName}</strong> • Real-time AI Metrology & Micro-crack detection active
+            Media Telemetry: <strong className="text-slate-700 dark:text-slate-200 font-mono">{inspectionData.mediaName}</strong> • {isNonAsset ? 'Subject classification complete (Out of inspection scope)' : 'Evidence-based visual anomaly detection active'}
           </p>
         </div>
 
@@ -958,6 +841,86 @@ export default function InspectionResult() {
         </div>
       </div>
 
+      {/* SECTION 16: INSPECTION NOT APPLICABLE VIEW */}
+      {isNonAsset ? (
+        <section className="card p-8 md:p-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl text-center space-y-8 shadow-xl animate-in fade-in">
+          <div className="w-20 h-20 rounded-3xl bg-amber-500/10 text-amber-500 mx-auto flex items-center justify-center">
+            <AlertTriangle className="w-10 h-10" />
+          </div>
+
+          <div className="space-y-2 max-w-xl mx-auto">
+            <div className="inline-flex items-center gap-2 bg-amber-500/10 text-amber-600 dark:text-amber-400 px-3.5 py-1 rounded-full text-xs font-black uppercase tracking-wider border border-amber-500/20">
+              <span>AI Visual Observation • Non-Inspectable Subject</span>
+            </div>
+            <h2 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white">
+              Inspection Not Applicable
+            </h2>
+            <p className="text-slate-600 dark:text-slate-300 text-sm md:text-base leading-relaxed">
+              {nonAssetReason}
+            </p>
+          </div>
+
+          {/* 4 Standard Metrics: Category, Confidence, Defects (0), Health Score (N/A) */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl mx-auto">
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Detected Category</span>
+              <span className="text-base sm:text-lg font-black text-slate-800 dark:text-white truncate block">{nonAssetSubject}</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Model Confidence</span>
+              <span className="text-base sm:text-lg font-black text-cyan-600 dark:text-cyan-400 block">
+                {pipelineResult?.classificationConfidenceLabel || 'Validated'}
+              </span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Defects Tagged</span>
+              <span className="text-base sm:text-lg font-black text-slate-500 block">0 (Suppressed)</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Health Score</span>
+              <span className="text-base sm:text-lg font-black text-slate-500 block">N/A</span>
+            </div>
+          </div>
+
+          {/* User Guidance Callout */}
+          <div className="p-5 rounded-2xl bg-primary/5 border border-primary/20 max-w-2xl mx-auto text-left flex items-start gap-3.5">
+            <ShieldCheck className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <h4 className="text-sm font-bold text-slate-900 dark:text-white">Guidance for Inspector</h4>
+              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                Upload an image of an infrastructure asset, industrial equipment, or road surface to begin automated inspection. The AI pipeline will automatically classify the asset across 14 categories and perform evidence-based visual flaw detection.
+              </p>
+            </div>
+          </div>
+
+          {/* Media Thumbnail Preview */}
+          {inspectionData.mediaUrl && (
+            <div className="max-w-sm mx-auto rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-md">
+              <img src={inspectionData.mediaUrl} alt={inspectionData.mediaName} className="w-full h-48 object-cover" />
+              <div className="p-2.5 bg-slate-900 text-slate-300 text-xs font-mono">
+                {inspectionData.mediaName}
+              </div>
+            </div>
+          )}
+
+          <div className="pt-2 flex flex-wrap items-center justify-center gap-4">
+            <Link to="/inspect" className="btn-primary py-3 px-6 text-sm font-bold flex items-center gap-2">
+              <ArrowLeft className="w-4 h-4" /> Upload New Asset Image
+            </Link>
+            <button 
+              type="button" 
+              onClick={() => setForceInspectOverride(true)}
+              className="text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 underline cursor-pointer"
+            >
+              Inspector Override (Force Metrology)
+            </button>
+          </div>
+        </section>
+      ) : (
+        <>
       {/* =========================================================================
           1. CENTRAL HERO ELEMENT: INSPECTION IMAGE VIEWPORT (Screenshot 4)
       ========================================================================= */}
@@ -1341,10 +1304,10 @@ export default function InspectionResult() {
             ) : (
               <>
                 <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-rose-500"></span> 1 Critical Fracture (96%)
+                  <span className="w-2 h-2 rounded-full bg-rose-500"></span> {visibleIssues.filter((i: any) => i.severity === 'High Severity').length} High Severity
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-amber-400"></span> 1 Corrosion Region (89%)
+                  <span className="w-2 h-2 rounded-full bg-amber-400"></span> {visibleIssues.filter((i: any) => i.severity === 'Medium Severity').length} Medium Severity
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-emerald-400"></span> Safety Factor: <strong>{currentSafetyFactor} SF</strong>
@@ -1609,7 +1572,7 @@ export default function InspectionResult() {
         {/* Quick Voice Query Chips */}
         <div className="space-y-2 relative z-10">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-            {copilotLang === 'hi' ? 'त्वरित प्रश्न:' : copilotLang === 'hinglish' ? 'Quick Voice Prompts:' : 'Suggested Inquiries:'}
+            {copilotLang === 'hi' ? 'त्वरित प्रश्न:' : 'Suggested Inquiries:'}
           </p>
           <div className="flex flex-wrap gap-2">
             {quickPrompts[copilotLang].map((prompt, idx) => (
@@ -1646,9 +1609,7 @@ export default function InspectionResult() {
             placeholder={
               copilotLang === 'hi' 
                 ? 'प्रश्न बोलें या टाइप करें (उदा. मुख्य कमियां क्या हैं?)...' 
-                : copilotLang === 'hinglish' 
-                ? 'Bolkar ya type karke poochein (e.g. Defects summary sunao)...' 
-                : 'Speak or type your question (e.g. What is the failure horizon?)...'
+                : 'Speak or type your question (e.g. What is the asset condition?)...'
             }
             className="flex-1 bg-slate-800/80 border border-slate-700 focus:border-cyan-400 rounded-2xl px-4 py-3 text-xs md:text-sm text-white placeholder:text-slate-500 outline-none transition"
           />
@@ -1676,10 +1637,10 @@ export default function InspectionResult() {
             <div>
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs font-black uppercase tracking-widest text-cyan-600 dark:text-cyan-400">
-                  5. Add an "Inspection Score"
+                  5. Transparent Health Score
                 </span>
                 <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">
-                  ISO 55000 Defensible
+                  4-Factor Formula
                 </span>
               </div>
               <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
@@ -1797,8 +1758,8 @@ export default function InspectionResult() {
                   <div className="pt-3 border-t-2 border-slate-800 dark:border-slate-700 flex items-center justify-between text-sm font-black">
                     <span className="text-slate-800 dark:text-white">Overall Health Score</span>
                     <div className="text-right">
-                      <span className="text-lg text-primary font-black">72 / 100</span>
-                      <p className="text-[10px] font-normal text-slate-400 font-mono">Weighted Total: {weightedSum.toFixed(1)} - 2.3 (Fatigue factor) = 72</p>
+                      <span className="text-lg text-primary font-black">{currentScore} / 100</span>
+                      <p className="text-[10px] font-normal text-slate-400 font-mono">Formula: Visual (40%) + Defects (30%) + Severity (20%) + Confidence (10%)</p>
                     </div>
                   </div>
                 </div>
@@ -1809,7 +1770,7 @@ export default function InspectionResult() {
 
           <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
             <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-            <span>Compliant with ASME & ISO 55000 asset integrity standards. Defensible for civil audits.</span>
+            <span>Mathematical 4-factor health score formula. Physical dimensions require verified field measurement.</span>
           </div>
         </section>
 
@@ -1974,32 +1935,24 @@ export default function InspectionResult() {
               <h3 className="text-lg font-black text-slate-900 dark:text-white">
                 Detected Defect Metrology
               </h3>
-              <p className="text-xs text-slate-400">Sub-millimeter dimension variances</p>
+              <p className="text-xs text-slate-400">Evidence-based visual anomaly candidates</p>
             </div>
             <span className="text-xs font-mono font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-full border border-primary/20">
               {visibleIssues.length} Active Signals
             </span>
           </div>
 
-          {isNonAsset ? (
-            <div className="p-8 text-center space-y-3 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800">
-              <div className="w-12 h-12 mx-auto rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center justify-center font-black text-xl">
+          {visibleIssues.length === 0 ? (
+            <div className="p-8 text-center space-y-3 rounded-2xl bg-emerald-500/5 border border-emerald-500/20">
+              <div className="w-12 h-12 mx-auto rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-black text-xl">
                 ✓
               </div>
               <h4 className="font-extrabold text-base text-slate-900 dark:text-white">
-                Defect Metrology Withheld (0 False Alarms)
+                No Visible Defect Detected
               </h4>
               <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
-                Because this image was classified as an out-of-domain non-industrial subject (<strong className="text-slate-700 dark:text-slate-300">{nonAssetSubject}</strong>), defect detection, bounding boxes, and tolerance measurements were withheld to prevent hallucinated fractures.
+                The visual scan found no significant cracks, corrosion, spalling, or surface defects in the uploaded media. Overall Health Score: 100 / 100 (Healthy Baseline).
               </p>
-              <div className="pt-2">
-                <Link
-                  to="/new-inspection"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold shadow-md hover:bg-primary/90 transition"
-                >
-                  📷 Upload Industrial Asset
-                </Link>
-              </div>
             </div>
           ) : (
             <div className="space-y-3">
@@ -2282,6 +2235,8 @@ export default function InspectionResult() {
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white text-xs font-bold px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 border border-emerald-500/30">
           <CheckCircle2 className="w-4 h-4 text-emerald-400" /> {cmmsToast}
         </div>
+      )}
+        </>
       )}
 
       {/* Add Field Inspector Finding Modal */}

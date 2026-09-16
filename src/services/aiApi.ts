@@ -1,7 +1,9 @@
 /**
  * Google Gemini Multimodal Vision Diagnostic Service
- * Enables live asset defect detection, quantitative metrology, and safety factor evaluation.
+ * Strictly adheres to the 14 asset categories and non-fabrication principles.
  */
+
+import type { AssetCategory, DefectSeverity, VisualDefect } from './inspectionPipeline/types';
 
 const STORAGE_KEY = 'gemini_api_key';
 
@@ -64,46 +66,25 @@ export async function testGeminiApiKey(apiKey: string): Promise<{ success: boole
   }
 }
 
-export interface GeminiDefectItem {
-  id: string;
-  name: string;
-  severity: string;
-  confidenceVal: number;
-  conf: string;
-  color: 'critical' | 'attention' | 'healthy';
-  icon: string;
-  tag: string;
-  metricText: string;
-  measurements: {
-    length?: string;
-    width?: string;
-    depth?: string;
-    propagation?: string;
-    area?: string;
-    pitting?: string;
-    isoGrade?: string;
-    clearance?: string;
-    tolerance?: string;
-    deviation?: string;
-  };
-}
-
 export interface GeminiDiagnosticResult {
-  isIndustrialAsset?: boolean;
-  detectedSubject?: string;
+  isIndustrialAsset: boolean;
+  inspectionEligible: boolean;
+  detectedCategory: AssetCategory;
+  detectedSubject: string;
+  classificationConfidence: number;
   rejectionReason?: string;
   assetName: string;
   category: string;
   healthScore: number;
-  status: 'HEALTHY' | 'ATTENTION' | 'AT RISK' | 'CRITICAL' | 'NON_ASSET';
-  safetyFactor: string;
-  safetyBreached: boolean;
+  status: 'HEALTHY' | 'ATTENTION' | 'AT RISK' | 'CRITICAL' | 'NON_ASSET' | 'MANUAL_VERIFICATION_REQUIRED';
   diagnosticSummary: string;
-  defects: GeminiDefectItem[];
+  aiObservation: string;
+  engineeringAssessment: string;
+  defects: VisualDefect[];
   recommendations: {
-    icon: string;
+    step: number;
     title: string;
-    sub: string;
+    detail: string;
   }[];
   modelUsed: string;
   analysisTimestamp: string;
@@ -113,7 +94,7 @@ export async function analyzeAssetWithGemini(
   apiKey: string,
   base64Data: string,
   mimeType: string,
-  userNotes: string
+  userNotes: string = ''
 ): Promise<GeminiDiagnosticResult> {
   const cleanKey = apiKey.trim();
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(cleanKey)}`;
@@ -122,124 +103,112 @@ export async function analyzeAssetWithGemini(
   const pureBase64 = base64Data.replace(/^data:[^;]+;base64,/, '');
 
   const systemPrompt = `
-You are an ASME & ISO 9001 Senior Asset Integrity & Diagnostic Engineer.
+You are a Rigorous Vision-Based AI Asset Inspection Assistant.
 
-CRITICAL FIRST STEP - DOMAIN VALIDATION:
-Evaluate if this image represents a genuine industrial machine, civil structure, electrical power equipment, pipeline, or engineering component.
-NOTE: Civil engineering structures (including concrete beams, ceiling slabs, walls, lintels, columns, pillars, plaster fissures, conduit-routed structural beams, masonry, pipes, bridges, dams, buildings) ARE 100% VALID INDUSTRIAL & CIVIL ASSETS. If the image shows cracks or damage on a building, wall, ceiling, or beam, set "isIndustrialAsset": true!
+YOUR CORE MANDATE: NEVER INVENT FINDINGS, DEFECTS, OR PHYSICAL MEASUREMENTS THAT ARE NOT VISIBLE IN THE IMAGE.
 
-IF THE IMAGE IS NOT AN INDUSTRIAL ASSET (e.g., animals, pets, hamsters, humans, portraits, food, cartoons, memes, domestic items, landscapes):
+STEP 1: ASSET CLASSIFICATION
+Classify the uploaded image into EXACTLY ONE of the following 14 categories:
+- Road
+- Bridge
+- Building
+- Industrial Machinery
+- Electrical Pole
+- Pipeline
+- Solar Panel
+- Railway Infrastructure
+- Vehicle / Equipment
+- Person / Human
+- Animal
+- Indoor Room
+- Landscape
+- Unknown / Unsupported
+
+Assign a confidence score (0 to 100) for this classification.
+
+STEP 2: INSPECTION ELIGIBILITY CHECK
+If the image belongs to:
+"Person / Human", "Animal", "Indoor Room", "Landscape", or "Unknown / Unsupported", OR classification confidence < 70:
+- Set "inspectionEligible": false
 - Set "isIndustrialAsset": false
-- Set "detectedSubject": A brief label of what is actually in the image (e.g. "Domestic hamsters at computer monitors")
-- Set "rejectionReason": "Non-industrial subject detected. Optical flaw metrology requires physical machinery or structural infrastructure."
-- Set "assetName": "Non-Industrial Image"
-- Set "category": "Non-Engineering Content"
-- Set "healthScore": 0
 - Set "status": "NON_ASSET"
-- Set "safetyFactor": "N/A"
-- Set "safetyBreached": false
-- Set "diagnosticSummary": "Non-industrial subject detected. Defect detection algorithms are deactivated."
-- Set "defects": [] (MUST BE COMPLETELY EMPTY ARRAY. DO NOT GENERATE DEFECTS ON ANIMALS, PETS, OR PEOPLE)
-- Set "recommendations": [
-    {
-      "icon": "⚠️",
-      "title": "Upload Valid Engineering Asset",
-      "sub": "Please take or upload a photo of machinery, bridges, power equipment, or pipelines."
-    }
-  ]
+- Set "healthScore": 0
+- Set "rejectionReason": "The uploaded image does not appear to contain a supported inspectable asset. Structural infrastructure defects cannot be reliably assessed from this image."
+- Set "defects": [] (MUST BE STRICTLY EMPTY ARRAY. DO NOT GENERATE CRACKS, CORROSION, OR REPAIRS FOR A PERSON, ANIMAL, ROOM, OR LANDSCAPE!)
+- Set "aiObservation": "Image content identified as [Category]. Structural inspection is not applicable."
+- Set "engineeringAssessment": "No engineering defect assessment conducted."
 
-IF AND ONLY IF THE IMAGE IS A REAL INDUSTRIAL ASSET:
-- Set "isIndustrialAsset": true
-- Set "detectedSubject": Asset description
-- Carefully inspect for physical defects (cracks, fractures, oxidation, wear, spalling, leaks).
+STEP 3: VISUAL DEFECT DETECTION (ONLY IF ELIGIBLE)
+If and only if the image is an inspectable asset:
+Inspect ONLY for defects that have CLEAR VISUAL EVIDENCE in the image:
+- Surface crack, pothole, concrete spalling, corrosion/rust, paint/coating deterioration, surface damage, visible deformation, oil/fluid leakage.
+- IF NO VISUAL DEFECT EXISTS: return "defects": [] and indicate "No visible defect detected."
 
-User inspector notes: "${userNotes || 'Routine visual asset diagnostic'}"
+CRITICAL RULE ON MEASUREMENTS:
+NEVER fabricate exact physical measurements (NO crack width in mm, NO depth in mm, NO UTM values, NO temperature, NO vibration, NO safety factors).
+Instead, provide descriptive visual evidence and state: "Physical dimensions require calibrated measurement equipment or a reference scale."
 
-You must respond ONLY with a valid, raw JSON object (no markdown formatting, no \`\`\`json code fences, no extra text).
-JSON schema to strictly follow:
+STEP 4: DISTINGUISH OBSERVATION FROM ASSESSMENT
+For each finding, provide:
+- "aiObservation": Visual features observed (e.g. "Continuous dark linear fissure pattern across the concrete beam.")
+- "engineeringAssessment": Conservative guidance (e.g. "Potential structural concern detected — professional engineering assessment recommended.")
+
+User notes/context: "${userNotes || 'Standard visual inspection'}"
+
+You must respond ONLY with a valid JSON object matching this schema:
 {
+  "detectedCategory": "One of the 14 categories",
+  "classificationConfidence": 92,
+  "inspectionEligible": true,
   "isIndustrialAsset": true,
-  "detectedSubject": "Brief subject label",
+  "detectedSubject": "Specific subject, e.g. Concrete Highway Bridge Pier",
+  "assetName": "Descriptive name based on image",
   "rejectionReason": "",
-  "assetName": "Brief name identifying the asset, e.g. Industrial Machine Rotor Hub or Bridge Pier #102",
-  "category": "Asset category, e.g. Industrial Machinery, Civil Infrastructure, Electrical Power Equipment",
-  "healthScore": 58,
-  "status": "AT RISK",
-  "safetyFactor": "1.15",
-  "safetyBreached": true,
-  "diagnosticSummary": "A clear, precise, 2-3 sentence root cause diagnosis describing visible defects and structural risk.",
+  "status": "HEALTHY" | "ATTENTION" | "AT RISK" | "CRITICAL" | "NON_ASSET",
+  "healthScore": 75,
+  "diagnosticSummary": "Clear 2-sentence summary based strictly on visual evidence.",
+  "aiObservation": "Clear AI visual observation statement.",
+  "engineeringAssessment": "Conservative engineering assessment statement.",
   "defects": [
     {
-      "id": "CRACK",
-      "name": "Defect Title (e.g. Outer Rim Fracture)",
-      "severity": "High Severity",
-      "confidenceVal": 96,
-      "conf": "96% Confidence",
-      "color": "critical",
-      "icon": "🔴",
-      "tag": "Critical Defect",
-      "metricText": "Length: 14.2 mm • Width: 1.4 mm • Depth: 2.8 mm",
-      "measurements": {
-        "length": "14.2 mm",
-        "width": "1.4 mm",
-        "depth": "2.8 mm",
-        "propagation": "+0.4 mm / 100 operating hours"
-      }
-    },
-    {
-      "id": "RUST",
-      "name": "Defect Title (e.g. Surface Rust & Oxidation)",
-      "severity": "Medium Severity",
-      "confidenceVal": 89,
-      "conf": "89% Confidence",
-      "color": "attention",
-      "icon": "🟡",
-      "tag": "Attention Needed",
-      "metricText": "Area: 18.4% (84.6 cm²) • Pitting: 0.65 mm",
-      "measurements": {
-        "area": "18.4% Surface Coverage",
-        "pitting": "0.65 mm Depth",
-        "isoGrade": "ISO 8501-1 Grade C Degradation"
-      }
-    },
-    {
-      "id": "WEAR",
-      "name": "Defect Title (e.g. Center Bore Spline Wear)",
-      "severity": "Low Severity",
-      "confidenceVal": 84,
-      "conf": "84% Confidence",
-      "color": "healthy",
-      "icon": "🟢",
-      "tag": "Monitor",
-      "metricText": "Radial Wear: +0.045 mm (Tolerance: ±0.015 mm)",
-      "measurements": {
-        "clearance": "+0.045 mm Radial Clearance",
-        "tolerance": "ISO ±0.015 mm Spec",
-        "deviation": "+0.030 mm Breach"
-      }
+      "id": "DEFECT_1",
+      "type": "surface_crack",
+      "name": "SURFACE CRACK",
+      "confidence": 91,
+      "severity": "LOW" | "MEDIUM" | "HIGH",
+      "visualEvidence": "Visible linear surface discontinuity observed on concrete area. Physical crack dimensions require calibrated measurement equipment or a reference scale.",
+      "aiObservation": "AI VISUAL OBSERVATION: Continuous fissure observed on load-bearing concrete.",
+      "engineeringAssessment": "ENGINEERING ASSESSMENT: Potential structural concern detected — professional engineering assessment recommended."
     }
   ],
   "recommendations": [
     {
-      "icon": "🔴",
-      "title": "Immediate Action",
-      "sub": "Clear risk explanation and mandatory engineering protocol"
+      "step": 1,
+      "title": "Review the detected area manually",
+      "detail": "Inspect flagged surface region on-site."
     },
     {
-      "icon": "🟡",
-      "title": "Maintenance Action",
-      "sub": "Preventative surface treatment or stabilization"
+      "step": 2,
+      "title": "Capture additional close-up images",
+      "detail": "Record high-resolution macro perspectives."
     },
     {
-      "icon": "🟢",
-      "title": "Calibration & Monitoring",
-      "sub": "Next scheduled tolerance inspection"
+      "step": 3,
+      "title": "Perform calibrated measurement if dimensions are required",
+      "detail": "Deploy certified measurement tools rather than relying on uncalibrated estimates."
+    },
+    {
+      "step": 4,
+      "title": "Have a qualified inspector/engineer assess the defect",
+      "detail": "A certified engineer must evaluate structural impact."
+    },
+    {
+      "step": 5,
+      "title": "Schedule repair based on the verified inspection result",
+      "detail": "Determine maintenance priority based on verified on-site inspection."
     }
   ]
 }
-
-If the image shows no critical defect, set healthScore appropriately higher (80-95), status to HEALTHY or ATTENTION, safetyFactor to >= 1.50, and safetyBreached to false.
-Ensure color is exactly one of: "critical" | "attention" | "healthy".
 `;
 
   const payload = {
@@ -257,7 +226,7 @@ Ensure color is exactly one of: "critical" | "attention" | "healthy".
       }
     ],
     generationConfig: {
-      temperature: 0.2,
+      temperature: 0.1,
       topP: 0.8,
       maxOutputTokens: 2048
     }
@@ -285,17 +254,46 @@ Ensure color is exactly one of: "critical" | "attention" | "healthy".
 
   const parsed = JSON.parse(jsonMatch[0]);
 
+  const isEligible = Boolean(parsed.inspectionEligible && parsed.isIndustrialAsset !== false);
+  const cat: AssetCategory = parsed.detectedCategory || 'Unknown / Unsupported';
+
+  const sanitizedDefects: VisualDefect[] = isEligible && Array.isArray(parsed.defects)
+    ? parsed.defects.map((d: any, idx: number) => {
+        const sev: DefectSeverity = d.severity === 'HIGH' ? 'HIGH' : (d.severity === 'LOW' ? 'LOW' : 'MEDIUM');
+        return {
+          id: d.id || `DEFECT_${idx + 1}`,
+          type: d.type || 'surface_anomaly',
+          name: (d.name || 'Visual Defect').toUpperCase(),
+          confidence: typeof d.confidence === 'number' ? d.confidence : 85,
+          confidenceLabel: typeof d.confidence === 'number' ? `${d.confidence}%` : 'Model confidence unavailable',
+          severity: sev,
+          visualEvidence: d.visualEvidence || 'Visible surface discontinuity evident in image.',
+          aiObservation: d.aiObservation || `AI VISUAL OBSERVATION: Discontinuity detected.`,
+          engineeringAssessment: d.engineeringAssessment || `ENGINEERING ASSESSMENT: Verification by a qualified inspector recommended. Physical dimensions require calibrated measurement equipment or a reference scale.`,
+          color: sev === 'HIGH' ? 'critical' : (sev === 'MEDIUM' ? 'attention' : 'healthy'),
+          icon: sev === 'HIGH' ? '🔴' : (sev === 'MEDIUM' ? '🟡' : '🟢'),
+          tag: `${sev} Priority Defect`
+        };
+      })
+    : [];
+
   return {
-    assetName: parsed.assetName || 'Inspected Asset Component',
-    category: parsed.category || 'Industrial Component',
-    healthScore: typeof parsed.healthScore === 'number' ? parsed.healthScore : 65,
-    status: parsed.status || 'ATTENTION',
-    safetyFactor: parsed.safetyFactor || '1.25',
-    safetyBreached: Boolean(parsed.safetyBreached),
-    diagnosticSummary: parsed.diagnosticSummary || 'Visual AI analysis completed.',
-    defects: Array.isArray(parsed.defects) ? parsed.defects : [],
+    isIndustrialAsset: isEligible,
+    inspectionEligible: isEligible,
+    detectedCategory: cat,
+    detectedSubject: parsed.detectedSubject || parsed.assetName || cat,
+    classificationConfidence: typeof parsed.classificationConfidence === 'number' ? parsed.classificationConfidence : 80,
+    rejectionReason: parsed.rejectionReason || (isEligible ? '' : 'Structural infrastructure defects cannot be reliably assessed from this image.'),
+    assetName: parsed.assetName || `${cat} Asset`,
+    category: cat,
+    healthScore: isEligible ? (typeof parsed.healthScore === 'number' ? parsed.healthScore : 75) : 0,
+    status: isEligible ? (parsed.status || 'ATTENTION') : 'NON_ASSET',
+    diagnosticSummary: parsed.diagnosticSummary || (isEligible ? 'Visual AI analysis completed.' : 'Inspection not applicable to this image.'),
+    aiObservation: parsed.aiObservation || 'AI visual assessment complete.',
+    engineeringAssessment: parsed.engineeringAssessment || 'On-site verification recommended.',
+    defects: sanitizedDefects,
     recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : [],
-    modelUsed: 'Google Gemini 1.5 Flash Vision (Live Neural Diagnostic)',
+    modelUsed: 'Google Gemini 1.5 Flash Vision (Evidence-Based Mode)',
     analysisTimestamp: new Date().toISOString()
   };
 }

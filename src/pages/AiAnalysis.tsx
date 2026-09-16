@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sparkles, CheckCircle2, CircleDashed, ArrowRight, ShieldCheck } from 'lucide-react';
 import { getGeminiApiKey, analyzeAssetWithGemini } from '../services/aiApi';
+import { runInspectionPipeline } from '../services/inspectionPipeline';
 
 export default function AiAnalysis() {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(0);
   const [assetName, setAssetName] = useState('Industrial Machine #M-401');
   const [isGeminiActive, setIsGeminiActive] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<string>('Analyzing visual telemetry...');
+  const [statusMessage, setStatusMessage] = useState<string>('Validating image and asset context...');
 
   useEffect(() => {
     let isCancelled = false;
@@ -38,6 +39,8 @@ export default function AiAnalysis() {
         parsed.imageBase64
       );
 
+      let modelResult: any = null;
+
       if (shouldRunGemini) {
         setIsGeminiActive(true);
         setStatusMessage('Connecting to Google Gemini 1.5 Flash Vision Model...');
@@ -52,46 +55,50 @@ export default function AiAnalysis() {
           );
 
           if (!isCancelled) {
-            // Save enriched live Gemini data into session storage
-            const updatedPayload = {
-              ...parsed,
-              geminiPending: false,
-              isGemini: true,
-              geminiResult,
-              isIndustrialAsset: geminiResult.isIndustrialAsset !== false,
-              detectedSubject: geminiResult.detectedSubject,
-              rejectionReason: geminiResult.rejectionReason,
-              assetName: geminiResult.assetName || parsed.assetName,
-              assetCategory: geminiResult.category || parsed.assetCategory,
-              healthScore: geminiResult.healthScore,
-              status: geminiResult.status,
-              safetyFactor: geminiResult.safetyFactor,
-              diagnosticSummary: geminiResult.diagnosticSummary,
-              liveDefects: geminiResult.defects || [],
-              liveRecommendations: geminiResult.recommendations || [],
-              modelUsed: geminiResult.modelUsed
-            };
-
-            sessionStorage.setItem('currentInspection', JSON.stringify(updatedPayload));
+            modelResult = geminiResult;
             if (geminiResult.isIndustrialAsset === false) {
-              setStatusMessage('Non-industrial subject detected: ' + (geminiResult.detectedSubject || 'Subject not an engineering asset'));
+              setStatusMessage('Identified: ' + (geminiResult.detectedSubject || 'Subject not an engineering asset'));
             } else {
-              setStatusMessage('Gemini Neural Metrology Analysis Complete!');
+              setStatusMessage('Gemini Vision observation complete. Finalizing pipeline...');
             }
           }
         } catch (apiError: any) {
-          console.warn('Gemini live vision call failed, falling back to offline model:', apiError);
-          if (!isCancelled) {
-            const fallbackPayload = {
-              ...parsed,
-              geminiPending: false,
-              isGemini: false,
-              geminiError: apiError.message || 'API call failed'
-            };
-            sessionStorage.setItem('currentInspection', JSON.stringify(fallbackPayload));
-            setStatusMessage('Fallback to high-precision offline model.');
-          }
+          console.warn('Gemini vision call failed, continuing with built-in pipeline:', apiError);
+          setStatusMessage('Running built-in asset validation & inspection pipeline...');
         }
+      }
+
+      if (isCancelled) return;
+
+      // Execute comprehensive inspection pipeline (Section 2 - 14)
+      try {
+        const pipelineResult = await runInspectionPipeline({
+          fileName: parsed.mediaName || 'asset_scan.jpg',
+          mediaUrl: parsed.mediaUrl || parsed.imageBase64 || '',
+          inputType: parsed.inputType || 'static_image',
+          userSelectedAsset: parsed.assetName || '',
+          userAssetId: parsed.assetId || '',
+          userNotes: parsed.description || parsed.userNotes || '',
+          modelResult,
+          isDemoMode: Boolean(parsed.isDemoData)
+        });
+
+        if (!isCancelled) {
+          const updatedPayload = {
+            ...parsed,
+            ...pipelineResult,
+            geminiPending: false,
+            isGemini: Boolean(modelResult),
+            geminiResult: modelResult,
+            pipelineResult
+          };
+
+          sessionStorage.setItem('currentInspection', JSON.stringify(updatedPayload));
+          sessionStorage.setItem('currentInspectionResult', JSON.stringify(pipelineResult));
+          setStatusMessage('Inspection pipeline complete.');
+        }
+      } catch (pipelineErr) {
+        console.error('Inspection pipeline error:', pipelineErr);
       }
     };
 
@@ -103,19 +110,19 @@ export default function AiAnalysis() {
   }, []);
 
   const steps = isGeminiActive ? [
-    "Image integrity & anti-malware verified",
-    "Sending frame to Google Gemini 1.5 Flash Vision",
-    "Extracting sub-millimeter fracture coordinates",
-    "Assessing ISO & ASME structural tolerances",
-    "Formulating engineering recommendations",
-    "Preparing cryptographically sealed report"
+    "Image integrity & quality validation",
+    "Gemini 1.5 Flash Vision multimodal classification",
+    "14-category asset eligibility verification",
+    "Evidence-based visual anomaly detection",
+    "Transparent 4-factor health score calculation",
+    "Inspection dossier & disclaimers prepared"
   ] : [
-    "Image received & sandboxed",
-    "Voice converted to text",
-    "Defects detected",
-    "Assessing severity & tolerance",
-    "Generating recommendations",
-    "Preparing report"
+    "Image integrity & quality validation",
+    "14-category asset classification & scope check",
+    "Evidence-based visual anomaly detection",
+    "Defect severity & confidence verification",
+    "Transparent 4-factor health score calculation",
+    "Inspection dossier & disclaimers prepared"
   ];
 
   useEffect(() => {

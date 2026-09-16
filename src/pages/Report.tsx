@@ -19,7 +19,8 @@ import {
   Camera, 
   FileCheck2,
   FileSpreadsheet,
-  Database
+  Database,
+  AlertTriangle
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getActiveOfficer, saveOfficerInspection } from '../utils/officerStore';
@@ -36,6 +37,10 @@ export default function Report() {
     location: 'Sector 5 (Mechanical Fabrication Unit)',
     isMachine: true,
     isIndustrialAsset: true,
+    isDemoData: false,
+    inspectionModeTitle: 'AI Visual Inspection',
+    inputSourceLabel: 'Uploaded Image',
+    inspectionTimestamp: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
     detectedSubject: '',
     rejectionReason: '',
     score: '72 / 100',
@@ -45,7 +50,7 @@ export default function Report() {
     duration: '02:10 minutes',
     mediaUrl: windTurbine401Img,
     isGemini: false,
-    modelUsed: 'Built-in Precision Metrology Engine',
+    modelUsed: 'Built-in Asset Validation & Inspection Pipeline',
     diagnosticSummary: '',
     humanVerifications: {
       'CRACK': 'Confirmed',
@@ -62,9 +67,19 @@ export default function Report() {
 
   useEffect(() => {
     const saved = sessionStorage.getItem('currentInspection');
-    if (saved) {
+    const savedResult = sessionStorage.getItem('currentInspectionResult');
+    let pipelineResult: any = null;
+    if (savedResult) {
       try {
-        const parsed = JSON.parse(saved);
+        pipelineResult = JSON.parse(savedResult);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    if (saved || pipelineResult) {
+      try {
+        const parsed = saved ? JSON.parse(saved) : {};
         const isM = parsed.isMachine || 
                     parsed.assetName?.toLowerCase().includes('machine') || 
                     parsed.mediaName?.toLowerCase().includes('screenshot') ||
@@ -72,32 +87,42 @@ export default function Report() {
         const isG = Boolean(parsed.isGemini && parsed.geminiResult);
         const gResult = parsed.geminiResult || {};
 
-        const isNonAsset = parsed.isIndustrialAsset === false || 
-                           gResult.isIndustrialAsset === false ||
-                           parsed.status === 'NON_ASSET' ||
-                           gResult.status === 'NON_ASSET' ||
-                           parsed.assetName?.toLowerCase().includes('non-industrial') ||
-                           parsed.assetCategory?.toLowerCase().includes('non-industrial');
+        const isNonAsset = pipelineResult ? !pipelineResult.inspectionEligible : (
+          parsed.isIndustrialAsset === false || 
+          gResult.isIndustrialAsset === false ||
+          parsed.status === 'NON_ASSET' ||
+          gResult.status === 'NON_ASSET' ||
+          parsed.assetName?.toLowerCase().includes('non-industrial') ||
+          parsed.assetCategory?.toLowerCase().includes('non-industrial')
+        );
+
+        const currentScore = isNonAsset ? 'N/A' : (pipelineResult?.healthScore?.finalScore ? `${pipelineResult.healthScore.finalScore} / 100` : (isG ? `${gResult.healthScore ?? 72} / 100` : '72 / 100'));
+        const currentStatus = isNonAsset ? 'Out of Scope (Non-Asset)' : (pipelineResult?.healthScore?.status || (isG ? (gResult.status ?? 'At Risk') : 'At Risk'));
+        const currentSafetyFactor = isNonAsset ? 'N/A' : (pipelineResult?.defects?.length === 0 ? '1.50' : (isG ? (gResult.safetyFactor ?? '1.15') : (isM ? '1.15' : '1.28')));
 
         setData({
-          assetName: parsed.assetName || (isM ? 'Industrial Machine #M-401 (Mechanical Hub)' : 'Bridge #102'),
-          assetId: isNonAsset ? 'NON-ASSET-01' : (isM ? 'MACH-401-HUB' : 'BRIDGE-102'),
+          assetName: pipelineResult?.assetName || parsed.assetName || (isM ? 'Industrial Machine #M-401 (Mechanical Hub)' : 'Bridge #102'),
+          assetId: pipelineResult?.assetId || (isNonAsset ? 'NON-ASSET-01' : (isM ? 'MACH-401-HUB' : 'BRIDGE-102')),
           location: isNonAsset ? 'Out of Engineering Scope' : (isM ? 'Sector 5 (Mechanical Fabrication Unit)' : 'Sector 5 (Highway Crossing)'),
           isMachine: isM,
           isIndustrialAsset: !isNonAsset,
-          detectedSubject: parsed.detectedSubject || gResult.detectedSubject || '',
-          rejectionReason: parsed.rejectionReason || gResult.rejectionReason || '',
-          score: isNonAsset ? 'N/A' : (isG ? `${gResult.healthScore ?? 72} / 100` : '72 / 100'),
-          status: isNonAsset ? 'Out of Scope (Non-Asset)' : (isG ? (gResult.status ?? 'At Risk') : 'At Risk'),
-          safetyFactor: isNonAsset ? 'N/A' : (isG ? (gResult.safetyFactor ?? '1.15') : (isM ? '1.15' : '1.28')),
+          isDemoData: Boolean(pipelineResult?.isDemoData || parsed.isDemoData),
+          inspectionModeTitle: pipelineResult?.inspectionModeTitle || 'AI Visual Inspection',
+          inputSourceLabel: pipelineResult?.inputSourceLabel || 'Uploaded Image',
+          inspectionTimestamp: pipelineResult?.formattedDate || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+          detectedSubject: pipelineResult?.detectedCategory || parsed.detectedSubject || gResult.detectedSubject || '',
+          rejectionReason: pipelineResult?.ineligibilityReason || parsed.rejectionReason || gResult.rejectionReason || '',
+          score: currentScore,
+          status: currentStatus,
+          safetyFactor: currentSafetyFactor,
           securityHash: parsed.securityHash || 'SHA256:7f3a9e10c4b281d5',
           duration: parsed.duration || '02:10 minutes',
-          mediaUrl: parsed.mediaUrl || (isM ? windTurbine401Img : bridge102Img),
+          mediaUrl: pipelineResult?.mediaUrl || parsed.mediaUrl || (isM ? windTurbine401Img : bridge102Img),
           isGemini: isG,
-          modelUsed: isG ? (gResult.modelUsed || 'Google Gemini 1.5 Flash Vision') : 'Built-in Precision Metrology Engine',
+          modelUsed: pipelineResult?.modelUsed || (isG ? (gResult.modelUsed || 'Google Gemini 1.5 Flash Vision') : 'Built-in Asset Validation & Inspection Pipeline'),
           diagnosticSummary: isNonAsset 
-            ? (parsed.rejectionReason || gResult.rejectionReason || 'Non-industrial image detected. Defect metrology and crack scoring withheld.') 
-            : (isG ? gResult.diagnosticSummary : ''),
+            ? (pipelineResult?.ineligibilityReason || parsed.rejectionReason || gResult.rejectionReason || 'Non-industrial image detected. Defect metrology and crack scoring withheld.') 
+            : (pipelineResult?.summaryObservation || (isG ? gResult.diagnosticSummary : 'Visual defect detection completed.')),
           humanVerifications: parsed.humanVerifications || {
             'CRACK': 'Confirmed',
             'RUST': 'Confirmed',
@@ -106,9 +131,9 @@ export default function Report() {
             'defect-corrosion': 'Confirmed',
             'defect-wear': 'Needs Review'
           },
-          defects: isNonAsset ? [] : (isG && Array.isArray(gResult.defects) ? gResult.defects : []),
+          defects: isNonAsset ? [] : (pipelineResult?.defects || (isG && Array.isArray(gResult.defects) ? gResult.defects : [])),
           customDefects: isNonAsset ? [] : (Array.isArray(parsed.customDefects) ? parsed.customDefects : []),
-          recommendations: isNonAsset ? [] : (isG && Array.isArray(gResult.recommendations) ? gResult.recommendations : [])
+          recommendations: isNonAsset ? [] : (pipelineResult?.recommendedSteps || (isG && Array.isArray(gResult.recommendations) ? gResult.recommendations : []))
         });
       } catch (e) {
         console.error(e);
@@ -204,60 +229,6 @@ export default function Report() {
     setTimeout(() => setSaveToast(false), 3500);
   };
 
-  const defaultMachineDefects = [
-    {
-      id: 'CRACK',
-      name: 'Rim Fracture / Crack',
-      severity: 'High Severity',
-      metricText: '14.2 mm (L) × 1.4 mm (W) × 2.8 mm (D)',
-      tolerance: '+0.4 mm / 100 hrs propagation',
-      confidence: '96.4%'
-    },
-    {
-      id: 'RUST',
-      name: 'Surface Oxidation & Rust',
-      severity: 'Medium Severity',
-      metricText: '84.6 cm² (18.4% Area) • 0.65 mm Pitting',
-      tolerance: 'ISO 8501-1 Grade C Oxidation',
-      confidence: '89.1%'
-    },
-    {
-      id: 'WEAR',
-      name: 'Center Bore Spline Wear',
-      severity: 'Low Severity',
-      metricText: '+0.045 mm Radial Clearance',
-      tolerance: '+0.030 mm over ISO ±0.015 mm spec',
-      confidence: '84.0%'
-    }
-  ];
-
-  const defaultInfraDefects = [
-    {
-      id: 'CRACK',
-      name: 'Structural Crack (Pier 4)',
-      severity: 'High Severity',
-      metricText: '18.6 mm (L) × 2.1 mm (W) × 4.5 mm (D)',
-      tolerance: '+0.8 mm / cycle expansion',
-      confidence: '94.2%'
-    },
-    {
-      id: 'RUST',
-      name: 'Concrete Spalling (Deck)',
-      severity: 'Medium Severity',
-      metricText: '142 cm² (12.1% Area) • 12 mm Depth',
-      tolerance: 'EN 1504 Grade 2 Delamination',
-      confidence: '87.5%'
-    },
-    {
-      id: 'WEAR',
-      name: 'Rebar Corrosion (West Flange)',
-      severity: 'Low Severity',
-      metricText: '3 Reinforcement Bars Exposed',
-      tolerance: '8.2% Cross-sectional mass loss',
-      confidence: '81.3%'
-    }
-  ];
-
   const isNonAsset = data.isIndustrialAsset === false || 
                      data.status?.toLowerCase().includes('out of scope') || 
                      data.status === 'NON_ASSET' ||
@@ -265,14 +236,14 @@ export default function Report() {
 
   const baseDefects = isNonAsset ? [] : (data.defects.length > 0 
     ? data.defects.map(d => ({
-        id: d.id || 'CRACK',
+        id: d.id || 'DEFECT',
         name: d.name,
-        severity: d.severity,
-        metricText: d.metricText || 'Sub-millimeter dimension variance',
-        tolerance: d.measurements?.propagation || d.measurements?.isoGrade || d.measurements?.deviation || 'Exceeds nominal baseline',
-        confidence: d.conf || `${d.confidenceVal || 90}%`
+        severity: d.severity === 'HIGH' ? 'High Severity' : d.severity === 'MEDIUM' ? 'Medium Severity' : 'Low Severity',
+        metricText: d.metricText || 'Visual indication observed',
+        tolerance: 'Field physical measurement required',
+        confidence: typeof d.confidence === 'number' ? `${d.confidence}%` : (d.conf || '85%')
       }))
-    : (data.isMachine ? defaultMachineDefects : defaultInfraDefects));
+    : []);
 
   const customMapped = isNonAsset ? [] : data.customDefects.map(c => ({
     id: c.id,
@@ -599,45 +570,49 @@ export default function Report() {
           </div>
         </section>
 
-        {/* 8. INSPECTOR'S OBSERVATIONS (Screenshot 2) */}
+        {/* 8. INSPECTOR'S OBSERVATIONS */}
         <section className="space-y-2 bg-slate-50 p-4 rounded-xl border border-slate-200">
           <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-            <User className="w-3.5 h-3.5 text-primary" /> Inspector's Field Observations
+            <User className="w-3.5 h-3.5 text-primary" /> Inspector's Field Observations & AI Summary
           </h3>
           <p className="text-xs text-slate-700 leading-relaxed font-medium">
-            "Lead Inspector <strong>{officer.name} ({officer.id})</strong>: Physical review of {data.assetName} confirms AI finding of high-severity fracture along the circular rim collar. Ultrasonic non-destructive gauge readings confirm localized cross-sectional thinning from 6.0mm to 3.2mm. Surface oxidation is actively weeping with oil leakage. High centrifugal hoop stresses present immediate risk of structural failure. Immediate Lockout/Tagout (LOTO) protocol authorized."
+            {data.diagnosticSummary || `Visual assessment completed for ${data.assetName}. Candidate anomaly annotations recorded for on-site verification with calibrated measuring instruments.`}
           </p>
         </section>
 
-        {/* 9. RECOMMENDED ACTIONS (Screenshot 2 & 3) */}
+        {/* 9. RECOMMENDED ACTIONS */}
         <section className="space-y-3">
           <div className="flex flex-wrap items-center justify-between border-b border-slate-200 pb-2">
             <h3 className="text-base font-black text-slate-800 uppercase tracking-wider">
-              Recommended Actions & Remediation Protocol
+              Recommended Next Steps & Verification Workflow
             </h3>
             <div className="flex items-center gap-2 text-xs">
-              <span className="bg-rose-100 text-rose-700 font-extrabold px-2 py-0.5 rounded border border-rose-200">
-                Priority: HIGH
-              </span>
-              <span className="bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded">
-                Est: 2–4 hours
-              </span>
-              <span className="bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded border border-amber-200">
-                Timeframe: Within 7 days
+              <span className="bg-cyan-100 text-cyan-800 font-extrabold px-2 py-0.5 rounded border border-cyan-200">
+                Action: Verification Prior to Repair
               </span>
             </div>
           </div>
 
           <ol className="space-y-2 text-xs sm:text-sm text-slate-700 font-medium list-decimal list-inside">
-            <li><strong className="text-slate-900 font-bold">Isolate affected component:</strong> Execute Lockout/Tagout (LOTO) protocol. Disconnect electrical power and depressurize local hydraulic load circuits.</li>
-            <li><strong className="text-slate-900 font-bold">Perform ultrasonic thickness measurement (UTM):</strong> Deploy calibrated high-frequency UTM probe at 5 designated grid points along fracture boundary to determine wall thickness remaining.</li>
-            <li><strong className="text-slate-900 font-bold">Remove surface corrosion:</strong> Grit-blast affected recessed chamber to ISO 8501-1 Sa 2.5 bare-metal standard. Grind micro-crack tips to arrest propagation.</li>
-            <li><strong className="text-slate-900 font-bold">Apply structural composite sleeve reinforcement:</strong> Install high-modulus carbon/epoxy composite sleeve reinforcement over collar crack zone to restore nominal hoop stress rating.</li>
-            <li><strong className="text-slate-900 font-bold">Reinspect after treatment:</strong> Conduct secondary multimodal AI visual scan, verify dimensional clearance, and recalibrate acoustic vibration baseline.</li>
+            {data.recommendations && data.recommendations.length > 0 ? (
+              data.recommendations.map((rec: any, idx: number) => (
+                <li key={idx}>
+                  <strong className="text-slate-900 font-bold">{rec.title || `Step ${idx + 1}`}:</strong> {rec.detail || rec.action || ''}
+                </li>
+              ))
+            ) : (
+              <>
+                <li><strong className="text-slate-900 font-bold">Review visual findings:</strong> Review AI defect annotations with field inspection team to establish operational context.</li>
+                <li><strong className="text-slate-900 font-bold">Capture calibrated close-ups:</strong> Take high-resolution photographs with a calibrated reference scale adjacent to marked areas.</li>
+                <li><strong className="text-slate-900 font-bold">Perform physical measurement:</strong> Use calibrated mechanical or optical measuring gauges to quantify actual physical dimensions.</li>
+                <li><strong className="text-slate-900 font-bold">Qualified engineer review:</strong> Submit visual dossier and calibrated measurements to a certified professional engineer for formal assessment.</li>
+                <li><strong className="text-slate-900 font-bold">Schedule verified repair:</strong> Execute maintenance and repair protocols only as authorized by the qualified engineer.</li>
+              </>
+            )}
           </ol>
         </section>
 
-        {/* 10. SIGNATURE / APPROVAL SECTION (Screenshot 2: Signature/approval section) */}
+        {/* 10. SIGNATURE / APPROVAL SECTION */}
         <section className="pt-6 border-t-2 border-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-6 text-xs text-slate-600">
           <div className="space-y-2">
             <p className="font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
@@ -645,36 +620,47 @@ export default function Report() {
             </p>
             <div className="border-2 border-dashed border-slate-300 rounded-xl p-4 bg-slate-50 space-y-2">
               <div className="font-serif italic text-lg text-slate-900 tracking-wide border-b border-slate-200 pb-1">
-                Shivam Panchal
+                {officer.name}
               </div>
               <p className="font-mono font-bold text-slate-800">
-                Er. Shivam Panchal (PE #8841-IN)
+                {officer.name} ({officer.id})
               </p>
-              <p className="text-slate-500">Chief Asset Integrity Assessor • Field Unit 4</p>
+              <p className="text-slate-500">Asset Integrity Assessor • Field Unit 4</p>
               <p className="text-emerald-600 font-bold flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" /> Cryptographically Signed: 10-Sep-2026 14:22 UTC
+                <CheckCircle2 className="w-3.5 h-3.5" /> Logged: {data.inspectionTimestamp}
               </p>
             </div>
           </div>
 
           <div className="space-y-2">
             <p className="font-bold text-slate-800 uppercase tracking-wider">
-              Engineering Approval & Seal:
+              Engineering Status & Disclaimer:
             </p>
             <div className="border-2 border-emerald-500/40 rounded-xl p-4 bg-emerald-50/50 flex flex-col justify-between space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200">
-                  APPROVED FOR REMEDIATION
+                  AI PRELIMINARY OBSERVATION
                 </span>
-                <span className="font-mono text-[10px] text-slate-400">ID: SEAL-8841</span>
+                <span className="font-mono text-[10px] text-slate-400">ID: {data.assetId}</span>
               </div>
               <div>
-                <p className="font-bold text-slate-900">ISO 9001:2015 & OSHA 1910.212 Compliant</p>
-                <p className="text-slate-500 text-[11px]">Metrology Engine: {data.modelUsed}</p>
+                <p className="font-bold text-slate-900">Qualified Engineering Review Required</p>
+                <p className="text-slate-500 text-[11px]">Inspection Engine: {data.modelUsed}</p>
                 <p className="text-slate-400 font-mono text-[10px]">Tamper Proof Digest: {data.securityHash}</p>
               </div>
             </div>
           </div>
+        </section>
+
+        {/* Mandatory Engineering Disclaimer */}
+        <section className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs leading-relaxed space-y-1">
+          <p className="font-black flex items-center gap-1.5">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+            Mandatory Engineering & Compliance Disclaimer
+          </p>
+          <p className="font-medium text-slate-700">
+            This report conveys preliminary visual observations generated by an automated AI inspection assistant. It does NOT constitute a certified structural, statutory, or mechanical engineering assessment. Calibrated physical measurements and review by an accredited professional engineer are required before undertaking structural repairs or altering equipment operational limits.
+          </p>
         </section>
 
         {/* Footer Signature */}

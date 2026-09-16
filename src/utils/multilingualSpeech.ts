@@ -1,9 +1,10 @@
 /**
- * Multilingual Speech-to-Text, Voice Synthesis (TTS), and Voice AI Copilot Engine
- * Supports: English (en-US), Hindi (hi-IN), and Hinglish (Conversational Hindi/English)
+ * Speech Recognition and Voice Synthesis Engine
+ * Clean English (en-US) and Standard Hindi (hi-IN).
+ * Note: Hinglish voice assistance removed as requested.
  */
 
-export type InspectionLanguage = 'en' | 'hi' | 'hinglish';
+export type InspectionLanguage = 'en' | 'hi';
 
 export interface LanguageOption {
   code: InspectionLanguage;
@@ -17,28 +18,21 @@ export const SUPPORTED_LANGUAGES: LanguageOption[] = [
   {
     code: 'en',
     label: 'English',
-    nativeLabel: 'English',
+    nativeLabel: 'English (US/UK)',
     flag: '🇬🇧',
     speechLang: 'en-US'
   },
   {
     code: 'hi',
     label: 'Hindi',
-    nativeLabel: 'हिंदी',
-    flag: '🇮🇳',
-    speechLang: 'hi-IN'
-  },
-  {
-    code: 'hinglish',
-    label: 'Hinglish',
-    nativeLabel: 'Hinglish (हिंदी + Eng)',
+    nativeLabel: 'हिंदी (Standard)',
     flag: '🇮🇳',
     speechLang: 'hi-IN'
   }
 ];
 
 /**
- * Initializes and starts Web Speech Recognition for the given language
+ * Initializes and starts Web Speech Recognition
  */
 export function startMultilingualRecognition(
   lang: InspectionLanguage,
@@ -58,9 +52,7 @@ export function startMultilingualRecognition(
     const recognition = new SpeechRecognition();
     recognition.continuous = false;
     recognition.interimResults = true;
-
-    // Use Hindi for Hindi and Hinglish to capture Indian phonetic phrasing
-    recognition.lang = lang === 'en' ? 'en-US' : 'hi-IN';
+    recognition.lang = lang === 'hi' ? 'hi-IN' : 'en-US';
 
     recognition.onresult = (event: any) => {
       let finalTranscript = '';
@@ -84,7 +76,7 @@ export function startMultilingualRecognition(
 }
 
 /**
- * Speaks text using Web SpeechSynthesis API with Hindi/Indian English voice selection
+ * Speaks text using Web SpeechSynthesis API
  */
 export function speakInspectionVoice(
   text: string,
@@ -98,41 +90,21 @@ export function speakInspectionVoice(
   try {
     window.speechSynthesis.cancel(); // Stop ongoing speech
 
-    // Clean markdown asterisks or code formatting for clear natural voice output
-    const speechText = text
-      .replace(/[*_#`]/g, '')
-      .replace(/(\d+)\s*\/\s*100/g, '$1 out of 100')
-      .replace(/\+/g, 'plus ')
-      .trim();
-
-    const utterance = new SpeechSynthesisUtterance(speechText);
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = lang === 'hi' ? 'hi-IN' : 'en-US';
     utterance.rate = 0.95;
     utterance.pitch = 1.0;
 
+    // Pick best matching voice
     const voices = window.speechSynthesis.getVoices();
-    
-    if (lang === 'hi' || lang === 'hinglish') {
-      utterance.lang = 'hi-IN';
-      // Look for Hindi or Indian English voice
-      const hindiVoice = voices.find(v => 
-        v.lang === 'hi-IN' || 
-        v.lang.startsWith('hi') || 
-        v.name.toLowerCase().includes('hindi') || 
-        v.name.toLowerCase().includes('lekha') ||
-        v.name.toLowerCase().includes('hemant') ||
-        v.name.toLowerCase().includes('kalpana')
-      );
-      const indianVoice = voices.find(v => v.lang === 'en-IN' || v.name.toLowerCase().includes('india'));
-      if (hindiVoice) {
-        utterance.voice = hindiVoice;
-      } else if (indianVoice) {
-        utterance.voice = indianVoice;
-      }
-    } else {
-      utterance.lang = 'en-US';
-      const englishVoice = voices.find(v => v.lang === 'en-US' || v.lang === 'en-GB' || v.lang.startsWith('en'));
-      if (englishVoice) {
-        utterance.voice = englishVoice;
+    if (voices && voices.length > 0) {
+      if (lang === 'hi') {
+        const hindiVoice = voices.find(v => v.lang.startsWith('hi') || v.name.toLowerCase().includes('hindi'));
+        if (hindiVoice) utterance.voice = hindiVoice;
+      } else {
+        const engVoice = voices.find(v => (v.lang === 'en-US' || v.lang === 'en-GB') && v.name.includes('Natural')) ||
+                         voices.find(v => v.lang.startsWith('en'));
+        if (engVoice) utterance.voice = engVoice;
       }
     }
 
@@ -144,14 +116,12 @@ export function speakInspectionVoice(
     window.speechSynthesis.speak(utterance);
     return true;
   } catch (err) {
-    console.warn('SpeechSynthesis failed:', err);
+    console.warn('Speech synthesis failed:', err);
+    if (onEnd) onEnd();
     return false;
   }
 }
 
-/**
- * Stops any active speech synthesis
- */
 export function stopInspectionVoice(): void {
   if (typeof window !== 'undefined' && window.speechSynthesis) {
     window.speechSynthesis.cancel();
@@ -159,136 +129,127 @@ export function stopInspectionVoice(): void {
 }
 
 /**
- * Intelligent Multilingual Inspector AI Copilot Response Engine
- * Answers inspector queries in Hindi, Hinglish, or English using live telemetry
+ * Generates audio narration text for an inspection result
+ */
+export function generateVoiceCopilotScript(
+  inspectionData: any,
+  lang: InspectionLanguage
+): string {
+  const isSupported = inspectionData.inspectionEligible !== false;
+  const assetName = inspectionData.assetName || inspectionData.detectedCategory || 'Asset';
+  const score = inspectionData.healthScore?.finalScore ?? 75;
+  const defectsCount = Array.isArray(inspectionData.defects) ? inspectionData.defects.length : 0;
+
+  if (lang === 'hi') {
+    if (!isSupported) {
+      return `ध्यान दें: अपलोड की गई छवि किसी समर्थित औद्योगिक या सिविल ढांचे से मेल नहीं खाती। दोष निरीक्षण लागू नहीं है।`;
+    }
+    if (defectsCount === 0) {
+      return `${assetName} का निरीक्षण पूरा हुआ। कोई दृश्य दोष नहीं पाया गया। स्वास्थ्य स्कोर ${score} है।`;
+    }
+    return `${assetName} का एआई दृश्य निरीक्षण पूरा हुआ। ${defectsCount} दृश्य विसंगतियाँ पाई गई हैं। स्वास्थ्य स्कोर ${score} है। योग्य इंजीनियर द्वारा पुष्टि आवश्यक है।`;
+  }
+
+  // English
+  if (!isSupported) {
+    return `Notice: The uploaded image does not contain a supported industrial or infrastructure asset. Flaw inspection is not applicable.`;
+  }
+  if (defectsCount === 0) {
+    return `Visual inspection of ${assetName} completed. No visible surface defects detected. Asset health score is ${score} out of 100.`;
+  }
+  return `AI visual inspection of ${assetName} completed. ${defectsCount} visual finding${defectsCount === 1 ? '' : 's'} identified with a health score of ${score}. Professional engineering verification is recommended.`;
+}
+
+/**
+ * Provides truthful, non-hallucinatory copilot answers to inspector voice inquiries
  */
 export function generateInspectorAnswer(
-  question: string,
+  questionText: string,
   lang: InspectionLanguage,
   context: {
-    assetName: string;
-    healthScore: number;
-    status: string;
-    defects: { name: string; severity: string; metricText?: string }[];
+    assetName?: string;
+    healthScore?: number;
+    status?: string;
+    defects?: Array<{ name: string; severity: string; metricText?: string }>;
     failureHorizon?: string;
     diagnosticSummary?: string;
   }
 ): string {
-  const q = question.toLowerCase();
+  const q = questionText.toLowerCase();
+  const defects = context.defects || [];
+  const defectCount = defects.length;
+  const topDefect = defects[0]?.name || (lang === 'hi' ? 'कोई गंभीर दोष नहीं' : 'No major defects');
+  const score = context.healthScore ?? 80;
+  const status = context.status || (score >= 80 ? 'Healthy' : score >= 60 ? 'Attention Needed' : 'Critical');
+  const asset = context.assetName || (lang === 'hi' ? 'एसेट' : 'Asset');
 
-  // 0. DOMAIN VALIDATION (Non-industrial image check)
+  // 1. DEFECTS
   if (
-    context.status === 'NON_ASSET' || 
-    context.status?.toLowerCase().includes('non-asset') || 
-    context.status?.toLowerCase().includes('out of scope') ||
-    context.assetName?.toLowerCase().includes('non-industrial')
-  ) {
-    if (lang === 'hi') {
-      return `यह अपलोड की गई छवि किसी औद्योगिक मशीन या सिविल इंजीनियरिंग ढांचे की नहीं है। इसलिए गलत रिपोर्ट और फॉल्स-पॉजिटिव से बचने के लिए एआई ने डिफेक्ट मेट्रोलॉजी और स्कोरिंग रोक दी है। कृपया किसी वास्तविक मशीन, पाइपलाइन या ब्रिज की फोटो अपलोड करें।`;
-    }
-    if (lang === 'hinglish') {
-      return `Yeh uploaded photo kisi industrial machine ya civil structure ki nahi lagti. False positives se bachne ke liye AI defect metrology suppress kar di gayi hai. Please valid industrial asset upload karein.`;
-    }
-    return `The uploaded image is not recognized as an industrial or civil engineering asset. Defect metrology and crack scoring have been withheld to preserve engineering data integrity. Please provide an industrial asset image.`;
-  }
-
-  const topDefect = context.defects[0] ? context.defects[0].name : 'Structural Anomaly';
-  const topDefectMetric = context.defects[0]?.metricText || '14.2 mm dimension';
-  const defectCount = context.defects.length;
-  const horizon = context.failureHorizon || '~3.8 months';
-  const score = context.healthScore || 72;
-
-  // 1. DEFECTS / KHARAABI / PROBLEMS
-  if (
-    q.includes('defect') || 
-    q.includes('kharaabi') || 
-    q.includes('khamiya') || 
-    q.includes('problem') || 
-    q.includes('crack') || 
+    q.includes('defect') ||
+    q.includes('problem') ||
+    q.includes('crack') ||
     q.includes('damage') ||
-    q.includes('samusya') ||
     q.includes('खामियां') ||
     q.includes('समस्या') ||
     q.includes('दोष')
   ) {
     if (lang === 'hi') {
-      return `इस एसेट में कुल ${defectCount} प्रमुख खामियां पाई गई हैं। सबसे गंभीर समस्या "${topDefect}" है (${topDefectMetric})। इसके अलावा द्वितीयक सतह ऑक्सीडेशन और वियर देखा गया है, जो सहनीय सीमा से अधिक है।`;
+      if (defectCount === 0) return `${asset} में कोई दृश्य दोष नहीं पाया गया। सतह की स्थिति सामान्य प्रतीत होती है।`;
+      return `${asset} में कुल ${defectCount} दृश्य विसंगतियाँ पाई गई हैं। मुख्य निष्कर्ष: ${topDefect}। योग्य इंजीनियर द्वारा स्थलीय सत्यापन की सलाह दी जाती है।`;
     }
-    if (lang === 'hinglish') {
-      return `Inspection me total ${defectCount} main defects detect hue hain. Sabse critical issue "${topDefect}" hai (${topDefectMetric}). Secondary corrosion aur wear bhi baseline se zyada badh chuka hai.`;
-    }
-    return `A total of ${defectCount} issues were identified. The primary critical defect is "${topDefect}" (${topDefectMetric}), accompanied by secondary surface oxidation and mechanical wear exceeding design tolerances.`;
+    if (defectCount === 0) return `No visible defects were identified on ${asset}. Surface visual condition appears nominal.`;
+    return `A total of ${defectCount} visual anomaly finding(s) were observed on ${asset}. Primary finding: ${topDefect}. Qualified on-site engineering verification is recommended.`;
   }
 
-  // 2. HEALTH SCORE / CONDITION / RISK / STATUS
+  // 2. HEALTH SCORE / STATUS
   if (
-    q.includes('health') || 
-    q.includes('score') || 
-    q.includes('condition') || 
-    q.includes('risk') || 
+    q.includes('health') ||
+    q.includes('score') ||
+    q.includes('condition') ||
     q.includes('status') ||
-    q.includes('sthiti') ||
-    q.includes('kaisa hai') ||
-    q.includes('kya sthiti') ||
     q.includes('स्थिति') ||
     q.includes('स्कोर')
   ) {
     if (lang === 'hi') {
-      return `एसेट का वर्तमान हेल्थ स्कोर ${score}/100 है, जो 'At Risk' स्थिति दर्शाता है। पिछली तिमाही की तुलना में स्थिति में गिरावट आई है, लेकिन तत्काल सुधारात्मक कदम उठाने पर इसे सुरक्षित सीमा में लाया जा सकता है।`;
+      return `${asset} का वर्तमान दृश्य स्वास्थ्य स्कोर ${score}/100 है (${status})। यह 40/30/20/10 भारित विश्लेषण पर आधारित है।`;
     }
-    if (lang === 'hinglish') {
-      return `Asset ka overall health score abhi ${score}/100 hai (At Risk status). Last inspection ke comparison me health thodi deteriorate hui hai, isliye immediate monitoring zaroori hai.`;
-    }
-    return `The asset health score currently stands at ${score}/100 under 'At Risk' status. Telemetry shows a measurable decline compared to the baseline audit, warranting scheduled intervention.`;
+    return `The visual health score for ${asset} is ${score}/100 with status '${status}', calculated using the transparent 40/30/20/10 weighted formula.`;
   }
 
-  // 3. FAILURE HORIZON / KAB TAK CHALEGI / LIFETIME
+  // 3. FAILURE HORIZON / LIFETIME
   if (
-    q.includes('failure') || 
-    q.includes('horizon') || 
-    q.includes('kab tak') || 
-    q.includes('kab fail') || 
+    q.includes('failure') ||
+    q.includes('horizon') ||
     q.includes('life') ||
     q.includes('timeline') ||
     q.includes('समय') ||
     q.includes('फेलियर')
   ) {
     if (lang === 'hi') {
-      return `प्रिडिक्टिव डेटा के अनुसार, यदि कोई मरम्मत नहीं की गई तो क्रिटिकल फेलियर होराइजन लगभग ${horizon} का अनुमानित है। स्ट्रेस कंसंट्रेशन लगातार बढ़ रहा है।`;
+      return `विफलता समय-सीमा का निर्धारण योग्य संरचनात्मक इंजीनियर द्वारा कैलिब्रेटेड मापों के आधार पर ही किया जाना चाहिए। एआई केवल प्रारंभिक दृश्य संकेत प्रदान करता है।`;
     }
-    if (lang === 'hinglish') {
-      return `Predictive telemetry ke mutabik critical failure horizon lagbhag ${horizon} ka estimate hai. Agar maintenance delay hui toh fatigue margin threshold cross ho jayega.`;
-    }
-    return `Predictive analytics projects a critical failure horizon of approximately ${horizon} if operating under continuous load without mechanical remediation.`;
+    return `Failure horizon estimation requires calibrated physical measurements and certified structural engineering evaluation. The AI platform provides preliminary visual observations only.`;
   }
 
-  // 4. ACTION / MAINTENANCE / REPAIR / KYA KAREIN
+  // 4. ACTION / MAINTENANCE / REPAIR / STEPS
   if (
-    q.includes('action') || 
-    q.includes('kya kare') || 
-    q.includes('repair') || 
-    q.includes('maintenance') || 
-    q.includes('step') || 
-    q.includes('kadam') ||
-    q.includes('karna') ||
+    q.includes('action') ||
+    q.includes('repair') ||
+    q.includes('maintenance') ||
+    q.includes('step') ||
     q.includes('उपाय') ||
-    q.includes('कार्रवाई')
+    q.includes('कदम')
   ) {
     if (lang === 'hi') {
-      return `सिफारिश किए गए सुधारात्मक कदम: 1. हाइड्रोस्टैटिक या अल्ट्रासोनिक री-गेजिंग करें। 2. मुख्य क्रैक पर प्रेशर एपॉक्सी इंजेक्शन लगाएं। 3. एंटी-कोरोज़न सुरक्षात्मक कोटिंग चढ़ाएं। 4. 30 दिनों के भीतर री-इंस्पेक्शन शेड्यूल करें।`;
+      return `सिफारिश किए गए सुरक्षित कदम: 1. चिह्नित क्षेत्र की भौतिक जांच करें। 2. क्लोज़-अप तस्वीरें लें। 3. कैलिब्रेटेड उपकरणों से माप लें। 4. योग्य इंजीनियर से समीक्षा कराएं।`;
     }
-    if (lang === 'hinglish') {
-      return `Immediate recommended action steps: 1. Defect area ko isolate karein aur ultrasonic gauge lagayein. 2. Fracture par pressure epoxy resin inject karein. 3. Anti-corrosive primer recoat karein. 4. Next follow-up audit 30 din me schedule karein.`;
-    }
-    return `Recommended mitigation protocols: 1. Deploy ultrasonic non-destructive thickness gauging. 2. Administer structural epoxy resin pressure injection. 3. Apply Sa 2.5 protective primer recoating. 4. Schedule a 30-day verification inspection pass.`;
+    return `Recommended 5-step workflow: 1. Review flagged area manually on site. 2. Capture high-resolution close-up imagery. 3. Perform calibrated physical measurement. 4. Obtain qualified engineer sign-off before repairs.`;
   }
 
-  // DEFAULT / GENERAL SUMMARY
+  // DEFAULT SUMMARY
   if (lang === 'hi') {
-    return `एसेट ${context.assetName} का समग्र विश्लेषण: हेल्थ स्कोर ${score}/100 है। ${topDefect} मुख्य चिंता का विषय है। अनुमानित विफलता समय ${horizon} है। विस्तृत रिपोर्ट और वर्क ऑर्डर तैयार हैं।`;
+    return `${asset} का एआई सारांश: स्वास्थ्य स्कोर ${score}/100 (${status}), कुल ${defectCount} दृश्य निष्कर्ष। पेशेवर इंजीनियरिंग सत्यापन आवश्यक है।`;
   }
-  if (lang === 'hinglish') {
-    return `Asset ${context.assetName} ki overall summary: Score ${score}/100 hai aur key concern "${topDefect}" hai. Failure horizon ${horizon} estimated hai. Work order ready hai.`;
-  }
-  return `Audit summary for ${context.assetName}: Overall health score is ${score}/100. Primary concern is "${topDefect}". Predictive horizon is ${horizon}. Engineering work orders are generated and ready for dispatch.`;
+  return `AI Inspection summary for ${asset}: Health score ${score}/100 (${status}) with ${defectCount} visual finding(s). Professional engineering verification recommended.`;
 }
+

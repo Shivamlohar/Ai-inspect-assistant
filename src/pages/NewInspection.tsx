@@ -21,7 +21,6 @@ import { optimizeImageForInspection } from '../utils/imageOptimizer';
 import { saveSessionDraft, loadSessionDraft, clearSessionDraft, type InspectionDraft } from '../utils/sessionRecovery';
 import { JitterFilter } from '../utils/jitterFilter';
 import { SUPPORTED_LANGUAGES, type InspectionLanguage } from '../utils/multilingualSpeech';
-import { validateAssetRelevance } from '../utils/assetValidator';
 import { 
   industrialMotorImg,
   centrifugalPumpImg,
@@ -36,6 +35,7 @@ import {
   pipelinePlImg,
   pressureVesselImg
 } from '../assets/assetImages';
+import { classifyAsset, checkInspectionEligibility } from '../services/inspectionPipeline';
 
 export default function NewInspection() {
   const navigate = useNavigate();
@@ -101,7 +101,7 @@ export default function NewInspection() {
   // Voice recording state
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
-  const [description, setDescription] = useState('Mechanical component inspected: Structural rim crack detected on outer collar with noticeable surface oxidation and rust accumulation.');
+  const [description, setDescription] = useState('');
 
   // Preset sample media for quick testing
   const samplePresets = [
@@ -289,82 +289,45 @@ export default function NewInspection() {
     return () => clearInterval(interval);
   }, [isRecording]);
 
-  const runAiPreScan = (fileName: string, dataUrl?: string) => {
+  const runAiPreScan = (fileName: string, _dataUrl?: string) => {
     setIsAiScanning(true);
     setTimeout(() => {
       setIsAiScanning(false);
 
-      // Validate asset domain relevance (detect animals, pets, selfies, food, etc.)
-      const validation = validateAssetRelevance(fileName, selectedAsset, description, dataUrl || mediaFile?.url);
+      const classification = classifyAsset(fileName, selectedAsset, description);
+      const eligibility = checkInspectionEligibility(classification.category, classification.confidence);
 
-      if (!validation.isIndustrial) {
+      if (!eligibility.isEligible) {
         setIsNonIndustrial(true);
-        setNonIndustrialSubject(validation.detectedSubject || 'Non-Industrial Subject (Animals / Pets)');
-        setNonIndustrialReason(validation.reason || 'Image content does not match industrial machinery or civil infrastructure.');
-        setSelectedAsset('Non-Industrial Image (Domain Rejected)');
+        setNonIndustrialSubject(classification.category);
+        setNonIndustrialReason(eligibility.reason);
+        setSelectedAsset(`${classification.category} (Non-Inspectable)`);
         setAiDetectionResult({
-          category: `Non-Industrial Subject (${validation.detectedSubject || 'Living Organism / Domestic'})`,
-          description: validation.reason || 'The visual pre-scanner determined this image contains non-engineering subjects. Automated flaw metrology cannot be applied.',
+          category: `${classification.category} (${classification.confidenceLabel})`,
+          description: eligibility.reason,
           defects: [],
-          confidence: 'Rejected from Metrology Pipeline (Non-Asset)',
-          measurements: 'N/A — Non-structural subject'
+          confidence: `${Math.round(classification.confidence * 100)}% Confidence`,
+          measurements: 'Inspection Not Applicable — Automated metrology suppressed'
         });
-        setSecurityNotice(`⚠️ Domain Alert: ${validation.detectedSubject || 'Non-Industrial Subject'} detected. Defect metrology disengaged.`);
+        setSecurityNotice(`⚠️ Scope Alert: ${classification.category} detected. Defect metrology disengaged.`);
         return;
       }
 
       setIsNonIndustrial(false);
       setNonIndustrialSubject('');
       setNonIndustrialReason('');
-      
-      const isMachine = fileName.toLowerCase().includes('screenshot') || 
-                        fileName.toLowerCase().includes('machine') || 
-                        fileName.toLowerCase().includes('rotor') ||
-                        fileName.toLowerCase().includes('hub') ||
-                        fileName.toLowerCase().includes('motor') ||
-                        fileName.toLowerCase().includes('pump') ||
-                        fileName.toLowerCase().includes('part');
 
-      const isBeamOrCeiling = fileName.toLowerCase().includes('beam') ||
-                              fileName.toLowerCase().includes('ceiling') ||
-                              fileName.toLowerCase().includes('wall') ||
-                              fileName.toLowerCase().includes('crack') ||
-                              selectedAsset.toLowerCase().includes('beam') ||
-                              selectedAsset.toLowerCase().includes('pillar') ||
-                              selectedAsset.toLowerCase().includes('concrete') ||
-                              selectedAsset.toLowerCase().includes('joint');
-
-      if (isBeamOrCeiling) {
-        setSelectedAsset('Reinforced Concrete Beam & Ceiling Slab (Civil Infrastructure)');
-        setDescription('Structural inspection: Severe vertical shear/tension crack traversing reinforced concrete lintel beam and ceiling slab.');
-        setAiDetectionResult({
-          category: 'Civil & Structural Infrastructure',
-          description: 'Reinforced concrete lintel beam and ceiling slab exhibiting prominent vertical tensile shear fracture.',
-          defects: ['🔴 Structural Beam Fracture (Vertical Fissure)', '🟡 Plaster Delamination & Spalling', '🟢 Reinforcement Core Integrity'],
-          confidence: '98.6% Precision Metrology',
-          measurements: 'Crack Aperture: 4.2mm • Vertical Span: 1.85m • Penetration: 28mm'
-        });
-      } else if (isMachine) {
-        setSelectedAsset('Industrial Machine #M-401 (Mechanical Hub)');
-        setDescription('Mechanical component inspected: Structural rim crack detected on outer collar with noticeable surface oxidation and rust accumulation.');
-        setAiDetectionResult({
-          category: 'Industrial Machine Component (Mechanical Flange Hub)',
-          description: 'Identified rotating cast-iron component with visible structural fracture on outer rim and surface oxidation.',
-          defects: ['🔴 Rim Crack (14.2mm)', '🟡 Surface Rust (18.4% Area)', '🟢 Bore Wear (+0.045mm)'],
-          confidence: '98.4% Precision Baseline',
-          measurements: 'Length: 14.2mm • Width: 1.4mm • Depth: 2.8mm'
-        });
-      } else {
-        setSelectedAsset('Civil Infrastructure #102');
-        setDescription('Structural inspection: Surface deterioration and crack fissures detected.');
-        setAiDetectionResult({
-          category: 'Infrastructure Asset Component',
-          description: 'Identified civil load-bearing structure with surface cracks and spalling.',
-          defects: ['🔴 Surface Crack (18.6mm)', '🟡 Concrete Spalling (12.1% Area)', '🟢 Rebar Corrosion'],
-          confidence: '97.8% Precision Baseline',
-          measurements: 'Length: 18.6mm • Width: 2.1mm • Depth: 4.5mm'
-        });
+      if (!selectedAsset || selectedAsset.includes('Non-Industrial') || selectedAsset.includes('Non-Inspectable')) {
+        setSelectedAsset(classification.category);
       }
+
+      setAiDetectionResult({
+        category: classification.category,
+        description: classification.reasoning,
+        defects: ['Visual anomaly scan queued for full pipeline'],
+        confidence: `${Math.round(classification.confidence * 100)}% Confidence (${classification.confidenceLabel})`,
+        measurements: 'Evidence-based visual inspection ready'
+      });
     }, 600);
   };
 
@@ -599,13 +562,11 @@ export default function NewInspection() {
       setTimeout(() => {
         setIsRecording(false);
         if (selectedLang === 'hi') {
-          setDescription('आउटर रिम पर गहरा फ्रैक्चर क्रैक दिखाई दे रहा है। सेंटर बोर के चारों तरफ सतह पर भारी जंग और ऑक्सीडेशन मौजूद है।');
-        } else if (selectedLang === 'hinglish') {
-          setDescription('Outer rim collar par fracture crack visible hai. Center bore ke paas heavy surface rust aur corrosion accumulated hai.');
+          setDescription('निरीक्षक अवलोकन: दृश्य निरीक्षण नोट रिकॉर्ड किया गया।');
         } else {
-          setDescription('Crack visible on the outer rim lip. Deep surface oxidation and rust present around center bore.');
+          setDescription('Inspector observation recorded for visual audit.');
         }
-      }, 3500);
+      }, 2500);
     } else {
       setIsRecording(false);
     }
@@ -613,25 +574,27 @@ export default function NewInspection() {
 
   const handleStartInspection = () => {
     clearSessionDraft();
-    const isMachine = selectedAsset.toLowerCase().includes('machine') || 
-                      (mediaFile && mediaFile.name.toLowerCase().includes('screenshot')) ||
-                      (mediaFile && mediaFile.name.toLowerCase().includes('machine'));
-
     const apiKey = getGeminiApiKey();
     const hasGemini = Boolean(apiKey && apiKey.trim().length > 10 && mediaFile?.base64);
 
+    const isVideo = mediaFile?.type === 'video';
+    const isCamera = isCameraActive || (mediaFile?.name && mediaFile.name.includes('machine_capture_'));
+    const inputType = isVideo ? 'video' : (isCamera ? 'camera' : 'static_image');
+
     const inspectionPayload = {
-      assetName: selectedAsset,
-      assetCategory: isNonIndustrial ? 'Non-Industrial Subject' : (isMachine ? 'Industrial Machinery Component' : 'Civil Infrastructure'),
+      assetName: selectedAsset || 'Inspection Asset',
+      assetCategory: isNonIndustrial ? nonIndustrialSubject : undefined,
       mediaUrl: mediaFile?.url || samplePresets[0].url,
       mediaType: mediaFile?.type || 'image',
       mediaName: mediaFile?.name || 'asset_scan.jpg',
+      inputType,
       description,
+      userNotes: description,
       language: selectedLang,
-      isMachine,
       isIndustrialAsset: !isNonIndustrial,
       detectedSubject: nonIndustrialSubject,
       rejectionReason: nonIndustrialReason,
+      isDemoData: Boolean((mediaFile as any)?.isDemoData),
       securityHash: mediaFile?.securityHash || 'SHA256:7f3a9e10c4b281d5',
       geminiPending: hasGemini,
       imageBase64: mediaFile?.base64,
@@ -1092,7 +1055,7 @@ export default function NewInspection() {
 
           {/* Quick Presets for Demo */}
           <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center gap-2">
-            <span className="text-xs font-bold text-slate-400">Try Sample Assets:</span>
+            <span className="text-xs font-bold text-slate-400">Try Demo Presets:</span>
             {samplePresets.map((preset, i) => (
               <button
                 key={i}
@@ -1103,17 +1066,18 @@ export default function NewInspection() {
                     type: 'image',
                     name: preset.name.toLowerCase().replace(/\s+/g, '_') + '.jpg',
                     size: preset.size,
-                    securityHash: 'SHA256:preset_verified'
-                  });
+                    securityHash: 'SHA256:preset_verified',
+                    isDemoData: true
+                  } as any);
                   setSelectedAsset(preset.asset);
                   setDescription(preset.note);
-                  setSecurityNotice('Verified Benchmark Asset: Clean File');
+                  setSecurityNotice('🔶 Demo Dataset: Sandboxed File');
                   setAiDetectionResult({
                     category: preset.category,
-                    description: `Preset loaded: ${preset.name}. Ready for automated flaw verification.`,
-                    defects: ['🔴 Crack / Fracture', '🟡 Surface Deterioration', '🟢 Wear / Corrosion'],
-                    confidence: '98.5% Precision Baseline',
-                    measurements: 'Benchmarked against ISO/AASHTO dataset'
+                    description: `Demo baseline loaded: ${preset.name}.`,
+                    defects: ['Visual defect detection ready'],
+                    confidence: '🔶 Pre-configured Demo Mode',
+                    measurements: 'Pre-calibrated demonstration baseline'
                   });
                 }}
                 className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-primary/10 hover:text-primary transition cursor-pointer"
@@ -1195,10 +1159,10 @@ export default function NewInspection() {
                 </label>
                 <button
                   type="button"
-                  onClick={() => setDescription('Structural crack visible on outer rim collar. Prominent surface oxidation and rust accumulation.')}
-                  className="text-xs font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                  onClick={() => setDescription('')}
+                  className="text-xs font-bold text-slate-400 hover:text-slate-600 flex items-center gap-1 cursor-pointer"
                 >
-                  <RotateCcw className="w-3 h-3" /> Auto-fill machine note
+                  <RotateCcw className="w-3 h-3" /> Clear notes
                 </button>
               </div>
               <textarea 
