@@ -36,6 +36,7 @@ import {
   pressureVesselImg
 } from '../assets/assetImages';
 import { classifyAsset, checkInspectionEligibility } from '../services/inspectionPipeline';
+import { classifyVisualInput, type VisionClassificationResult } from '../services/inspectionPipeline/visionClassifier';
 
 export default function NewInspection() {
   const navigate = useNavigate();
@@ -44,7 +45,7 @@ export default function NewInspection() {
     if (location.state?.assetName) return location.state.assetName;
     const stored = sessionStorage.getItem('selectedAsset');
     if (stored) return stored;
-    return 'Industrial Motor M-401 (M-401)';
+    return ''; // Auto-detect from image / video
   });
   const [selectedLang, setSelectedLang] = useState<InspectionLanguage>('en');
   const [luminance, setLuminance] = useState<number | null>(null);
@@ -289,13 +290,18 @@ export default function NewInspection() {
     return () => clearInterval(interval);
   }, [isRecording]);
 
-  const runAiPreScan = (fileName: string, _dataUrl?: string) => {
+  const runAiPreScan = async (fileName: string, dataUrl?: string) => {
     setIsAiScanning(true);
-    setTimeout(() => {
-      setIsAiScanning(false);
+    try {
+      let visualResult: VisionClassificationResult | undefined;
+      if (dataUrl) {
+        visualResult = await classifyVisualInput(dataUrl, fileName);
+      }
 
-      const classification = classifyAsset(fileName, selectedAsset, description);
+      const classification = classifyAsset(fileName, selectedAsset, description, undefined, visualResult);
       const eligibility = checkInspectionEligibility(classification.category, classification.confidence);
+
+      setIsAiScanning(false);
 
       if (!eligibility.isEligible) {
         setIsNonIndustrial(true);
@@ -306,7 +312,7 @@ export default function NewInspection() {
           category: `${classification.category} (${classification.confidenceLabel})`,
           description: eligibility.reason,
           defects: [],
-          confidence: `${Math.round(classification.confidence * 100)}% Confidence`,
+          confidence: `${classification.confidence}% Confidence`,
           measurements: 'Inspection Not Applicable — Automated metrology suppressed'
         });
         setSecurityNotice(`⚠️ Scope Alert: ${classification.category} detected. Defect metrology disengaged.`);
@@ -317,7 +323,7 @@ export default function NewInspection() {
       setNonIndustrialSubject('');
       setNonIndustrialReason('');
 
-      if (!selectedAsset || selectedAsset.includes('Non-Industrial') || selectedAsset.includes('Non-Inspectable')) {
+      if (!selectedAsset || selectedAsset.includes('Auto-detect') || selectedAsset.includes('Non-Industrial') || selectedAsset.includes('Non-Inspectable')) {
         setSelectedAsset(classification.category);
       }
 
@@ -325,10 +331,13 @@ export default function NewInspection() {
         category: classification.category,
         description: classification.reasoning,
         defects: ['Visual anomaly scan queued for full pipeline'],
-        confidence: `${Math.round(classification.confidence * 100)}% Confidence (${classification.confidenceLabel})`,
+        confidence: `${classification.confidence}% Confidence (${classification.confidenceLabel})`,
         measurements: 'Evidence-based visual inspection ready'
       });
-    }, 600);
+    } catch (scanErr) {
+      console.warn('Pre-scan error:', scanErr);
+      setIsAiScanning(false);
+    }
   };
 
   const handleFileSelection = (file: File) => {
@@ -380,6 +389,8 @@ export default function NewInspection() {
             base64: optimized.dataUrl,
             mimeType: 'image/jpeg'
           });
+
+          runAiPreScan(secResult.sanitizedName, optimized.dataUrl);
         })
         .catch(() => {
           const url = URL.createObjectURL(file);
@@ -392,6 +403,7 @@ export default function NewInspection() {
             securityHash: secResult.securityHash,
             mimeType: file.type
           });
+          runAiPreScan(secResult.sanitizedName, url);
         });
     } else {
       const url = URL.createObjectURL(file);
@@ -404,11 +416,11 @@ export default function NewInspection() {
         securityHash: secResult.securityHash,
         mimeType: file.type
       });
+      runAiPreScan(secResult.sanitizedName);
     }
 
     setSecurityNotice('Anti-Malware Sandbox: Clean File • 0 Threat Signatures • Integrity Verified');
     stopCamera();
-    runAiPreScan(secResult.sanitizedName);
   };
 
   const handleImageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -581,8 +593,12 @@ export default function NewInspection() {
     const isCamera = isCameraActive || (mediaFile?.name && mediaFile.name.includes('machine_capture_'));
     const inputType = isVideo ? 'video' : (isCamera ? 'camera' : 'static_image');
 
+    const resolvedAssetName = isNonIndustrial 
+      ? (nonIndustrialSubject || 'Person / Human (Non-Inspectable)')
+      : (selectedAsset || 'Auto-detected Asset');
+
     const inspectionPayload = {
-      assetName: selectedAsset || 'Inspection Asset',
+      assetName: resolvedAssetName,
       assetCategory: isNonIndustrial ? nonIndustrialSubject : undefined,
       mediaUrl: mediaFile?.url || samplePresets[0].url,
       mediaType: mediaFile?.type || 'image',
@@ -757,7 +773,7 @@ export default function NewInspection() {
           </div>
           <div>
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Target Component</span>
-            <h4 className="text-lg font-black text-slate-800">{selectedAsset}</h4>
+            <h4 className="text-lg font-black text-slate-800">{selectedAsset || 'Auto-detect from image / video'}</h4>
           </div>
         </div>
 
@@ -766,6 +782,7 @@ export default function NewInspection() {
           onChange={(e) => setSelectedAsset(e.target.value)}
           className="bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold text-sm rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer w-full sm:w-auto"
         >
+          <option value="">🔍 Auto-detect asset type from image / video</option>
           <optgroup label="🏭 INDUSTRIAL MACHINERY">
             <option value="Industrial Motor M-401 (M-401)">Industrial Motor M-401 (M-401)</option>
             <option value="Centrifugal Pump P-204 (P-204)">Centrifugal Pump P-204 (P-204)</option>

@@ -59,6 +59,10 @@ const CATEGORY_KEYWORDS: Record<AssetCategory, string[]> = {
   'Unknown / Unsupported': []
 };
 
+import { classifyVisualInput, analyzeImagePixelsForBiometrics, type VisionClassificationResult } from './visionClassifier';
+
+export { classifyVisualInput, analyzeImagePixelsForBiometrics };
+
 /**
  * Classifies an asset based on visual heuristics, text context, or model feedback.
  */
@@ -66,9 +70,23 @@ export function classifyAsset(
   fileName: string,
   userSelectedAsset: string = '',
   userNotes: string = '',
-  modelClassification?: { category: string; confidence: number }
+  modelClassification?: { category: string; confidence: number },
+  visualClassification?: VisionClassificationResult
 ): AssetClassificationResult {
-  // 1. If real AI model classification exists, normalize it
+  // 1. If visual classification result is provided from the vision classifier, prioritize it!
+  if (visualClassification && visualClassification.category && visualClassification.category !== 'Unknown / Unsupported') {
+    const matchedCategory = normalizeCategoryName(visualClassification.category);
+    const conf = Math.max(10, Math.min(100, Math.round(visualClassification.confidence)));
+    return {
+      category: matchedCategory,
+      confidence: conf,
+      confidenceLabel: `${conf}%`,
+      source: visualClassification.source === 'cloud_vision_api' ? 'ai_model' : 'visual_heuristic',
+      reasoning: visualClassification.reason || `Visual classifier determined subject as ${matchedCategory} (${conf}% confidence).`
+    };
+  }
+
+  // 2. If real AI model classification exists, normalize it
   if (modelClassification && modelClassification.category) {
     const rawCat = modelClassification.category.trim();
     const matchedCategory = normalizeCategoryName(rawCat);
@@ -82,9 +100,15 @@ export function classifyAsset(
     };
   }
 
-  const combined = ` ${fileName} ${userSelectedAsset} ${userNotes} `.toLowerCase();
+  // Filter out auto-detect strings and non-inspectable tags from userSelectedAsset
+  const isAutoDetect = !userSelectedAsset || 
+                       userSelectedAsset.toLowerCase().includes('auto-detect') ||
+                       userSelectedAsset.toLowerCase().includes('unspecified');
 
-  // 2. Check for explicit non-inspectable subjects first (Person, Animal, Indoor Room, Landscape)
+  const cleanSelectedAsset = isAutoDetect ? '' : userSelectedAsset;
+  const combined = ` ${fileName} ${cleanSelectedAsset} ${userNotes} `.toLowerCase();
+
+  // 3. Check for explicit non-inspectable subjects first (Person, Animal, Indoor Room, Landscape)
   const nonInspectableOrder: AssetCategory[] = ['Person / Human', 'Animal', 'Indoor Room', 'Landscape'];
   for (const cat of nonInspectableOrder) {
     const keywords = CATEGORY_KEYWORDS[cat];
@@ -93,8 +117,8 @@ export function classifyAsset(
       if (regex.test(combined)) {
         return {
           category: cat,
-          confidence: 94,
-          confidenceLabel: '94%',
+          confidence: 96,
+          confidenceLabel: '96%',
           source: 'visual_heuristic',
           reasoning: `Visual indicators and context identify a non-inspectable subject (${kw}).`
         };
@@ -102,7 +126,7 @@ export function classifyAsset(
     }
   }
 
-  // 3. Check inspectable industrial & civil categories
+  // 4. Check inspectable industrial & civil categories in file name and user notes
   const inspectableOrder: AssetCategory[] = [
     'Solar Panel',
     'Railway Infrastructure',
@@ -131,9 +155,9 @@ export function classifyAsset(
     }
   }
 
-  // 4. Fallback if user selected a pre-registered asset
-  if (userSelectedAsset && userSelectedAsset.trim().length > 3) {
-    const clean = userSelectedAsset.toLowerCase();
+  // 5. Fallback if user explicitly selected a pre-registered asset (only if not Auto-detect)
+  if (cleanSelectedAsset && cleanSelectedAsset.trim().length > 3) {
+    const clean = cleanSelectedAsset.toLowerCase();
     if (clean.includes('motor') || clean.includes('pump') || clean.includes('compressor') || clean.includes('gearbox')) {
       return {
         category: 'Industrial Machinery',
@@ -172,7 +196,7 @@ export function classifyAsset(
     }
   }
 
-  // 5. Unknown / Low Confidence Fallback
+  // 6. Unknown / Low Confidence Fallback
   return {
     category: 'Unknown / Unsupported',
     confidence: 42,

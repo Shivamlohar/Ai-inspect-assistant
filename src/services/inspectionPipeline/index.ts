@@ -14,6 +14,7 @@ import { compareWithHistoricalAudits } from './historicalComparator';
 import { generateRecommendedSteps } from './recommendationEngine';
 import { retrieveInspectionKnowledge } from './knowledgeRetriever';
 import { validateEvidence } from './evidenceValidator';
+import { classifyVisualInput, type VisionClassificationResult } from './visionClassifier';
 
 export interface PipelineExecutionOptions {
   fileName?: string;
@@ -23,6 +24,7 @@ export interface PipelineExecutionOptions {
   userAssetId?: string;
   userNotes?: string;
   modelResult?: any;
+  visualClassification?: VisionClassificationResult;
   isDemoMode?: boolean;
 }
 
@@ -37,6 +39,7 @@ export async function runInspectionPipeline(
     userAssetId = '',
     userNotes = '',
     modelResult,
+    visualClassification: providedVisualClassification,
     isDemoMode = false
   } = options;
 
@@ -70,18 +73,102 @@ export async function runInspectionPipeline(
   // 3. Image Validation (quality, resolution)
   const validationResult = await validateImageQuality(mediaUrl);
 
-  // 4. Asset Classification (14 standardized categories)
+  // 4. First-Stage Visual Image Classification Gate
+  let visualClassification = providedVisualClassification;
+  if (!visualClassification && !modelResult && mediaUrl) {
+    try {
+      visualClassification = await classifyVisualInput(mediaUrl, fileName);
+    } catch (visErr) {
+      console.warn('Visual classification step error:', visErr);
+    }
+  }
+
+  // 5. Standardized Asset Classification (14 standardized categories)
   const classification = classifyAsset(
     fileName,
     userSelectedAsset,
     userNotes,
-    modelResult ? { category: modelResult.category || modelResult.assetCategory, confidence: modelResult.confidence || 85 } : undefined
+    modelResult ? { 
+      category: modelResult.category || modelResult.assetCategory || modelResult.detectedCategory, 
+      confidence: modelResult.confidence || modelResult.classificationConfidence || 85 
+    } : undefined,
+    visualClassification
   );
 
-  // 5. Inspection Eligibility Check (Section 2)
+  // 6. Inspection Eligibility Check (Section 2 & Hard Gate)
   const eligibility = checkInspectionEligibility(classification.category, classification.confidence);
 
-  // 6. Defect Detection (Only visual evidence, no fabricated mm dimensions)
+  // =========================================================================
+  // HARD ASSET VALIDATION GATE: STOP IMMEDIATELY IF INELIGIBLE OR CONFIDENCE < 70%
+  // Zero defect generation, Zero fabricated measurements, Zero fake health scores
+  // =========================================================================
+  if (!eligibility.isEligible || classification.confidence < 70) {
+    const resolvedAssetName = (userSelectedAsset && !userSelectedAsset.includes('Auto-detect') && !userSelectedAsset.includes('Non-Inspectable'))
+      ? userSelectedAsset
+      : `${classification.category} (Non-Inspectable)`;
+
+    const modelUsed = modelResult?.modelUsed || 
+      (visualClassification?.modelUsed) ||
+      (classification.source === 'ai_model' ? 'Google Gemini 1.5 Flash Vision' : 'Local Computer Vision Biometric & Pixel Classifier');
+
+    return {
+      inspectionId,
+      assetId: resolvedAssetId,
+      assetName: resolvedAssetName,
+      detectedCategory: classification.category,
+      classificationConfidence: classification.confidence,
+      classificationConfidenceLabel: classification.confidenceLabel,
+      inspectionEligible: false,
+      inspectionStatus: eligibility.status,
+      ineligibilityReason: eligibility.reason,
+      inputType,
+      inputSourceLabel,
+      inspectionModeTitle,
+      inspectionTimestamp,
+      formattedDate,
+      defects: [], // Strictly 0 defects
+      healthScore: {
+        isAvailable: false,
+        finalScore: null as any,
+        unavailabilityReason: eligibility.reason,
+        components: {
+          visualCondition: { score: 0, weight: 0.40, contribution: 0 },
+          defectCondition: { score: 0, weight: 0.30, contribution: 0 },
+          severityPenalty: { score: 0, weight: 0.20, contribution: 0 },
+          confidenceFactor: { score: 0, weight: 0.10, contribution: 0 }
+        },
+        explanation: 'Asset health score is not applicable to non-engineering subjects.'
+      },
+      recommendedSteps: [
+        {
+          step: 1,
+          title: 'Upload a supported civil infrastructure or industrial asset',
+          detail: 'Structural defect metrology is reserved for civil infrastructure, industrial equipment, and transportation assets.',
+          timing: 'Immediate',
+          type: 'review'
+        }
+      ],
+      historicalComparison: {
+        hasHistoricalData: false,
+        message: 'No historical inspection available for non-asset images.'
+      },
+      sensorTelemetry: {
+        hasSensorData: false,
+        sourceNote: 'Sensor telemetry is unavailable for non-engineering subjects.'
+      },
+      summaryObservation: `Visual observation identified subject as ${classification.category}. Structural inspection is not applicable.`,
+      engineeringNotice: 'ZERO FABRICATION POLICY: Automated defect detection, structural health scoring, and repair protocols are suppressed for non-asset images.',
+      limitationsOfVisualInspection: [
+        'Optical inspection engine rejected subject as non-inspectable.',
+        'No structural integrity assessment conducted.'
+      ],
+      isDemoData: Boolean(isDemoMode),
+      modelUsed,
+      mediaUrl
+    };
+  }
+
+  // 7. Defect Detection (Only visual evidence, strictly for inspectable assets)
   const defectFindings = detectDefects(
     classification.category,
     eligibility.isEligible,

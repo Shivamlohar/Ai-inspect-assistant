@@ -100,7 +100,11 @@ export default function Report() {
           parsed.status === 'NON_ASSET' ||
           gResult.status === 'NON_ASSET' ||
           parsed.assetName?.toLowerCase().includes('non-industrial') ||
-          parsed.assetCategory?.toLowerCase().includes('non-industrial')
+          parsed.assetCategory?.toLowerCase().includes('non-industrial') ||
+          parsed.assetName?.toLowerCase().includes('person') ||
+          parsed.assetName?.toLowerCase().includes('human') ||
+          parsed.detectedSubject?.toLowerCase().includes('person') ||
+          parsed.detectedSubject?.toLowerCase().includes('human')
         );
 
         const currentScore = isNonAsset ? 'N/A' : (pipelineResult?.healthScore?.finalScore ? `${pipelineResult.healthScore.finalScore} / 100` : (isG ? `${gResult.healthScore ?? 72} / 100` : '72 / 100'));
@@ -108,7 +112,7 @@ export default function Report() {
         const currentSafetyFactor = isNonAsset ? 'N/A' : (pipelineResult?.defects?.length === 0 ? '1.50' : (isG ? (gResult.safetyFactor ?? '1.15') : (isM ? '1.15' : '1.28')));
 
         setData({
-          assetName: pipelineResult?.assetName || parsed.assetName || (isM ? 'Industrial Machine #M-401 (Mechanical Hub)' : 'Bridge #102'),
+          assetName: pipelineResult?.assetName || parsed.assetName || (isNonAsset ? 'Inspection Not Applicable' : (isM ? 'Industrial Machine #M-401 (Mechanical Hub)' : 'Bridge #102')),
           assetId: pipelineResult?.assetId || (isNonAsset ? 'NON-ASSET-01' : (isM ? 'MACH-401-HUB' : 'BRIDGE-102')),
           location: isNonAsset ? 'Out of Engineering Scope' : (isM ? 'Sector 5 (Mechanical Fabrication Unit)' : 'Sector 5 (Highway Crossing)'),
           isMachine: isM,

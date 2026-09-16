@@ -162,7 +162,84 @@ export async function handleApiRequest(req, res, reqPath) {
     return true;
   }
 
-  // 6. INSPECTION UPLOAD & RECORDING (Section 23 & 28: Traceability)
+  // 6. VISION CLASSIFICATION GATE (First-Stage AI Gate)
+  if (reqPath === '/api/vision/classify' && req.method === 'POST') {
+    try {
+      const body = await readJsonBody(req);
+      const { imageBase64, mimeType = 'image/jpeg', fileName = 'asset.jpg' } = body;
+      const apiKey = process.env.GEMINI_API_KEY || req.headers['x-gemini-key'] || '';
+
+      if (apiKey && apiKey.trim().length > 10 && imageBase64) {
+        try {
+          const pureBase64 = imageBase64.replace(/^data:[^;]+;base64,/, '');
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
+          const prompt = `Classify this image into exactly ONE category: Road, Bridge, Building, Industrial Machinery, Electrical Pole, Pipeline, Solar Panel, Railway Infrastructure, Vehicle / Equipment, Person / Human, Animal, Indoor Room, Landscape, Unknown / Unsupported. If image contains a PERSON, HUMAN, SELFIE, FACE, or PORTRAIT, return category "Person / Human" and isEligible false. Return JSON only: {"category": "...", "confidence": 95, "isEligible": false, "reason": "..."}`;
+
+          const geminiResp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  { text: prompt },
+                  { inline_data: { mime_type: mimeType.startsWith('image/') ? mimeType : 'image/jpeg', data: pureBase64 } }
+                ]
+              }],
+              generationConfig: { temperature: 0.1, maxOutputTokens: 400 }
+            })
+          });
+
+          if (geminiResp.ok) {
+            const resJson = await geminiResp.json();
+            const text = resJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            const match = text.match(/\{[\s\S]*\}/);
+            if (match) {
+              const parsed = JSON.parse(match[0]);
+              sendJson(res, 200, {
+                success: true,
+                ...parsed,
+                modelUsed: 'Google Gemini 1.5 Flash Vision (gemini-1.5-flash)'
+              });
+              return true;
+            }
+          }
+        } catch (gErr) {
+          console.warn('[SERVER GEMINI CLASSIFY FAILED, FALLING BACK]:', gErr.message);
+        }
+      }
+
+      // Local Pattern & Text/Metadata Heuristic Fallback
+      const lowerFile = (fileName || '').toLowerCase();
+      const isPersonName = lowerFile.includes('person') || lowerFile.includes('selfie') || lowerFile.includes('portrait') || lowerFile.includes('human') || lowerFile.includes('face') || lowerFile.includes('man') || lowerFile.includes('woman') || lowerFile.includes('boy') || lowerFile.includes('girl');
+
+      if (isPersonName) {
+        sendJson(res, 200, {
+          success: true,
+          category: 'Person / Human',
+          confidence: 96,
+          isEligible: false,
+          reason: 'The uploaded image contains a person / unsupported subject. Structural and industrial inspection cannot be performed on non-infrastructure images.',
+          modelUsed: 'Local Computer Vision Pattern Classifier'
+        });
+        return true;
+      }
+
+      sendJson(res, 200, {
+        success: true,
+        category: 'Unknown / Unsupported',
+        confidence: 50,
+        isEligible: false,
+        reason: 'Visual subject requires confirmation before automated flaw metrology can be engaged.',
+        modelUsed: 'Local Computer Vision Heuristic'
+      });
+      return true;
+    } catch (err) {
+      sendJson(res, 400, { success: false, error: err.message });
+      return true;
+    }
+  }
+
+  // 7. INSPECTION UPLOAD & RECORDING (Section 23 & 28: Traceability)
   if (reqPath === '/api/inspection/upload' && req.method === 'POST') {
     try {
       const body = await readJsonBody(req);
@@ -185,9 +262,21 @@ export async function handleApiRequest(req, res, reqPath) {
       const payload = await readJsonBody(req);
       const inspectionId = payload.inspectionId || ('INSP-' + Date.now());
 
-      // Ensure asset exists in DB
+      // HARD GATE: Verify inspection eligibility
+      const isEligible = Boolean(
+        payload.inspectionEligible && 
+        payload.inspectionStatus !== 'NOT_APPLICABLE' && 
+        payload.inspectionStatus !== 'NOT SUPPORTED' &&
+        payload.detectedCategory !== 'Person / Human' &&
+        payload.detectedCategory !== 'Animal' &&
+        payload.detectedCategory !== 'Indoor Room' &&
+        payload.detectedCategory !== 'Landscape' &&
+        payload.detectedCategory !== 'Unknown / Unsupported'
+      );
+
+      // Ensure asset exists in DB only if genuine inspectable asset
       const existingAsset = assetDb.getById(payload.assetId);
-      if (!existingAsset && payload.assetId) {
+      if (!existingAsset && payload.assetId && isEligible) {
         assetDb.create({
           asset_id: payload.assetId,
           asset_type: payload.detectedCategory || 'Industrial Machinery',
@@ -197,28 +286,32 @@ export async function handleApiRequest(req, res, reqPath) {
         });
       }
 
-      // Persist inspection to SQLite
+      // Persist inspection to SQLite with strict zero-fabrication gating
       inspectionDb.create({
         id: inspectionId,
-        asset_id: payload.assetId || 'ASSET-GEN',
-        asset_name: payload.assetName || 'Asset Inspection',
+        asset_id: payload.assetId || (isEligible ? 'ASSET-GEN' : 'NON-ASSET-01'),
+        asset_name: payload.assetName || (isEligible ? 'Asset Inspection' : 'Non-Inspectable Subject'),
         inspection_date: payload.inspectionTimestamp || new Date().toISOString(),
         input_type: payload.inputType || 'static_image',
         image_url: payload.mediaUrl?.slice(0, 500) || null,
-        status: payload.inspectionStatus || 'SUPPORTED',
-        detected_category: payload.detectedCategory || 'Industrial Machinery',
-        overall_confidence: payload.classificationConfidence || 85,
-        health_score: payload.healthScore?.finalScore ?? null,
-        safety_factor: payload.healthScore?.finalScore ? (payload.healthScore.finalScore >= 80 ? '1.50' : '1.15') : null,
+        status: isEligible ? (payload.inspectionStatus || 'SUPPORTED') : 'NOT_APPLICABLE',
+        detected_category: payload.detectedCategory || (isEligible ? 'Industrial Machinery' : 'Person / Human'),
+        overall_confidence: payload.classificationConfidence || (isEligible ? 85 : 95),
+        health_score: isEligible ? (payload.healthScore?.finalScore ?? null) : null,
+        safety_factor: isEligible ? (payload.healthScore?.finalScore ? (payload.healthScore.finalScore >= 80 ? '1.50' : '1.15') : null) : null,
         inspector_name: payload.inspectorName || 'Lead Inspector',
         inspector_id: payload.inspectorId || 'OFFICER-001',
-        summary_observation: payload.summaryObservation || '',
-        engineering_notice: payload.engineeringNotice || '',
+        summary_observation: isEligible 
+          ? (payload.summaryObservation || '') 
+          : `Visual observation identified subject as ${payload.detectedCategory || 'non-asset'}. Structural inspection is not applicable.`,
+        engineering_notice: isEligible 
+          ? (payload.engineeringNotice || '') 
+          : 'ZERO FABRICATION POLICY: Automated defect metrology and degradation calculations suppressed for non-asset images.',
         is_demo_data: payload.isDemoData ? 1 : 0
       });
 
-      // Persist defects
-      if (Array.isArray(payload.defects) && payload.defects.length > 0) {
+      // Persist defects ONLY if eligible - NEVER for non-asset
+      if (isEligible && Array.isArray(payload.defects) && payload.defects.length > 0) {
         defectDb.createBatch(inspectionId, payload.defects);
       }
 
