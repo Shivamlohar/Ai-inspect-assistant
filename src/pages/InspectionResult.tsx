@@ -1109,7 +1109,7 @@ export default function InspectionResult() {
                 </div>
               </div>
 
-              <input 
+              <input name="compareSlider" id="input-compareslider" 
                 type="range"
                 min="0"
                 max="100"
@@ -1330,7 +1330,7 @@ export default function InspectionResult() {
               <Sliders className="w-3.5 h-3.5 text-cyan-400" />
               AI Confidence Filter:
             </span>
-            <input 
+            <input name="confidenceThreshold" id="input-confidencethreshold" 
               type="range"
               min="70"
               max="95"
@@ -1475,7 +1475,7 @@ export default function InspectionResult() {
                 <span className="text-slate-600 dark:text-slate-300 shrink-0 flex items-center gap-1">
                   <History className="w-3.5 h-3.5 text-primary" /> Compare Baseline:
                 </span>
-                <select
+                <select name="selectedPastAuditId" id="select-selectedpastauditid"
                   value={selectedPastAuditId}
                   onChange={e => setSelectedPastAuditId(e.target.value)}
                   className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 outline-none text-xs font-bold w-full sm:w-auto cursor-pointer"
@@ -1650,7 +1650,7 @@ export default function InspectionResult() {
           >
             <Mic className="w-5 h-5" />
           </button>
-          <input
+          <input name="copilotInput" id="input-copilotinput"
             type="text"
             value={copilotInput}
             onChange={e => setCopilotInput(e.target.value)}
@@ -2430,7 +2430,7 @@ export default function InspectionResult() {
             <form onSubmit={handleAddFinding} className="space-y-3 text-xs">
               <div>
                 <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Defect Title / Component Name</label>
-                <input
+                <input name="newFindingTitle" id="input-newfindingtitle"
                   type="text"
                   required
                   placeholder="e.g. Grounding Flange Bolt Corroded / Loose"
@@ -2443,6 +2443,8 @@ export default function InspectionResult() {
               <div>
                 <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Severity Level</label>
                 <select
+                  id="new-finding-severity"
+                  name="newFindingSeverity"
                   value={newFindingSeverity}
                   onChange={(e) => setNewFindingSeverity(e.target.value as any)}
                   className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none focus:border-primary"
@@ -2455,7 +2457,7 @@ export default function InspectionResult() {
 
               <div>
                 <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Physical Dimensions / Field Observation</label>
-                <textarea
+                <textarea name="newFindingMetric" id="textarea-newfindingmetric"
                   rows={3}
                   required
                   placeholder="e.g. Ultrasonic UTM verified 3.2mm remaining wall. Lock washer fatigued."

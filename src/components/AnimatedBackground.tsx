@@ -11,6 +11,7 @@ interface Particle {
 }
 
 export const AnimatedBackground = memo(function AnimatedBackground() {
+  const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const spotlightRef = useRef<HTMLDivElement | null>(null);
   const coreGlowRef = useRef<HTMLDivElement | null>(null);
@@ -65,7 +66,8 @@ export const AnimatedBackground = memo(function AnimatedBackground() {
     document.addEventListener('mouseleave', onMouseLeave, { passive: true });
 
     // Initialize 45 liquid telemetry nodes
-    const particleCount = Math.min(36, Math.floor((width * height) / 28000));
+    const isSmallScreen = width < 768;
+    const particleCount = isSmallScreen ? 12 : Math.min(24, Math.floor((width * height) / 38000));
     const colors = [
       '#06b6d4', // electric cyan
       '#0ea5e9', // sky blue
@@ -191,9 +193,11 @@ export const AnimatedBackground = memo(function AnimatedBackground() {
     };
 
         let isMounted = true;
+    if (prefersReducedMotion) return;
+
     const scheduleStart = typeof window.requestIdleCallback === 'function'
       ? window.requestIdleCallback
-      : (cb: () => void) => setTimeout(cb, 80);
+      : (cb: () => void) => setTimeout(cb, 400);
 
     const idleToken = scheduleStart(() => {
       if (isMounted) {
@@ -217,7 +221,7 @@ export const AnimatedBackground = memo(function AnimatedBackground() {
   return (
     <div 
       aria-hidden="true" 
-      className="fixed inset-0 pointer-events-none -z-10 overflow-hidden select-none transition-opacity duration-700"
+      className="fixed inset-0 pointer-events-none -z-10 overflow-hidden select-none transition-opacity duration-700 [contain:strict]"
     >
       {/* 1. CONTINUOUS DRIFTING AURORA GRADIENT ORBS (WITH LIQUID PARALLAX) */}
       <div ref={auroraContainerRef} className="absolute inset-0 overflow-hidden transition-transform duration-300 ease-out">

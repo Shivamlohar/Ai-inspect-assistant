@@ -784,6 +784,8 @@ export default function NewInspection() {
         </div>
 
         <select 
+          id="inspection-asset-select"
+          name="selectedAsset"
           value={selectedAsset}
           onChange={(e) => setSelectedAsset(e.target.value)}
           className="bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold text-sm rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer w-full sm:w-auto"
@@ -813,20 +815,20 @@ export default function NewInspection() {
       </div>
 
       {/* Hidden File Inputs */}
-      <input 
+      <input name="file" id="input-file" 
         type="file" 
         ref={imageInputRef} 
         onChange={handleImageInputChange} 
         accept="image/*" 
         className="hidden" 
-      />
-      <input 
+       />
+      <input name="file" id="input-file" 
         type="file" 
         ref={videoInputRef} 
         onChange={handleVideoInputChange} 
         accept="video/*" 
         className="hidden" 
-      />
+       />
 
       <div className="space-y-8">
         
@@ -1188,7 +1190,7 @@ export default function NewInspection() {
                   <RotateCcw className="w-3 h-3" /> Clear notes
                 </button>
               </div>
-              <textarea 
+              <textarea name="description" id="textarea-description" 
                 className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-slate-800 font-medium text-base min-h-[110px] focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all resize-none"
                 placeholder="Example: Crack visible on the left side. Some corrosion is also present."
                 value={description}

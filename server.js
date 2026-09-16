@@ -381,6 +381,15 @@ const server = http.createServer(async (req, res) => {
     const ext = path.extname(safeFilePath).toLowerCase();
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 
+    // HTTP 304 ETag Cache Validation
+    const etag = `W/"${stats ? stats.size : 0}-${stats ? stats.mtimeMs.toString(16) : 0}"`;
+    res.setHeader('ETag', etag);
+    if (req.headers['if-none-match'] === etag) {
+      res.writeHead(304);
+      res.end();
+      return;
+    }
+
     fs.readFile(safeFilePath, (readErr, content) => {
       if (readErr) {
         res.writeHead(404, { 'Content-Type': 'text/plain' });
@@ -390,11 +399,26 @@ const server = http.createServer(async (req, res) => {
 
       applySecurityHeaders(res, contentType, ext);
 
-      // High-performance gzip compression for text, code, and SVG assets
+      // High-performance Brotli (br) & Gzip compression for text, code, and SVG assets
       const compressible = /^\.?(html|js|mjs|css|json|svg|wasm|xml|txt)$/i.test(ext);
       const acceptEncoding = req.headers['accept-encoding'] || '';
 
-      if (compressible && /\bgzip\b/i.test(acceptEncoding)) {
+      if (compressible && /\bbr\b/i.test(acceptEncoding)) {
+        res.setHeader('Content-Encoding', 'br');
+        res.setHeader('Vary', 'Accept-Encoding');
+        res.writeHead(200, { 'Content-Type': contentType });
+        zlib.brotliCompress(content, {
+          params: {
+            [zlib.constants.BROTLI_PARAM_QUALITY]: 5
+          }
+        }, (err, compressed) => {
+          if (err) {
+            res.end(content);
+          } else {
+            res.end(compressed);
+          }
+        });
+      } else if (compressible && /\bgzip\b/i.test(acceptEncoding)) {
         res.setHeader('Content-Encoding', 'gzip');
         res.setHeader('Vary', 'Accept-Encoding');
         res.writeHead(200, { 'Content-Type': contentType });

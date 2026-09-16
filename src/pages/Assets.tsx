@@ -477,7 +477,7 @@ export default function Assets() {
         <div className="flex flex-col sm:flex-row items-center gap-3">
           <div className="relative w-full sm:w-64">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-            <input 
+            <input name="searchTerm" id="input-searchterm" 
               type="text" 
               placeholder="Search code (M-401), name..." 
               value={searchTerm}
@@ -486,7 +486,7 @@ export default function Assets() {
             />
           </div>
 
-          <select
+          <select name="selectedStatus" id="select-selectedstatus"
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
             className="w-full sm:w-auto bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer"

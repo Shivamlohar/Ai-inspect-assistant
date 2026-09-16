@@ -34,7 +34,7 @@ import { getStoredTheme, applyTheme } from './utils/theme';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { getActiveOfficer, setActiveOfficer, logoutOfficer, getOfficerInspections, type OfficerProfile } from './utils/officerStore';
 
-import Dashboard from './pages/Dashboard';
+const Dashboard = lazy(() => import('./pages/Dashboard'));
 const NewInspection = lazy(() => import('./pages/NewInspection'));
 const AiAnalysis = lazy(() => import('./pages/AiAnalysis'));
 const InspectionResult = lazy(() => import('./pages/InspectionResult'));
@@ -225,7 +225,7 @@ function SettingsModal({
               <p className="font-semibold text-slate-800 text-sm">High-Precision Vision Metrology</p>
               <p className="text-xs text-slate-500">Calculate sub-millimeter fracture dimensions & area %</p>
             </div>
-            <input type="checkbox" defaultChecked className="w-5 h-5 accent-primary cursor-pointer" />
+            <input type="checkbox" id="setting-high-precision" name="highPrecisionMetrology" defaultChecked className="w-5 h-5 accent-primary cursor-pointer" />
           </div>
 
           <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50">
@@ -233,7 +233,7 @@ function SettingsModal({
               <p className="font-semibold text-slate-800 text-sm">Voice Dictation Speech-to-Text</p>
               <p className="text-xs text-slate-500">Auto-transcribe inspector notes during field audits</p>
             </div>
-            <input type="checkbox" defaultChecked className="w-5 h-5 accent-primary cursor-pointer" />
+            <input type="checkbox" id="setting-voice-dictation" name="voiceDictation" defaultChecked className="w-5 h-5 accent-primary cursor-pointer" />
           </div>
 
           <div className="flex items-center justify-between p-3 rounded-2xl bg-healthy/5 border border-healthy/20">
@@ -551,10 +551,7 @@ function OfficerModal({
                         <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1 uppercase tracking-wider">
                           Google Account Name
                         </label>
-                        <input
-                          type="text"
-                          value={googleName}
-                          onChange={e => setGoogleName(e.target.value)}
+                        <input id="officer-google-name" name="googleAccountName" type="text" value={googleName} onChange={e => setGoogleName(e.target.value)}
                           placeholder="e.g. Shivam Lohar"
                           className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-xs font-semibold outline-none focus:border-primary"
                         />
@@ -563,10 +560,7 @@ function OfficerModal({
                         <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1 uppercase tracking-wider">
                           Google Email Address
                         </label>
-                        <input
-                          type="email"
-                          value={googleEmail}
-                          onChange={e => setGoogleEmail(e.target.value)}
+                        <input id="officer-google-email" name="googleAccountEmail" type="email" value={googleEmail} onChange={e => setGoogleEmail(e.target.value)}
                           placeholder="e.g. shivam.lohar@gmail.com"
                           className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-xs font-semibold outline-none focus:border-primary font-mono"
                         />
@@ -609,11 +603,7 @@ function OfficerModal({
                         <span className="px-3.5 py-2.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 font-bold text-xs border-r border-slate-200 dark:border-slate-700 select-none">
                           🇮🇳 +91
                         </span>
-                        <input
-                          type="tel"
-                          required
-                          value={phone}
-                          onChange={e => setPhone(e.target.value)}
+                        <input id="officer-phone-number" name="phoneNumber" type="tel" required value={phone} onChange={e => setPhone(e.target.value)}
                           placeholder="98765 43210"
                           maxLength={12}
                           className="w-full px-3.5 py-2.5 bg-transparent text-slate-800 dark:text-slate-100 text-sm font-semibold outline-none font-mono"
@@ -655,11 +645,7 @@ function OfficerModal({
                       <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 uppercase tracking-wider">
                         Enter 4-Digit Code
                       </label>
-                      <input
-                        type="text"
-                        required
-                        value={otpCode}
-                        onChange={e => setOtpCode(e.target.value)}
+                      <input id="officer-otp-code" name="otpCode" type="text" required value={otpCode} onChange={e => setOtpCode(e.target.value)}
                         placeholder="4092"
                         maxLength={4}
                         className="w-full text-center tracking-[1em] text-lg font-black px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 outline-none focus:border-emerald-500 font-mono"
@@ -697,11 +683,7 @@ function OfficerModal({
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 uppercase tracking-wider">
                     Officer Full Name
                   </label>
-                  <input
-                    type="text"
-                    required
-                    value={name}
-                    onChange={e => setName(e.target.value)}
+                  <input id="officer-full-name" name="officerFullName" type="text" required value={name} onChange={e => setName(e.target.value)}
                     placeholder="e.g. Er. Shivam Lohar"
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm font-semibold outline-none focus:border-primary"
                   />
@@ -711,11 +693,7 @@ function OfficerModal({
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 uppercase tracking-wider">
                     Service Badge / ID #
                   </label>
-                  <input
-                    type="text"
-                    required
-                    value={badgeId}
-                    onChange={e => setBadgeId(e.target.value)}
+                  <input id="officer-badge-id" name="badgeId" type="text" required value={badgeId} onChange={e => setBadgeId(e.target.value)}
                     placeholder="e.g. OFF-409"
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm font-semibold outline-none focus:border-primary font-mono"
                   />
@@ -726,6 +704,8 @@ function OfficerModal({
                     Assigned Department
                   </label>
                   <select
+                    id="officer-department"
+                    name="department"
                     value={department}
                     onChange={e => setDepartment(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm font-semibold outline-none focus:border-primary cursor-pointer"
@@ -895,6 +875,8 @@ function TopNav({
       <div className="hidden md:flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 text-slate-400 text-xs w-64 lg:w-80 focus-within:w-96 focus-within:border-primary/50 transition-all">
         <Search className="w-4 h-4 text-slate-400 shrink-0" />
         <input 
+          id="global-command-search"
+          name="searchQuery"
           type="text" 
           placeholder="Search assets, telemetry, reports..." 
           aria-label="Search assets, telemetry, and reports"

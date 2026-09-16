@@ -368,7 +368,7 @@ export default function KnowledgeAdmin() {
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
+              <input name="searchFilter" id="input-searchfilter"
                 type="text"
                 value={searchFilter}
                 onChange={e => setSearchFilter(e.target.value)}
@@ -477,7 +477,7 @@ export default function KnowledgeAdmin() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-300">Standard / Document Title *</label>
-                <input
+                <input name="newSourceTitle" id="input-newsourcetitle"
                   type="text"
                   value={newSourceTitle}
                   onChange={e => setNewSourceTitle(e.target.value)}
@@ -489,7 +489,7 @@ export default function KnowledgeAdmin() {
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-300">Source Organization *</label>
-                <input
+                <input name="newSourceName" id="input-newsourcename"
                   type="text"
                   value={newSourceName}
                   onChange={e => setNewSourceName(e.target.value)}
@@ -503,7 +503,7 @@ export default function KnowledgeAdmin() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-300">Source URL *</label>
-                <input
+                <input name="newSourceUrl" id="input-newsourceurl"
                   type="url"
                   value={newSourceUrl}
                   onChange={e => setNewSourceUrl(e.target.value)}
@@ -515,7 +515,7 @@ export default function KnowledgeAdmin() {
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-300">Applicable Asset Categories (comma-separated)</label>
-                <input
+                <input name="newAssetTypes" id="input-newassettypes"
                   type="text"
                   value={newAssetTypes}
                   onChange={e => setNewAssetTypes(e.target.value)}
@@ -528,7 +528,7 @@ export default function KnowledgeAdmin() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-300">Defect Topic</label>
-                <input
+                <input name="newTopic" id="input-newtopic"
                   type="text"
                   value={newTopic}
                   onChange={e => setNewTopic(e.target.value)}
@@ -539,7 +539,7 @@ export default function KnowledgeAdmin() {
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-300">Standard / Source Type</label>
-                <select
+                <select name="newSourceType" id="select-newsourcetype"
                   value={newSourceType}
                   onChange={e => setNewSourceType(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-xs text-white focus:border-cyan-500 outline-none"
@@ -552,7 +552,7 @@ export default function KnowledgeAdmin() {
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-300">Reliability Level</label>
-                <select
+                <select name="newReliability" id="select-newreliability"
                   value={newReliability}
                   onChange={e => setNewReliability(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-xs text-white focus:border-cyan-500 outline-none"
@@ -566,7 +566,7 @@ export default function KnowledgeAdmin() {
 
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-300">Technical Text / Content to Vectorize *</label>
-              <textarea
+              <textarea name="newContent" id="textarea-newcontent"
                 rows={6}
                 value={newContent}
                 onChange={e => setNewContent(e.target.value)}
@@ -609,7 +609,7 @@ export default function KnowledgeAdmin() {
             <form onSubmit={handleRunRAGTest} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-slate-300">Asset Category</label>
-                <select
+                <select name="testAsset" id="select-testasset"
                   value={testAsset}
                   onChange={e => setTestAsset(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs text-white focus:border-cyan-500 outline-none"
@@ -627,7 +627,7 @@ export default function KnowledgeAdmin() {
               <div className="sm:col-span-2 space-y-1">
                 <label className="text-[11px] font-bold text-slate-300">Observation Query</label>
                 <div className="flex gap-2">
-                  <input
+                  <input name="testQuery" id="input-testquery"
                     type="text"
                     value={testQuery}
                     onChange={e => setTestQuery(e.target.value)}

@@ -20,19 +20,19 @@ import {
   UserCheck
 } from 'lucide-react';
 import { 
-  getActiveOfficer, 
-  getOfficerInspections, 
-  deleteOfficerInspection,
-  type SavedInspectionRecord, 
-  type OfficerProfile 
-} from '../utils/officerStore';
-import { 
   industrialMotorImg, 
   centrifugalPumpImg, 
   structuralJointImg, 
   pipelinePlImg,
   bridge102Img 
 } from '../assets/assetImages';
+import { 
+  getActiveOfficer, 
+  getOfficerInspections, 
+  deleteOfficerInspection,
+  type SavedInspectionRecord, 
+  type OfficerProfile 
+} from '../utils/officerStore';
 
 const containerVariants: Variants = {
   hidden: { opacity: 1 },
