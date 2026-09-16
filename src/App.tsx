@@ -24,7 +24,8 @@ import {
   Phone,
   Check,
   ArrowLeft,
-  KeyRound
+  KeyRound,
+  BookOpen
 } from 'lucide-react';
 import { getGeminiApiKey } from './services/aiApi';
 import type { ThemeMode } from './utils/theme';
@@ -40,6 +41,7 @@ const Report = lazy(() => import('./pages/Report'));
 const Assets = lazy(() => import('./pages/Assets'));
 const SystemCheck = lazy(() => import('./pages/SystemCheck'));
 const AssetHistory = lazy(() => import('./pages/AssetHistory'));
+const KnowledgeAdmin = lazy(() => import('./pages/KnowledgeAdmin'));
 
 function PageLoader() {
   return (
@@ -1070,6 +1072,7 @@ function Sidebar({
     { path: '/history', icon: History, label: 'Asset History' },
     { path: '/inspect', icon: Camera, label: 'Inspections' },
     { path: '/report', icon: FileText, label: 'Reports' },
+    { path: '/knowledge-admin', icon: BookOpen, label: 'Knowledge Base' },
   ];
 
   return (
@@ -1168,6 +1171,7 @@ function MobileNav() {
     { path: '/system-check', icon: Activity, label: 'Diagnostics' },
     { path: '/inspect', icon: Camera, label: 'Inspect' },
     { path: '/assets', icon: Building2, label: 'Assets' },
+    { path: '/knowledge-admin', icon: BookOpen, label: 'Knowledge' },
     { path: '/report', icon: FileText, label: 'Reports' },
   ];
 
@@ -1281,6 +1285,7 @@ function AppShell({
                 <Route path="/analysis" element={<PageTransition><AiAnalysis /></PageTransition>} />
                 <Route path="/result" element={<PageTransition><InspectionResult /></PageTransition>} />
                 <Route path="/report" element={<PageTransition><Report /></PageTransition>} />
+                <Route path="/knowledge-admin" element={<PageTransition><KnowledgeAdmin /></PageTransition>} />
               </Routes>
             </AnimatePresence>
           </Suspense>

@@ -35,7 +35,9 @@ import {
   Mic,
   Volume2,
   VolumeX,
-  Send
+  Send,
+  BookOpen,
+  ExternalLink
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { getActiveOfficer, saveOfficerInspection, autoSaveCurrentInspection, getAssetPastInspections } from '../utils/officerStore';
@@ -280,6 +282,21 @@ export default function InspectionResult() {
 
   const isDemoData = Boolean(pipelineResult?.isDemoData || (inspectionData as any).isDemoData);
   const inspectionModeTitle = pipelineResult?.inspectionModeTitle || (inspectionData.mediaType === 'video' ? 'Real-Time AI Inspection' : 'AI Visual Inspection');
+
+  // Section 20 & 28 Knowledge Base & Audit Traceability
+  const knowledgeSources = pipelineResult?.knowledgeSources || [];
+  const technicalContext = pipelineResult?.technicalContext || '';
+  const sourceCitation = pipelineResult?.sourceCitation || '';
+  const limitations = (pipelineResult?.limitationsOfVisualInspection && pipelineResult.limitationsOfVisualInspection.length > 0)
+    ? pipelineResult.limitationsOfVisualInspection
+    : (pipelineResult?.limitations && pipelineResult.limitations.length > 0)
+    ? pipelineResult.limitations
+    : [
+        '2D visual inspection cannot determine internal crack depth or subsurface voiding.',
+        'Physical dimension measurements require verified calibration targets and mechanical gauges on-site.',
+        'Repair protocols must be reviewed and certified by an accredited structural or mechanical engineer.'
+      ];
+  const auditTraceId = pipelineResult?.auditTraceId || '';
 
   // Defensible Score & Status (Section 8)
   const currentScore = isNonAsset ? 0 : (pipelineResult?.healthScore?.finalScore ?? (isGemini ? (geminiData.healthScore ?? 72) : 72));
@@ -2102,6 +2119,115 @@ export default function InspectionResult() {
         </section>
 
       </div>
+
+      {/* =========================================================================
+          SECTION 20 & RAG: TECHNICAL CONTEXT & AUTHORITATIVE ENGINEERING STANDARDS
+      ========================================================================= */}
+      <section className="card p-6 md:p-8 bg-slate-900/90 text-white rounded-3xl border border-cyan-500/25 shadow-2xl space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0">
+              <BookOpen className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-xl font-black text-white">Technical Context & Engineering Standards</h3>
+                <span className="text-[10px] uppercase font-mono font-bold tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                  RAG Retrieved
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                Authoritative engineering standards retrieved via cosine semantic vector search
+              </p>
+            </div>
+          </div>
+
+          {auditTraceId && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700 font-mono text-xs text-slate-300">
+              <span className="text-[10px] uppercase text-slate-400">Audit Trace:</span>
+              <span className="text-cyan-400 font-bold">{auditTraceId}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Section 20 Limitations Banner */}
+        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 space-y-2">
+          <div className="flex items-center gap-2 text-amber-400 font-bold text-xs">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>Section 20: Limitations of 2D Visual AI Inspection</span>
+          </div>
+          <ul className="text-xs text-slate-300 space-y-1 pl-5 list-disc">
+            {limitations.map((lim: string, idx: number) => (
+              <li key={idx}>{lim}</li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Technical Context Summary */}
+        {technicalContext && (
+          <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/70 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" /> Technical RAG Context & Repair Thresholds
+              </span>
+              {sourceCitation && (
+                <span className="text-[11px] font-mono text-slate-400">
+                  Ref: {sourceCitation}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-200 leading-relaxed">
+              {technicalContext}
+            </p>
+          </div>
+        )}
+
+        {/* Retrieved Standards Grid */}
+        <div className="space-y-3">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+            Authoritative Reference Standards Seeded in Engine:
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {knowledgeSources.length > 0 ? (
+              knowledgeSources.map((ks: any, idx: number) => (
+                <div 
+                  key={idx} 
+                  className="p-4 rounded-2xl bg-slate-800/40 border border-slate-700/80 flex flex-col justify-between space-y-3 hover:border-cyan-500/40 transition"
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                        {ks.reliabilityLevel || ks.reliability_level || 'VERY_HIGH'}
+                      </span>
+                      <span className="text-[10px] text-slate-400">Standard Code</span>
+                    </div>
+                    <h5 className="text-sm font-bold text-white">{ks.title}</h5>
+                    <p className="text-xs text-slate-400">Authority: {ks.sourceName || ks.source_name || 'Engineering Standard'}</p>
+                  </div>
+
+                  {ks.url && (
+                    <div className="pt-2 border-t border-slate-700/60 flex justify-end">
+                      <a 
+                        href={ks.url} 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-semibold"
+                      >
+                        <span>Official Repository</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  )}
+                </div>
+              ))
+            ) : (
+              <div className="col-span-2 p-4 rounded-2xl bg-slate-800/30 border border-slate-700 text-xs text-slate-400">
+                Primary standards active: IRC:SP:40-2019 (Bridge Maintenance), IS 456:2000 (Plain and Reinforced Concrete), CPWD Maintenance Manual 2023, ISO 17359:2018 (Condition Monitoring), ASME B31.8 / API 570.
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
 
       {/* =========================================================================
           5. HISTORICAL DEGRADATION TIMELINE & RECHARTS GRAPH

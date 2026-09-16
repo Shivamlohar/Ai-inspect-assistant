@@ -20,7 +20,9 @@ import {
   FileCheck2,
   FileSpreadsheet,
   Database,
-  AlertTriangle
+  AlertTriangle,
+  BookOpen,
+  ExternalLink
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getActiveOfficer, saveOfficerInspection } from '../utils/officerStore';
@@ -52,6 +54,11 @@ export default function Report() {
     isGemini: false,
     modelUsed: 'Built-in Asset Validation & Inspection Pipeline',
     diagnosticSummary: '',
+    technicalContext: '',
+    sourceCitation: '',
+    knowledgeSources: [] as any[],
+    limitationsOfVisualInspection: [] as string[],
+    auditTraceId: '',
     humanVerifications: {
       'CRACK': 'Confirmed',
       'RUST': 'Confirmed',
@@ -133,7 +140,20 @@ export default function Report() {
           },
           defects: isNonAsset ? [] : (pipelineResult?.defects || (isG && Array.isArray(gResult.defects) ? gResult.defects : [])),
           customDefects: isNonAsset ? [] : (Array.isArray(parsed.customDefects) ? parsed.customDefects : []),
-          recommendations: isNonAsset ? [] : (pipelineResult?.recommendedSteps || (isG && Array.isArray(gResult.recommendations) ? gResult.recommendations : []))
+          recommendations: isNonAsset ? [] : (pipelineResult?.recommendedSteps || (isG && Array.isArray(gResult.recommendations) ? gResult.recommendations : [])),
+          technicalContext: pipelineResult?.technicalContext || '',
+          sourceCitation: pipelineResult?.sourceCitation || '',
+          knowledgeSources: pipelineResult?.knowledgeSources || [],
+          limitationsOfVisualInspection: (pipelineResult?.limitationsOfVisualInspection && pipelineResult.limitationsOfVisualInspection.length > 0)
+            ? pipelineResult.limitationsOfVisualInspection
+            : (pipelineResult?.limitations && pipelineResult.limitations.length > 0)
+            ? pipelineResult.limitations
+            : [
+                '2D visual inspection cannot determine internal crack depth or subsurface voiding.',
+                'Physical dimension measurements require verified calibration targets and mechanical gauges on-site.',
+                'Repair protocols must be reviewed and certified by an accredited structural or mechanical engineer.'
+              ],
+          auditTraceId: pipelineResult?.auditTraceId || ''
         });
       } catch (e) {
         console.error(e);
@@ -610,6 +630,77 @@ export default function Report() {
               </>
             )}
           </ol>
+        </section>
+
+        {/* AUTHORITATIVE ENGINEERING STANDARDS & RAG TECHNICAL CITATIONS */}
+        <section className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+            <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+              <BookOpen className="w-3.5 h-3.5 text-primary" /> Authoritative Engineering Standards & RAG Technical Citations
+            </h3>
+            {data.auditTraceId && (
+              <span className="text-[10px] font-mono text-slate-500">
+                Audit Trace ID: <strong className="text-slate-800">{data.auditTraceId}</strong>
+              </span>
+            )}
+          </div>
+
+          {data.technicalContext && (
+            <p className="text-xs text-slate-700 leading-relaxed font-medium">
+              <strong className="text-slate-900">Technical Context & Thresholds:</strong> {data.technicalContext}
+            </p>
+          )}
+
+          {data.sourceCitation && (
+            <p className="text-[11px] font-mono text-slate-600">
+              Primary Standard Reference: <strong className="text-slate-800">{data.sourceCitation}</strong>
+            </p>
+          )}
+
+          {data.knowledgeSources && data.knowledgeSources.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              {data.knowledgeSources.map((src: any, idx: number) => (
+                <div key={idx} className="p-2.5 rounded-lg bg-white border border-slate-200 text-[11px] space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-800">{src.title}</span>
+                    <span className="px-1.5 py-0.5 rounded bg-cyan-50 text-cyan-700 font-mono text-[9px] font-bold border border-cyan-200">
+                      {src.reliability_level || 'VERY_HIGH'}
+                    </span>
+                  </div>
+                  <p className="text-slate-500 text-[10px]">Issued by: {src.source_name}</p>
+                  {src.url && (
+                    <a 
+                      href={src.url} 
+                      target="_blank" 
+                      rel="noreferrer" 
+                      className="text-primary hover:underline text-[10px] inline-flex items-center gap-0.5 font-medium"
+                    >
+                      <span>Standard Reference</span>
+                      <ExternalLink className="w-2.5 h-2.5" />
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Section 20 Limitations in Report */}
+          <div className="pt-2 border-t border-slate-200 text-[10px] text-slate-600 space-y-1">
+            <span className="font-bold text-slate-700 block uppercase">Section 20 Visual Inspection Limitations:</span>
+            <ul className="list-disc pl-4 space-y-0.5">
+              {data.limitationsOfVisualInspection && data.limitationsOfVisualInspection.length > 0 ? (
+                data.limitationsOfVisualInspection.map((lim: string, idx: number) => (
+                  <li key={idx}>{lim}</li>
+                ))
+              ) : (
+                <>
+                  <li>2D visual inspection cannot determine internal crack depth or subsurface voids without ultrasonic testing.</li>
+                  <li>Physical dimensions require on-site calibration target verification.</li>
+                  <li>All maintenance protocols must be certified by a licensed professional engineer.</li>
+                </>
+              )}
+            </ul>
+          </div>
         </section>
 
         {/* 10. SIGNATURE / APPROVAL SECTION */}

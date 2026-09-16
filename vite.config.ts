@@ -6,6 +6,14 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   base: process.env.GITHUB_ACTIONS ? '/Ai-inspect-assistant/' : '/',
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:10000',
+        changeOrigin: true
+      }
+    }
+  },
   build: {
     target: 'esnext',
     cssCodeSplit: true,

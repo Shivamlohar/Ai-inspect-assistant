@@ -41,6 +41,13 @@ export interface VisualDefect {
   color: 'critical' | 'attention' | 'healthy';
   icon: string;
   tag: string;
+  limitations?: string;
+  sourceCitation?: {
+    title: string;
+    sourceName: string;
+    url: string;
+    reliabilityLevel?: string;
+  };
 }
 
 export interface HealthScoreBreakdown {
@@ -111,6 +118,25 @@ export interface PipelineInspectionResult {
   sensorTelemetry: SensorTelemetryData;
   summaryObservation: string;
   engineeringNotice: string;
+  sourceCitation?: string;
+  technicalContext?: string;
+  knowledgeSources?: Array<{
+    id: string;
+    title: string;
+    sourceName?: string;
+    source_name?: string;
+    url?: string;
+    reliabilityLevel?: string;
+    reliability_level?: string;
+  }>;
+  limitations?: string[];
+  evidenceValidation?: {
+    isSupported: boolean;
+    evidenceChecks: string[];
+    reasoning: string;
+  };
+  limitationsOfVisualInspection?: string[];
+  auditTraceId?: string;
   isDemoData: boolean;
   modelUsed: string;
   mediaUrl: string;

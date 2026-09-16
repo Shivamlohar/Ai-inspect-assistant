@@ -3,6 +3,13 @@ import fs from 'fs';
 import path from 'path';
 import zlib from 'zlib';
 import { fileURLToPath } from 'url';
+import { initDatabase } from './server/db/database.js';
+import { seedAuthoritativeKnowledgeBase } from './server/rag/knowledgeBase.js';
+import { handleApiRequest } from './server/apiRouter.js';
+
+// Initialize SQLite database and seed authoritative standards
+initDatabase();
+seedAuthoritativeKnowledgeBase();
 
 /**
  * ============================================================================
@@ -166,7 +173,7 @@ function applySecurityHeaders(res, contentType, ext) {
 // ============================================================================
 // 3. HTTP SERVER & FIREWALL INSPECTION PIPELINE
 // ============================================================================
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   firewallMetrics.totalRequests++;
   const clientIp = getClientIp(req);
   const now = Date.now();
@@ -301,36 +308,48 @@ const server = http.createServer((req, res) => {
     reqPath = reqPath.replace('/Ai-inspect-assistant', '') || '/';
   }
 
-  if (reqPath === '/api/firewall-status') {
-    res.writeHead(200, {
-      'Content-Type': 'application/json',
-      'Cache-Control': 'no-store',
-      'X-Defense-Tier': 'Active-Shield-Level-4'
-    });
-    res.end(JSON.stringify({
-      status: 'SHIELD_ACTIVE',
-      defenseLevel: 'Blue Team Tier-4 High Assurance',
-      metrics: {
-        uptimeSeconds: Math.floor(process.uptime()),
-        totalRequests: firewallMetrics.totalRequests,
-        blockedAttacks: firewallMetrics.blockedRequests,
-        rateLimitHits: firewallMetrics.rateLimitHits,
-        activeJails: firewallMetrics.activeJails,
-        ruleViolations: firewallMetrics.ruleViolations
-      },
-      activeProtections: [
-        'Content Security Policy (Strict Self + Gemini API)',
-        'Anti-Clickjacking (X-Frame-Options: DENY)',
-        'Anti-MIME Confuse (X-Content-Type-Options: nosniff)',
-        'Strict Transport Security (HSTS 1-Year Preload)',
-        'Canonical Path Traversal Boundary Enforcement',
-        'In-Memory SQLi, RCE, LFI, and XSS Pattern Interceptors',
-        'Dynamic IP Rate Limiting & Sliding Jail Table',
-        'Local Supply-Chain Asset Isolation (Zero 3rd-party CDN dependencies)'
-      ],
-      recentIncidents: firewallMetrics.recentIncidents
-    }, null, 2));
-    return;
+  if (reqPath.startsWith('/api/')) {
+    if (reqPath === '/api/firewall-status') {
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+        'X-Defense-Tier': 'Active-Shield-Level-4'
+      });
+      res.end(JSON.stringify({
+        status: 'SHIELD_ACTIVE',
+        defenseLevel: 'Blue Team Tier-4 High Assurance',
+        metrics: {
+          uptimeSeconds: Math.floor(process.uptime()),
+          totalRequests: firewallMetrics.totalRequests,
+          blockedAttacks: firewallMetrics.blockedRequests,
+          rateLimitHits: firewallMetrics.rateLimitHits,
+          activeJails: firewallMetrics.activeJails,
+          ruleViolations: firewallMetrics.ruleViolations
+        },
+        activeProtections: [
+          'Content Security Policy (Strict Self + Gemini API)',
+          'Anti-Clickjacking (X-Frame-Options: DENY)',
+          'Anti-MIME Confuse (X-Content-Type-Options: nosniff)',
+          'Strict Transport Security (HSTS 1-Year Preload)',
+          'Canonical Path Traversal Boundary Enforcement',
+          'In-Memory SQLi, RCE, LFI, and XSS Pattern Interceptors',
+          'Dynamic IP Rate Limiting & Sliding Jail Table',
+          'Local Supply-Chain Asset Isolation (Zero 3rd-party CDN dependencies)'
+        ],
+        recentIncidents: firewallMetrics.recentIncidents
+      }, null, 2));
+      return;
+    }
+
+    try {
+      const handled = await handleApiRequest(req, res, reqPath);
+      if (handled) return;
+    } catch (apiErr) {
+      console.error('[API SERVER ERROR]', apiErr);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Internal Server Error', message: apiErr.message }));
+      return;
+    }
   }
 
   // Canonical URL redirect: remove trailing slash from SPA paths (e.g. /inspect/ -> /inspect)

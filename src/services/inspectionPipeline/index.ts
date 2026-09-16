@@ -12,6 +12,8 @@ import { detectDefects } from './defectDetector';
 import { calculateAssetHealthScore } from './healthScoreCalculator';
 import { compareWithHistoricalAudits } from './historicalComparator';
 import { generateRecommendedSteps } from './recommendationEngine';
+import { retrieveInspectionKnowledge } from './knowledgeRetriever';
+import { validateEvidence } from './evidenceValidator';
 
 export interface PipelineExecutionOptions {
   fileName?: string;
@@ -87,31 +89,57 @@ export async function runInspectionPipeline(
     `${fileName} ${userSelectedAsset} ${userNotes}`
   );
 
-  // 7. Transparent Health Score (Section 8)
-  const healthScore = calculateAssetHealthScore(
+  // 7. RAG Knowledge Retrieval (Section 2 & 5)
+  const defectNames = defectFindings.defects.map(d => d.name);
+  const ragResult = await retrieveInspectionKnowledge(classification.category, defectNames);
+
+  // 8. Evidence Validation (Section 20: Evidence-First AI)
+  const evidenceCheck = validateEvidence(
+    classification.category,
     eligibility.isEligible,
     defectFindings.defects,
+    ragResult.sources.length
+  );
+
+  // Attach authoritative citations to matching defects
+  const validatedDefects = evidenceCheck.sanitizedDefects.map(d => {
+    const matchedSource = ragResult.sources[0];
+    return {
+      ...d,
+      sourceCitation: matchedSource ? {
+        title: matchedSource.title,
+        sourceName: matchedSource.sourceName,
+        url: matchedSource.url,
+        reliabilityLevel: matchedSource.reliabilityLevel
+      } : undefined
+    };
+  });
+
+  // 9. Transparent Health Score (Section 8)
+  const healthScore = calculateAssetHealthScore(
+    eligibility.isEligible,
+    validatedDefects,
     classification.confidence,
     validationResult.qualityScore
   );
 
-  // 8. Recommended Next Steps (Section 10)
+  // 10. Recommended Next Steps (Section 10)
   const recommendedSteps = generateRecommendedSteps(
     eligibility.isEligible,
-    defectFindings.defects
+    validatedDefects
   );
 
-  // 9. Historical Comparison (Section 12: strictly real storage or "No historical inspection available")
+  // 11. Historical Comparison (Section 12: strictly real storage or "No historical inspection available")
   const resolvedAssetName = userSelectedAsset.trim() || `${classification.category} (${resolvedAssetId})`;
   const historicalComparison = compareWithHistoricalAudits(
     resolvedAssetId,
     resolvedAssetName,
     healthScore.finalScore,
-    defectFindings.defects.length,
+    validatedDefects.length,
     inspectionId
   );
 
-  // 10. Sensor Telemetry (Section 14: Only show when actual sensor data exists)
+  // 12. Sensor Telemetry (Section 14: Only show when actual sensor data exists)
   const sensorTelemetry = {
     hasSensorData: false,
     sourceNote: inputType === 'camera' 
@@ -134,13 +162,21 @@ export async function runInspectionPipeline(
     inspectionModeTitle,
     inspectionTimestamp,
     formattedDate,
-    defects: defectFindings.defects,
+    defects: validatedDefects,
     healthScore,
     recommendedSteps,
     historicalComparison,
     sensorTelemetry,
     summaryObservation: defectFindings.summaryObservation,
     engineeringNotice: defectFindings.engineeringNotice,
+    technicalContext: ragResult.technicalContextSummary,
+    knowledgeSources: ragResult.sources,
+    evidenceValidation: {
+      isSupported: evidenceCheck.isSupported,
+      evidenceChecks: evidenceCheck.evidenceChecks,
+      reasoning: evidenceCheck.reasoning
+    },
+    limitationsOfVisualInspection: evidenceCheck.limitations,
     isDemoData: Boolean(isDemoMode),
     modelUsed: modelResult?.modelUsed || 'Built-in Asset Validation & Inspection Pipeline',
     mediaUrl
@@ -158,3 +194,5 @@ export * from './healthScoreCalculator';
 export * from './historicalComparator';
 export * from './recommendationEngine';
 export * from './reportGenerator';
+export * from './knowledgeRetriever';
+export * from './evidenceValidator';
