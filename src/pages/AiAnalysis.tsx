@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sparkles, CheckCircle2, CircleDashed, ArrowRight, ShieldCheck } from 'lucide-react';
 import { runInspectionPipeline } from '../services/inspectionPipeline';
+import { analyzeAssetWithGemini, getGeminiApiKey } from '../services/aiApi';
 
 export default function AiAnalysis() {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(0);
   const [assetName, setAssetName] = useState('Industrial Machine #M-401');
-  const [isGeminiActive] = useState(false);
+  const isGeminiActive = true;
   const [statusMessage, setStatusMessage] = useState<string>('Validating image and asset context...');
 
   useEffect(() => {
@@ -33,13 +34,35 @@ export default function AiAnalysis() {
       // Execute comprehensive inspection pipeline (Section 2 - 14)
       try {
         setStatusMessage('Evaluating visual scene & asset eligibility gate...');
+        const imageBase64 = parsed.imageBase64 || parsed.mediaUrl || '';
+        const mimeType = parsed.mimeType || 'image/jpeg';
+
+        if (!imageBase64) {
+          throw new Error('No uploaded image was found.');
+        }
+
+       const apiKey = getGeminiApiKey();
+
+       if (!apiKey) {
+         throw new Error('Gemini API key is not configured.');
+        }
+
+setStatusMessage('Sending uploaded image to Gemini Vision...');
+
+const geminiResult = await analyzeAssetWithGemini(
+  apiKey,
+  imageBase64,
+  mimeType,
+  parsed.description || parsed.userNotes || ''
+);
         const pipelineResult = await runInspectionPipeline({
           fileName: parsed.mediaName || 'asset_scan.jpg',
-          mediaUrl: parsed.mediaUrl || parsed.imageBase64 || '',
+          mediaUrl: imageBase64,
           inputType: parsed.inputType || 'static_image',
           userSelectedAsset: parsed.assetName || '',
           userAssetId: parsed.assetId || '',
           userNotes: parsed.description || parsed.userNotes || '',
+          modelResult: geminiResult,
           isDemoMode: Boolean(parsed.isDemoData)
         });
 
