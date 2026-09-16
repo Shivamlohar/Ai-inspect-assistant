@@ -875,6 +875,19 @@ export default function InspectionResult() {
             <p className="text-slate-600 dark:text-slate-300 text-sm md:text-base leading-relaxed">
               {nonAssetReason}
             </p>
+
+            {/* Visual Pipeline Architecture Trace */}
+            <div className="pt-2">
+              <div className="p-3 rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 max-w-2xl mx-auto flex flex-wrap items-center justify-center gap-1.5 text-[11px] font-mono">
+                <span className="px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold">IMAGE</span>
+                <span className="text-slate-400">→</span>
+                <span className="px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold">CLASSIFIER ({nonAssetSubject})</span>
+                <span className="text-slate-400">→</span>
+                <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold border border-amber-500/30">Supported Asset? NO [❌ STOP]</span>
+                <span className="text-slate-400">→</span>
+                <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold border border-rose-500/30">Inspection Not Applicable</span>
+              </div>
+            </div>
           </div>
 
           {/* 4 Standard Metrics: Category, Confidence, Defects (0), Health Score (N/A) */}

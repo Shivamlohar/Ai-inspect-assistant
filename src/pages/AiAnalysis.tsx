@@ -110,19 +110,19 @@ export default function AiAnalysis() {
   }, []);
 
   const steps = isGeminiActive ? [
-    "Image integrity & quality validation",
-    "Gemini 1.5 Flash Vision multimodal classification",
-    "14-category asset eligibility verification",
-    "Evidence-based visual anomaly detection",
-    "Transparent 4-factor health score calculation",
-    "Inspection dossier & disclaimers prepared"
+    "CLASSIFIER: Image validation & Gemini multimodal asset classification",
+    "ELIGIBILITY GATE: Supported asset verification (Civil / Industrial check)",
+    "DEFECT AI: Specialized visual flaw & anomaly detection",
+    "EVIDENCE: Section 20 optical evidence & 70% confidence validation",
+    "SEVERITY & KNOWLEDGE: Severity grading & RAG standards retrieval (IRC/BIS/ISO/ASME)",
+    "REPORT: Defensible 4-factor scoring & auditable inspection dossier"
   ] : [
-    "Image integrity & quality validation",
-    "14-category asset classification & scope check",
-    "Evidence-based visual anomaly detection",
-    "Defect severity & confidence verification",
-    "Transparent 4-factor health score calculation",
-    "Inspection dossier & disclaimers prepared"
+    "CLASSIFIER: Image quality check & 14-category asset classification",
+    "ELIGIBILITY GATE: Supported asset verification (Civil / Industrial check)",
+    "DEFECT AI: Specialized visual flaw & anomaly detection",
+    "EVIDENCE: Section 20 optical evidence & 70% confidence validation",
+    "SEVERITY & KNOWLEDGE: Severity grading & RAG standards retrieval (IRC/BIS/ISO/ASME)",
+    "REPORT: Defensible 4-factor scoring & auditable inspection dossier"
   ];
 
   useEffect(() => {
