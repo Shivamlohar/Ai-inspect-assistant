@@ -23,7 +23,7 @@ export interface VisionClassificationResult {
   subjectDescription: string;
   reason: string;
   modelUsed: string;
-  source: 'cloud_vision_api' | 'local_biometric_cv' | 'metadata_inference';
+  source: 'cloud_vision_api' | 'local_biometric_cv' | 'local_cv' | 'metadata_inference';
   skinToneRatio?: number;
   portraitRatio?: number;
 }
