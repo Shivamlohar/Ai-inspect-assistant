@@ -177,13 +177,7 @@ export async function handleApiRequest(req, res, reqPath) {
         try {
           const pureBase64 = imageBase64.replace(/^data:[^;]+;base64,/, '');
           
-          const prompt = `You are the first-stage visual content classifier for an engineering asset inspection system.
-
-Analyze ONLY the visual contents of the provided image.
-
-Determine the primary subject and whether the image contains a supported engineering inspection asset.
-
-const prompt = `
+          const prompt = `
 You are an engineering asset classification system.
 
 Analyze the supplied image.
