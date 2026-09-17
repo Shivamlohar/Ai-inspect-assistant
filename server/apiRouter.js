@@ -259,7 +259,8 @@ Return strict JSON only matching this schema:
                 activeModel = modelName;
                 break;
               } else {
-                console.warn(`[GEMINI CLASSIFY] Model ${modelName} returned status ${resp.status}`);
+                lastGeminiStatus = resp.status;
+console.warn(`[GEMINI CLASSIFY] Model ${modelName} returned status ${resp.status}`);
               }
             } catch (err) {
               console.warn(`[GEMINI CLASSIFY] Error with model ${modelName}:`, err.message);
@@ -370,7 +371,9 @@ Return strict JSON only matching this schema:
         assetType: null,
         confidence: 0,
         inspectionEligible: false,
-        reason: apiKey ? 'Visual classification model unavailable.' : 'Visual classification service requires server GEMINI_API_KEY.',
+        reason: apiKey
+  ? `Visual classification model unavailable (Gemini HTTP ${lastGeminiStatus || 'unknown'}).`
+  : 'Visual classification service requires server GEMINI_API_KEY.',
         modelName: 'None (Service Unavailable)',
         modelVersion: GEMINI_VISION_MODEL,
         inspectionId: reqId,
