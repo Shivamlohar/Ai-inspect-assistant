@@ -28,6 +28,7 @@ export interface VisionClassificationResult {
   portraitRatio?: number;
   serviceAvailable?: boolean;
   broadDomain?: string;
+  isKeyInvalid?: boolean;
 }
 
 /**
@@ -380,6 +381,7 @@ export async function classifyVisualInput(
 
       // If server returned 503 / service unavailable, preserve honest technical status
       if (serverResp.status === 503 || data.serviceAvailable === false) {
+        const keyInvalid = Boolean(data.isKeyInvalid || (data.reason && (data.reason.includes('API key') || data.reason.includes('API_KEY'))));
         return {
           category: 'Unknown / Unsupported',
           confidence: 0,
@@ -389,7 +391,8 @@ export async function classifyVisualInput(
           reason: data.reason || 'The visual classification service could not be reached. Please verify the server-side GEMINI_API_KEY and API configuration.',
           modelUsed: 'None (Service Unavailable)',
           source: 'cloud_vision_api',
-          serviceAvailable: false
+          serviceAvailable: false,
+          isKeyInvalid: keyInvalid
         };
       }
 

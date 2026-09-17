@@ -172,4 +172,5 @@ export interface PipelineInspectionResult {
   broadDomain?: string;
   serviceAvailable?: boolean;
   serviceUnavailableReason?: string;
+  isKeyInvalid?: boolean;
 }

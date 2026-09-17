@@ -76,6 +76,20 @@ async function callGeminiVision(apiKey, systemPrompt, pureBase64, mimeType = 'im
       if (!response.ok) {
         const errorText = await response.text().catch(() => '');
         console.warn(`[AI INSPECTION ENGINE] Model ${modelName} returned HTTP ${response.status}: ${errorText.slice(0, 150)}`);
+        
+        const isInvalidKey = (response.status === 400 && (
+          errorText.includes('API key not valid') ||
+          errorText.includes('API_KEY_INVALID') ||
+          errorText.includes('key is invalid') ||
+          errorText.includes('INVALID_ARGUMENT')
+        )) || response.status === 401 || response.status === 403;
+
+        if (isInvalidKey) {
+          const keyErr = new Error('The configured Google Gemini API key is invalid or expired. Please verify or update your GEMINI_API_KEY.');
+          keyErr.isKeyInvalid = true;
+          throw keyErr;
+        }
+
         lastError = new Error(`HTTP ${response.status}: ${errorText.slice(0, 100)}`);
         continue;
       }
@@ -189,11 +203,23 @@ Respond strictly in valid JSON format:
     };
   } catch (err) {
     console.error('[AI CLASSIFIER ERROR]:', err.message);
+    const isKeyInvalid = Boolean(
+      err.isKeyInvalid || 
+      (err.message && (
+        err.message.includes('API key not valid') || 
+        err.message.includes('API_KEY_INVALID') || 
+        err.message.includes('invalid or expired') ||
+        err.message.includes('INVALID_ARGUMENT')
+      ))
+    );
     return {
       success: false,
       serviceAvailable: false,
+      isKeyInvalid,
       status: 'SERVICE_UNAVAILABLE',
-      reason: `Visual classification service error: ${err.message}. Please verify server-side GEMINI_API_KEY.`,
+      reason: isKeyInvalid
+        ? 'The configured Google Gemini API key is invalid or expired. Please update or clear the API key.'
+        : `Visual classification service error: ${err.message}. Please verify server-side GEMINI_API_KEY.`,
       modelName: 'None (Service Unavailable)',
       modelVersion: GEMINI_VISION_MODEL,
       primaryCategory: 'Unknown / Unsupported',
@@ -388,11 +414,23 @@ Respond strictly in valid JSON matching this schema:
     };
   } catch (err) {
     console.error('[AI INSPECTION ERROR]:', err.message);
+    const isKeyInvalid = Boolean(
+      err.isKeyInvalid || 
+      (err.message && (
+        err.message.includes('API key not valid') || 
+        err.message.includes('API_KEY_INVALID') || 
+        err.message.includes('invalid or expired') ||
+        err.message.includes('INVALID_ARGUMENT')
+      ))
+    );
     return {
       success: false,
       serviceAvailable: false,
+      isKeyInvalid,
       status: 'SERVICE_UNAVAILABLE',
-      reason: `AI Vision Service Error: ${err.message}. Please verify server-side GEMINI_API_KEY.`,
+      reason: isKeyInvalid
+        ? 'The configured Google Gemini API key is invalid or expired. Please update or clear the API key.'
+        : `AI Vision Service Error: ${err.message}. Please verify server-side GEMINI_API_KEY.`,
       modelUsed: 'None (Service Unavailable)'
     };
   }

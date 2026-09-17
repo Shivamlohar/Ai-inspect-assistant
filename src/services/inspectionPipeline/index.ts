@@ -45,6 +45,7 @@ export function createNonInspectableResult(
     broadDomain?: string;
     serviceAvailable?: boolean;
     serviceUnavailableReason?: string;
+    isKeyInvalid?: boolean;
   }
 ): Readonly<PipelineInspectionResult> {
   const catLower = (classification.category || '').toLowerCase();
@@ -115,7 +116,8 @@ export function createNonInspectableResult(
     conditionDisclaimer: 'Visual assessment only — qualified engineer verification required.',
     broadDomain: options?.broadDomain,
     serviceAvailable: options?.serviceAvailable,
-    serviceUnavailableReason: options?.serviceUnavailableReason
+    serviceUnavailableReason: options?.serviceUnavailableReason,
+    isKeyInvalid: options?.isKeyInvalid
   };
 
   return Object.freeze(result);
@@ -235,6 +237,7 @@ export async function runInspectionPipeline(
     mediaUrl,
     serviceAvailable: isServiceAvail,
     serviceUnavailableReason: !isServiceAvail ? serviceUnavailReason : undefined,
+    isKeyInvalid: Boolean(visualClassification?.isKeyInvalid || modelResult?.isKeyInvalid),
     broadDomain: visualClassification?.broadDomain || modelResult?.broadDomain
   });
 
