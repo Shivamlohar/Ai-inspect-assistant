@@ -183,15 +183,47 @@ Analyze ONLY the visual contents of the provided image.
 
 Determine the primary subject and whether the image contains a supported engineering inspection asset.
 
-Supported assets:
-- road (pavements, highways, asphalt, streets)
-- bridge (viaducts, overpasses, piers, abutments)
-- building (civil structures, concrete beams, columns, slabs, masonry)
-- industrial machinery (motors, pumps, generators, compressors, turbines, gearboxes, plant equipment, mechanical systems)
-- electrical pole (utility poles, transmission towers, transformers)
-- pipeline (oil/gas pipes, industrial conduits, flanges)
-- solar panel (photovoltaic arrays, PV modules)
-- railway infrastructure (tracks, ties, catenary, rails)
+const prompt = `
+You are an engineering asset classification system.
+
+Analyze the supplied image.
+
+Your job is ONLY to identify whether the PRIMARY visible subject
+is an inspectable engineering/infrastructure asset.
+
+Supported categories:
+
+1. road
+2. bridge
+3. building
+4. industrial machinery
+5. electrical pole
+6. pipeline
+7. solar panel
+8. railway infrastructure
+
+Classification rules:
+
+- A road, pavement, asphalt or highway surface -> road
+- A bridge or viaduct -> bridge
+- A building or structural building component -> building
+- Industrial equipment, motors, pumps, engines, machinery or machine components -> industrial machinery
+- Utility/electrical pole -> electrical pole
+- Pipeline or large industrial pipe -> pipeline
+- Solar photovoltaic panel -> solar panel
+- Railway tracks, railway structures or railway equipment -> railway infrastructure
+
+If people are present but an engineering asset is the PRIMARY subject,
+classify the engineering asset.
+
+Only classify as unknown when the image genuinely does not contain
+a recognizable supported engineering asset.
+
+Do NOT detect defects in this step.
+Do NOT invent information.
+
+Return ONLY the requested JSON.
+`;
 
 Unsupported primary subjects:
 - person
@@ -251,7 +283,45 @@ Return strict JSON only matching this schema:
                       { inline_data: { mime_type: mimeType.startsWith('image/') ? mimeType : 'image/jpeg', data: pureBase64 } }
                     ]
                   }],
-                  generationConfig: { temperature: 0.1, maxOutputTokens: 400 }
+                  generationConfig: {
+  temperature: 0.0,
+  maxOutputTokens: 300,
+  responseMimeType: "application/json",
+  responseSchema: {
+    type: "OBJECT",
+    properties: {
+      primaryCategory: {
+        type: "STRING",
+        enum: [
+          "road",
+          "bridge",
+          "building",
+          "industrial machinery",
+          "electrical pole",
+          "pipeline",
+          "solar panel",
+          "railway infrastructure",
+          "unknown"
+        ]
+      },
+      confidence: {
+        type: "NUMBER"
+      },
+      inspectionEligible: {
+        type: "BOOLEAN"
+      },
+      reason: {
+        type: "STRING"
+      }
+    },
+    required: [
+      "primaryCategory",
+      "confidence",
+      "inspectionEligible",
+      "reason"
+    ]
+  }
+}
                 })
               });
               if (resp.ok) {
@@ -270,9 +340,19 @@ console.warn(`[GEMINI CLASSIFY] Model ${modelName} returned status ${resp.status
           if (geminiResp && geminiResp.ok) {
             const resJson = await geminiResp.json();
             const text = resJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
-            const match = text.match(/\{[\s\S]*\}/);
-            if (match) {
-              const parsed = JSON.parse(match[0]);
+            let parsed;
+
+try {
+  parsed = JSON.parse(text.trim());
+} catch {
+  const match = text.match(/\{[\s\S]*\}/);
+
+  if (!match) {
+    throw new Error("Gemini returned invalid classification JSON");
+  }
+
+  parsed = JSON.parse(match[0]);
+}
               const rawCategory = String(parsed.primaryCategory || parsed.category || 'unknown').toLowerCase().trim();
               
               const isPerson = rawCategory === 'person' || rawCategory === 'human' || rawCategory === 'selfie' || rawCategory === 'portrait' || rawCategory === 'face' || rawCategory.includes('people') || (rawCategory.includes('person') && !rawCategory.includes('machinery') && !rawCategory.includes('motor'));
