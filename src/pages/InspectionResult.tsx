@@ -274,6 +274,21 @@ export default function InspectionResult() {
     )
   );
 
+  const isServiceUnavailable = !forceInspectOverride && (
+    pipelineResult?.serviceAvailable === false || 
+    (pipelineResult?.modelUsed && pipelineResult.modelUsed.includes('Service Unavailable')) ||
+    (inspectionData as any)?.serviceAvailable === false ||
+    (pipelineResult?.ineligibilityReason && (
+      pipelineResult.ineligibilityReason.includes('GEMINI_API_KEY') || 
+      pipelineResult.ineligibilityReason.includes('Service Unavailable') || 
+      pipelineResult.ineligibilityReason.includes('could not be reached')
+    ))
+  );
+
+  const serviceUnavailableReason = pipelineResult?.serviceUnavailableReason || 
+    pipelineResult?.ineligibilityReason || 
+    'Server-side GEMINI_API_KEY is not configured in Render.com environment settings.';
+
   const nonAssetSubject = pipelineResult?.detectedCategory || 
                          (inspectionData as any).detectedSubject || 
                          (geminiData && geminiData.detectedSubject) || 
@@ -860,8 +875,88 @@ export default function InspectionResult() {
         </div>
       </div>
 
-      {/* SECTION 16: INSPECTION NOT APPLICABLE VIEW */}
-      {isNonAsset ? (
+      {/* SECTION 16: SERVICE UNAVAILABLE OR INSPECTION NOT APPLICABLE VIEW */}
+      {isServiceUnavailable ? (
+        <section className="card p-8 md:p-12 bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-800/60 rounded-3xl text-center space-y-8 shadow-xl animate-in fade-in">
+          <div className="w-20 h-20 rounded-3xl bg-amber-500/10 text-amber-500 mx-auto flex items-center justify-center">
+            <AlertTriangle className="w-10 h-10" />
+          </div>
+
+          <div className="space-y-3 max-w-xl mx-auto">
+            <div className="inline-flex items-center gap-2 bg-amber-500/10 text-amber-600 dark:text-amber-400 px-3.5 py-1 rounded-full text-xs font-black uppercase tracking-wider border border-amber-500/20">
+              <span>Technical Status • Backend Diagnostics</span>
+            </div>
+            <h2 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white">
+              AI Vision Service Unavailable
+            </h2>
+            <p className="text-slate-600 dark:text-slate-300 text-sm md:text-base leading-relaxed">
+              {serviceUnavailableReason}
+            </p>
+          </div>
+
+          {/* Render.com setup instructions callout */}
+          <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 max-w-2xl mx-auto text-left space-y-3">
+            <div className="flex items-center gap-2 text-primary font-bold text-sm">
+              <Database className="w-4 h-4" />
+              <span>Enable Server Multimodal Vision on Render.com:</span>
+            </div>
+            <ol className="text-xs text-slate-600 dark:text-slate-300 space-y-2 list-decimal list-inside leading-relaxed">
+              <li>Open your <strong>Render Dashboard</strong> and navigate to this Web Service.</li>
+              <li>Click on the <strong>Environment</strong> tab in the left sidebar.</li>
+              <li>Add the following environment variable:
+                <div className="mt-1 font-mono font-bold text-[11px] bg-slate-200 dark:bg-slate-900 p-2 rounded-lg border border-slate-300 dark:border-slate-700 select-all">
+                  Key: GEMINI_API_KEY<br />
+                  Value: your_google_gemini_api_key
+                </div>
+              </li>
+              <li>Click <strong>Save Changes</strong>. Render will restart the service with multimodal vision active.</li>
+            </ol>
+          </div>
+
+          {/* Diagnostic Metrics */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-3xl mx-auto">
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Vision Service</span>
+              <span className="text-sm font-black text-amber-500 block">Unavailable</span>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Active Vision Model</span>
+              <span className="text-sm font-black text-slate-500 block truncate">None (Awaiting Key)</span>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Engineered Models</span>
+              <span className="text-sm font-black text-cyan-600 dark:text-cyan-400 block truncate">gemini-2.5-flash</span>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Platform</span>
+              <span className="text-sm font-black text-primary block">Render.com</span>
+            </div>
+          </div>
+
+          {/* Media Thumbnail Preview */}
+          {inspectionData.mediaUrl && (
+            <div className="max-w-sm mx-auto rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-md">
+              <img src={inspectionData.mediaUrl} alt={inspectionData.mediaName} className="w-full h-48 object-cover" />
+              <div className="p-2.5 bg-slate-900 text-slate-300 text-xs font-mono">
+                {inspectionData.mediaName}
+              </div>
+            </div>
+          )}
+
+          <div className="pt-2 flex flex-wrap items-center justify-center gap-4">
+            <Link to="/inspect" className="btn-primary py-3 px-6 text-sm font-bold flex items-center gap-2">
+              <ArrowLeft className="w-4 h-4" /> Back to Inspection
+            </Link>
+            <button 
+              type="button" 
+              onClick={() => setForceInspectOverride(true)}
+              className="text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 underline cursor-pointer"
+            >
+              Inspector Override (Force Offline Inspection)
+            </button>
+          </div>
+        </section>
+      ) : isNonAsset ? (
         <section className="card p-8 md:p-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl text-center space-y-8 shadow-xl animate-in fade-in">
           <div className="w-20 h-20 rounded-3xl bg-amber-500/10 text-amber-500 mx-auto flex items-center justify-center">
             <AlertTriangle className="w-10 h-10" />
@@ -1742,7 +1837,7 @@ export default function InspectionResult() {
                 <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 space-y-3">
                   <div className="flex items-baseline justify-between">
                     <div>
-                      <span className="text-xs font-black uppercase tracking-wider text-slate-400">Asset Health</span>
+                      <span className="text-xs font-black uppercase tracking-wider text-slate-400">AI Visual Condition Score</span>
                       <div className="text-4xl sm:text-5xl font-black text-slate-900 dark:text-white tracking-tight">
                         {currentScore} <span className="text-2xl font-bold text-slate-400">/ 100</span>
                       </div>
@@ -1758,6 +1853,12 @@ export default function InspectionResult() {
                       </span>
                       <p className="text-[11px] text-slate-400 font-mono mt-1">Safety Factor: {currentSafetyFactor} SF</p>
                     </div>
+                  </div>
+
+                  {/* Mandatory qualified engineer verification disclaimer */}
+                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs font-semibold">
+                    <ShieldAlert className="w-4 h-4 shrink-0 text-amber-500" />
+                    <span>Visual assessment only — qualified engineer verification required.</span>
                   </div>
 
                   {/* Visual High-Contrast Horizontal Meter matching Screenshot 2 */}

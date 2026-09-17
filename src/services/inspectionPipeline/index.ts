@@ -42,6 +42,9 @@ export function createNonInspectableResult(
     modelUsed?: string;
     mediaUrl?: string;
     ineligibilityReason?: string;
+    broadDomain?: string;
+    serviceAvailable?: boolean;
+    serviceUnavailableReason?: string;
   }
 ): Readonly<PipelineInspectionResult> {
   const catLower = (classification.category || '').toLowerCase();
@@ -106,7 +109,13 @@ export function createNonInspectableResult(
     ],
     isDemoData: false,
     modelUsed: options?.modelUsed || 'Visual Classifier',
-    mediaUrl: options?.mediaUrl || ''
+    mediaUrl: options?.mediaUrl || '',
+    aiVisualConditionScore: null,
+    conditionRating: 'N/A',
+    conditionDisclaimer: 'Visual assessment only — qualified engineer verification required.',
+    broadDomain: options?.broadDomain,
+    serviceAvailable: options?.serviceAvailable,
+    serviceUnavailableReason: options?.serviceUnavailableReason
   };
 
   return Object.freeze(result);
@@ -121,7 +130,7 @@ export function inspectionEligibilityGate(
   eligibility: { isEligible: boolean; status: any; reason: string },
   options?: any
 ): Readonly<PipelineInspectionResult> | null {
-  if (!eligibility.isEligible || classification.confidence < 70) {
+  if (!eligibility.isEligible) {
     console.log('[GATE] Inspection blocked');
     console.log('[DEFECT DETECTOR] SKIPPED');
     console.log('[HEALTH SCORE] SKIPPED');
@@ -214,13 +223,19 @@ export async function runInspectionPipeline(
   // Stops immediately if ineligible or low confidence (<70%)
   // Zero defect generation, Zero fabricated measurements, Zero fake health scores
   // =========================================================================
+  const isServiceAvail = visualClassification?.serviceAvailable !== false && modelResult?.serviceAvailable !== false;
+  const serviceUnavailReason = visualClassification?.reason || modelResult?.rejectionReason;
+
   const blockedResult = inspectionEligibilityGate(classification, eligibility, {
     inspectionId,
     assetId: resolvedAssetId,
     userSelectedAsset,
     inputType,
     modelUsed: modelResult?.modelUsed || visualClassification?.modelUsed || (classification.source === 'ai_model' ? 'Google Gemini Vision' : 'Local Visual Classifier'),
-    mediaUrl
+    mediaUrl,
+    serviceAvailable: isServiceAvail,
+    serviceUnavailableReason: !isServiceAvail ? serviceUnavailReason : undefined,
+    broadDomain: visualClassification?.broadDomain || modelResult?.broadDomain
   });
 
   if (blockedResult) {
@@ -347,7 +362,13 @@ export async function runInspectionPipeline(
     inspection: {
       status: 'SUPPORTED',
       reason: 'Inspection conducted with verified visual evidence.'
-    }
+    },
+    aiVisualConditionScore: modelResult?.conditionScore ?? healthScore.finalScore,
+    conditionRating: modelResult?.conditionRating ?? (healthScore.finalScore >= 80 ? 'Good' : healthScore.finalScore >= 60 ? 'Fair' : 'Poor'),
+    conditionDisclaimer: 'Visual assessment only — qualified engineer verification required.',
+    broadDomain: visualClassification?.broadDomain || modelResult?.broadDomain || 'Industrial / Infrastructure',
+    serviceAvailable: isServiceAvail,
+    serviceUnavailableReason: !isServiceAvail ? serviceUnavailReason : undefined
   };
 }
 

@@ -6,17 +6,23 @@ export type AssetCategory =
   | 'Road'
   | 'Bridge'
   | 'Building'
+  | 'Civil Infrastructure'
   | 'Industrial Machinery'
+  | 'Mechanical Equipment'
+  | 'Electrical Equipment'
   | 'Electrical Pole'
   | 'Pipeline'
+  | 'Pressure Vessel'
   | 'Solar Panel'
   | 'Railway Infrastructure'
   | 'Vehicle / Equipment'
+  | 'Structural Component'
   | 'Person / Human'
   | 'Animal'
   | 'Indoor Room'
   | 'Landscape'
-  | 'Unknown / Unsupported';
+  | 'Unknown / Unsupported'
+  | (string & {});
 
 export type InspectionInputType = 'static_image' | 'video' | 'camera';
 
@@ -159,4 +165,11 @@ export interface PipelineInspectionResult {
     status: string;
     reason: string;
   };
+  // Advanced Condition & Service Health
+  aiVisualConditionScore?: number | null;
+  conditionRating?: string;
+  conditionDisclaimer?: string;
+  broadDomain?: string;
+  serviceAvailable?: boolean;
+  serviceUnavailableReason?: string;
 }

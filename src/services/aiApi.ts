@@ -91,209 +91,87 @@ export interface GeminiDiagnosticResult {
 }
 
 export async function analyzeAssetWithGemini(
-  apiKey: string,
+  apiKey: string = '',
   base64Data: string,
-  mimeType: string,
+  mimeType: string = 'image/jpeg',
   userNotes: string = ''
 ): Promise<GeminiDiagnosticResult> {
-  const cleanKey = apiKey.trim();
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(cleanKey)}`;
+  const pureBase64 = base64Data.startsWith('data:')
+    ? base64Data
+    : (base64Data.length > 200 ? `data:${mimeType};base64,${base64Data}` : base64Data);
 
-  // Clean base64 string if it has data URL prefix
-  const pureBase64 = base64Data.replace(/^data:[^;]+;base64,/, '');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const clientKey = apiKey.trim() || getGeminiApiKey();
+  if (clientKey) {
+    headers['x-gemini-key'] = clientKey;
+  }
 
-  const systemPrompt = `
-You are a Rigorous Vision-Based AI Asset Inspection Assistant.
-
-YOUR CORE MANDATE: NEVER INVENT FINDINGS, DEFECTS, OR PHYSICAL MEASUREMENTS THAT ARE NOT VISIBLE IN THE IMAGE.
-
-STEP 1: ASSET CLASSIFICATION
-Classify the uploaded image into EXACTLY ONE of the following 14 categories:
-- Road
-- Bridge
-- Building
-- Industrial Machinery
-- Electrical Pole
-- Pipeline
-- Solar Panel
-- Railway Infrastructure
-- Vehicle / Equipment
-- Person / Human
-- Animal
-- Indoor Room
-- Landscape
-- Unknown / Unsupported
-
-Assign a confidence score (0 to 100) for this classification.
-
-STEP 2: INSPECTION ELIGIBILITY CHECK
-If the image belongs to:
-"Person / Human", "Animal", "Indoor Room", "Landscape", or "Unknown / Unsupported", OR classification confidence < 70:
-- Set "inspectionEligible": false
-- Set "isIndustrialAsset": false
-- Set "status": "NON_ASSET"
-- Set "healthScore": 0
-- Set "rejectionReason": "The uploaded image does not appear to contain a supported inspectable asset. Structural infrastructure defects cannot be reliably assessed from this image."
-- Set "defects": [] (MUST BE STRICTLY EMPTY ARRAY. DO NOT GENERATE CRACKS, CORROSION, OR REPAIRS FOR A PERSON, ANIMAL, ROOM, OR LANDSCAPE!)
-- Set "aiObservation": "Image content identified as [Category]. Structural inspection is not applicable."
-- Set "engineeringAssessment": "No engineering defect assessment conducted."
-
-STEP 3: VISUAL DEFECT DETECTION (ONLY IF ELIGIBLE)
-If and only if the image is an inspectable asset:
-Inspect ONLY for defects that have CLEAR VISUAL EVIDENCE in the image:
-- Surface crack, pothole, concrete spalling, corrosion/rust, paint/coating deterioration, surface damage, visible deformation, oil/fluid leakage.
-- IF NO VISUAL DEFECT EXISTS: return "defects": [] and indicate "No visible defect detected."
-
-CRITICAL RULE ON MEASUREMENTS:
-NEVER fabricate exact physical measurements (NO crack width in mm, NO depth in mm, NO UTM values, NO temperature, NO vibration, NO safety factors).
-Instead, provide descriptive visual evidence and state: "Physical dimensions require calibrated measurement equipment or a reference scale."
-
-STEP 4: DISTINGUISH OBSERVATION FROM ASSESSMENT
-For each finding, provide:
-- "aiObservation": Visual features observed (e.g. "Continuous dark linear fissure pattern across the concrete beam.")
-- "engineeringAssessment": Conservative guidance (e.g. "Potential structural concern detected — professional engineering assessment recommended.")
-
-User notes/context: "${userNotes || 'Standard visual inspection'}"
-
-You must respond ONLY with a valid JSON object matching this schema:
-{
-  "detectedCategory": "One of the 14 categories",
-  "classificationConfidence": 92,
-  "inspectionEligible": true,
-  "isIndustrialAsset": true,
-  "detectedSubject": "Specific subject, e.g. Concrete Highway Bridge Pier",
-  "assetName": "Descriptive name based on image",
-  "rejectionReason": "",
-  "status": "HEALTHY" | "ATTENTION" | "AT RISK" | "CRITICAL" | "NON_ASSET",
-  "healthScore": 75,
-  "diagnosticSummary": "Clear 2-sentence summary based strictly on visual evidence.",
-  "aiObservation": "Clear AI visual observation statement.",
-  "engineeringAssessment": "Conservative engineering assessment statement.",
-  "defects": [
-    {
-      "id": "DEFECT_1",
-      "type": "surface_crack",
-      "name": "SURFACE CRACK",
-      "confidence": 91,
-      "severity": "LOW" | "MEDIUM" | "HIGH",
-      "visualEvidence": "Visible linear surface discontinuity observed on concrete area. Physical crack dimensions require calibrated measurement equipment or a reference scale.",
-      "aiObservation": "AI VISUAL OBSERVATION: Continuous fissure observed on load-bearing concrete.",
-      "engineeringAssessment": "ENGINEERING ASSESSMENT: Potential structural concern detected — professional engineering assessment recommended."
-    }
-  ],
-  "recommendations": [
-    {
-      "step": 1,
-      "title": "Review the detected area manually",
-      "detail": "Inspect flagged surface region on-site."
-    },
-    {
-      "step": 2,
-      "title": "Capture additional close-up images",
-      "detail": "Record high-resolution macro perspectives."
-    },
-    {
-      "step": 3,
-      "title": "Perform calibrated measurement if dimensions are required",
-      "detail": "Deploy certified measurement tools rather than relying on uncalibrated estimates."
-    },
-    {
-      "step": 4,
-      "title": "Have a qualified inspector/engineer assess the defect",
-      "detail": "A certified engineer must evaluate structural impact."
-    },
-    {
-      "step": 5,
-      "title": "Schedule repair based on the verified inspection result",
-      "detail": "Determine maintenance priority based on verified on-site inspection."
-    }
-  ]
-}
-`;
-
-  const payload = {
-    contents: [
-      {
-        parts: [
-          { text: systemPrompt },
-          {
-            inline_data: {
-              mime_type: mimeType.startsWith('image/') ? mimeType : 'image/jpeg',
-              data: pureBase64
-            }
-          }
-        ]
-      }
-    ],
-    generationConfig: {
-      temperature: 0.1,
-      topP: 0.8,
-      maxOutputTokens: 2048
-    }
-  };
-
-  const response = await fetch(url, {
+  // Secure Server-Side Multimodal Inspection Call
+  const response = await fetch('/api/inspection/analyze', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
+    headers,
+    body: JSON.stringify({
+      imageBase64: pureBase64,
+      mimeType,
+      userNotes
+    })
   });
 
+  const data = await response.json().catch(() => ({}));
+
+  if (response.status === 503 || data.serviceAvailable === false) {
+    throw new Error(data.reason || 'AI Vision Service Unavailable. Please verify the server-side GEMINI_API_KEY in Render environment settings.');
+  }
+
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error?.message || `Gemini Vision API error (HTTP ${response.status})`);
+    throw new Error(data.error || data.reason || `Server inspection error (HTTP ${response.status})`);
   }
 
-  const resultData = await response.json();
-  const textOutput = resultData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  
-  // Extract JSON from potential code block wrapping
-  const jsonMatch = textOutput.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    throw new Error('Gemini model response was not valid JSON.');
-  }
+  const isEligible = Boolean(data.eligible && data.status !== 'NOT_APPLICABLE');
+  const cat: AssetCategory = data.assetCategory || 'Industrial Machinery';
 
-  const parsed = JSON.parse(jsonMatch[0]);
+  const sanitizedDefects: VisualDefect[] = isEligible && Array.isArray(data.visibleDefects)
+    ? data.visibleDefects.map((d: any, idx: number) => {
+        const rawSev = String(d.severity || 'Medium').toUpperCase();
+        const sev: DefectSeverity = (rawSev === 'CRITICAL' || rawSev === 'HIGH') ? 'HIGH' : (rawSev === 'LOW' ? 'LOW' : 'MEDIUM');
+        const confNum = typeof d.confidence === 'number' ? Math.round(d.confidence) : 85;
 
-  const isEligible = Boolean(parsed.inspectionEligible && parsed.isIndustrialAsset !== false);
-  const cat: AssetCategory = parsed.detectedCategory || 'Unknown / Unsupported';
-
-  const sanitizedDefects: VisualDefect[] = isEligible && Array.isArray(parsed.defects)
-    ? parsed.defects.map((d: any, idx: number) => {
-        const sev: DefectSeverity = d.severity === 'HIGH' ? 'HIGH' : (d.severity === 'LOW' ? 'LOW' : 'MEDIUM');
         return {
           id: d.id || `DEFECT_${idx + 1}`,
-          type: d.type || 'surface_anomaly',
+          type: d.type || d.defectType || 'surface_anomaly',
           name: (d.name || 'Visual Defect').toUpperCase(),
-          confidence: typeof d.confidence === 'number' ? d.confidence : 85,
-          confidenceLabel: typeof d.confidence === 'number' ? `${d.confidence}%` : 'Model confidence unavailable',
+          confidence: confNum,
+          confidenceLabel: `${confNum}%`,
           severity: sev,
-          visualEvidence: d.visualEvidence || 'Visible surface discontinuity evident in image.',
-          aiObservation: d.aiObservation || `AI VISUAL OBSERVATION: Discontinuity detected.`,
-          engineeringAssessment: d.engineeringAssessment || `ENGINEERING ASSESSMENT: Verification by a qualified inspector recommended. Physical dimensions require calibrated measurement equipment or a reference scale.`,
+          visualEvidence: d.visualEvidence || 'Visible surface anomaly identified.',
+          aiObservation: d.aiObservation || `AI VISUAL OBSERVATION: Surface discontinuity identified.`,
+          engineeringAssessment: d.engineeringAssessment || `ENGINEERING ASSESSMENT: Qualified engineer verification required. Physical dimensions require calibrated measurement tools.`,
           color: sev === 'HIGH' ? 'critical' : (sev === 'MEDIUM' ? 'attention' : 'healthy'),
           icon: sev === 'HIGH' ? '🔴' : (sev === 'MEDIUM' ? '🟡' : '🟢'),
-          tag: `${sev} Priority Defect`
+          tag: `${d.severity || 'Medium'} Priority Defect`
         };
       })
     : [];
+
+  const finalScore = typeof data.conditionScore === 'number' ? data.conditionScore : (isEligible ? 80 : 0);
 
   return {
     isIndustrialAsset: isEligible,
     inspectionEligible: isEligible,
     detectedCategory: cat,
-    detectedSubject: parsed.detectedSubject || parsed.assetName || cat,
-    classificationConfidence: typeof parsed.classificationConfidence === 'number' ? parsed.classificationConfidence : 80,
-    rejectionReason: parsed.rejectionReason || (isEligible ? '' : 'Structural infrastructure defects cannot be reliably assessed from this image.'),
-    assetName: parsed.assetName || `${cat} Asset`,
+    detectedSubject: data.assetType || data.assetCategory || 'Engineering Asset',
+    classificationConfidence: typeof data.confidence === 'number' ? data.confidence : 85,
+    rejectionReason: data.eligibilityReason || (isEligible ? '' : 'Non-engineering subject detected.'),
+    assetName: data.assetType || `${cat} Asset`,
     category: cat,
-    healthScore: isEligible ? (typeof parsed.healthScore === 'number' ? parsed.healthScore : 75) : 0,
-    status: isEligible ? (parsed.status || 'ATTENTION') : 'NON_ASSET',
-    diagnosticSummary: parsed.diagnosticSummary || (isEligible ? 'Visual AI analysis completed.' : 'Inspection not applicable to this image.'),
-    aiObservation: parsed.aiObservation || 'AI visual assessment complete.',
-    engineeringAssessment: parsed.engineeringAssessment || 'On-site verification recommended.',
+    healthScore: finalScore,
+    status: isEligible ? (finalScore >= 75 ? 'HEALTHY' : finalScore >= 50 ? 'ATTENTION' : 'CRITICAL') : 'NON_ASSET',
+    diagnosticSummary: data.summaryObservation || 'Visual AI analysis completed.',
+    aiObservation: data.summaryObservation || 'AI visual assessment complete.',
+    engineeringAssessment: data.engineeringAssessment || 'Visual inspection only. Qualified engineer verification required.',
     defects: sanitizedDefects,
-    recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : [],
-    modelUsed: 'Google Gemini 1.5 Flash Vision (Evidence-Based Mode)',
-    analysisTimestamp: new Date().toISOString()
+    recommendations: Array.isArray(data.recommendations) ? data.recommendations : [],
+    modelUsed: data.modelUsed || 'Google Gemini Vision (Server-Side)',
+    analysisTimestamp: data.inspectionTimestamp || new Date().toISOString()
   };
 }

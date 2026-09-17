@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sparkles, CheckCircle2, CircleDashed, ArrowRight, ShieldCheck } from 'lucide-react';
 import { runInspectionPipeline } from '../services/inspectionPipeline';
-import { analyzeAssetWithGemini, getGeminiApiKey } from '../services/aiApi';
+import { analyzeAssetWithGemini } from '../services/aiApi';
 
 export default function AiAnalysis() {
   const navigate = useNavigate();
@@ -41,20 +41,19 @@ export default function AiAnalysis() {
           throw new Error('No uploaded image was found.');
         }
 
-       const apiKey = getGeminiApiKey();
-
-       if (!apiKey) {
-         throw new Error('Gemini API key is not configured.');
+        let geminiResult = null;
+        try {
+          setStatusMessage('Analyzing asset with Server-Side Gemini Vision...');
+          geminiResult = await analyzeAssetWithGemini(
+            '',
+            imageBase64,
+            mimeType,
+            parsed.description || parsed.userNotes || ''
+          );
+        } catch (visionErr: any) {
+          console.warn('[AI ANALYSIS] Server Gemini Vision analysis notice:', visionErr.message);
         }
 
-setStatusMessage('Sending uploaded image to Gemini Vision...');
-
-const geminiResult = await analyzeAssetWithGemini(
-  apiKey,
-  imageBase64,
-  mimeType,
-  parsed.description || parsed.userNotes || ''
-);
         const pipelineResult = await runInspectionPipeline({
           fileName: parsed.mediaName || 'asset_scan.jpg',
           mediaUrl: imageBase64,

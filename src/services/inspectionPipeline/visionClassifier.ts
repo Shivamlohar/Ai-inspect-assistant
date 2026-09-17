@@ -26,6 +26,8 @@ export interface VisionClassificationResult {
   source: 'cloud_vision_api' | 'local_biometric_cv' | 'local_cv' | 'metadata_inference';
   skinToneRatio?: number;
   portraitRatio?: number;
+  serviceAvailable?: boolean;
+  broadDomain?: string;
 }
 
 /**
@@ -297,20 +299,49 @@ function createUnknownResult(reason: string): VisionClassificationResult {
 }
 export function mapCategoryStringToAssetCategory(cat: string): AssetCategory {
   const c = (cat || '').toLowerCase().trim();
+  if (!c) return 'Unknown / Unsupported';
+
+  // 1. Strict Out-of-Scope
   if (c.includes('person') || c.includes('human') || c.includes('selfie') || c.includes('portrait') || c.includes('face') || c.includes('group of people')) return 'Person / Human';
-  if (c.includes('bridge') || c.includes('viaduct') || c.includes('overpass')) return 'Bridge';
-  if (c.includes('road') || c.includes('pavement') || c.includes('highway') || c.includes('asphalt') || c.includes('street')) return 'Road';
-  if (c.includes('machinery') || c.includes('machine') || c.includes('motor') || c.includes('pump') || c.includes('turbine') || c.includes('engine') || c.includes('compressor') || c.includes('gearbox')) return 'Industrial Machinery';
-  if (c.includes('building') || c.includes('beam') || c.includes('pillar') || c.includes('concrete structure') || c.includes('masonry') || c.includes('slab')) return 'Building';
-  if (c.includes('pole') || c.includes('electrical pole') || c.includes('utility pole') || c.includes('pylon') || c.includes('transformer')) return 'Electrical Pole';
-  if (c.includes('pipeline') || c.includes('pipe') || c.includes('gas line')) return 'Pipeline';
-  if (c.includes('solar') || c.includes('photovoltaic') || c.includes('pv module')) return 'Solar Panel';
-  if (c.includes('rail') || c.includes('railway') || c.includes('train track')) return 'Railway Infrastructure';
-  if (c.includes('vehicle') || c.includes('truck') || c.includes('equipment') || c.includes('crane')) return 'Vehicle / Equipment';
   if (c.includes('animal') || c.includes('dog') || c.includes('cat') || c.includes('pet')) return 'Animal';
   if (c.includes('room') || c.includes('indoor') || c.includes('furniture')) return 'Indoor Room';
   if (c.includes('landscape') || c.includes('nature') || c.includes('foliage') || c.includes('mountain')) return 'Landscape';
-  return 'Unknown / Unsupported';
+
+  // 2. Mechanical & Industrial
+  if (
+    c.includes('machin') || c.includes('motor') || c.includes('pump') ||
+    c.includes('compressor') || c.includes('turbine') || c.includes('engine') ||
+    c.includes('gearbox') || c.includes('bearing') || c.includes('shaft') ||
+    c.includes('valve') || c.includes('conveyor') || c.includes('hydraulic') ||
+    c.includes('mechanical')
+  ) {
+    return 'Industrial Machinery';
+  }
+
+  // 3. Pressure Vessels & Pipelines
+  if (c.includes('pressure vessel') || c.includes('boiler') || c.includes('vessel')) return 'Pressure Vessel';
+  if (c.includes('pipeline') || c.includes('pipe') || c.includes('tank') || c.includes('conduit')) return 'Pipeline';
+
+  // 4. Infrastructure & Civil
+  if (c.includes('bridge') || c.includes('viaduct') || c.includes('overpass') || c.includes('flyover') || c.includes('pier')) return 'Bridge';
+  if (c.includes('road') || c.includes('pavement') || c.includes('highway') || c.includes('asphalt') || c.includes('street') || c.includes('sidewalk')) return 'Road';
+  if (c.includes('building') || c.includes('beam') || c.includes('pillar') || c.includes('column') || c.includes('concrete') || c.includes('masonry') || c.includes('slab') || c.includes('wall')) return 'Building';
+  if (c.includes('tunnel') || c.includes('culvert') || c.includes('drainage') || c.includes('dam') || c.includes('shed') || c.includes('civil')) return 'Civil Infrastructure';
+  if (c.includes('rail') || c.includes('railway') || c.includes('train track') || c.includes('locomotive')) return 'Railway Infrastructure';
+
+  // 5. Electrical & Power
+  if (c.includes('pole') || c.includes('electrical pole') || c.includes('utility pole') || c.includes('pylon')) return 'Electrical Pole';
+  if (c.includes('panel') || c.includes('switchgear') || c.includes('transformer') || c.includes('cable') || c.includes('electric') || c.includes('cabinet')) return 'Electrical Equipment';
+  if (c.includes('solar') || c.includes('photovoltaic') || c.includes('pv module')) return 'Solar Panel';
+
+  // 6. Materials & Components
+  if (c.includes('steel') || c.includes('weld') || c.includes('flange') || c.includes('bolt') || c.includes('joint') || c.includes('metal')) return 'Structural Component';
+  if (c.includes('vehicle') || c.includes('truck') || c.includes('equipment') || c.includes('crane') || c.includes('excavator')) return 'Vehicle / Equipment';
+
+  // 7. Broad Fallback for Engineering/Industrial Terms
+  if (c.includes('industrial') || c.includes('plant') || c.includes('hardware') || c.includes('component')) return 'Industrial Machinery';
+
+  return (cat as AssetCategory) || 'Unknown / Unsupported';
 }
 
 /**
@@ -345,29 +376,45 @@ export async function classifyVisualInput(
         })
       });
 
-      if (serverResp.ok) {
-        const data = await serverResp.json();
-        if (data && data.success) {
-          const mappedCat = mapCategoryStringToAssetCategory(data.primaryCategory || data.category);
-          const confNum = typeof data.confidence === 'number' 
-            ? Math.round(data.confidence <= 1 ? data.confidence * 100 : data.confidence)
-            : 85;
+      const data = await serverResp.json().catch(() => ({}));
 
-          const isEligible = Boolean(data.inspectionEligible && mappedCat !== 'Person / Human' && mappedCat !== 'Animal' && mappedCat !== 'Indoor Room' && mappedCat !== 'Landscape' && mappedCat !== 'Unknown / Unsupported');
+      // If server returned 503 / service unavailable, preserve honest technical status
+      if (serverResp.status === 503 || data.serviceAvailable === false) {
+        return {
+          category: 'Unknown / Unsupported',
+          confidence: 0,
+          confidenceLabel: 'N/A',
+          isEligible: false,
+          subjectDescription: 'AI Vision Service Unavailable',
+          reason: data.reason || 'The visual classification service could not be reached. Please verify the server-side GEMINI_API_KEY and API configuration.',
+          modelUsed: 'None (Service Unavailable)',
+          source: 'cloud_vision_api',
+          serviceAvailable: false
+        };
+      }
 
-          return {
-            category: mappedCat,
-            confidence: confNum,
-            confidenceLabel: `${confNum}%`,
-            isEligible,
-            subjectDescription: data.assetType || data.primaryCategory || mappedCat,
-            reason: data.reason || (isEligible 
-              ? 'Supported engineering asset identified by visual classifier.' 
-              : 'Subject is not an eligible engineering inspection asset.'),
-            modelUsed: `${data.modelName || 'Google Gemini Vision'} (${data.modelVersion || 'gemini-2.5-flash'})`,
-            source: 'cloud_vision_api'
-          };
-        }
+      if (serverResp.ok && data && data.success) {
+        const mappedCat = mapCategoryStringToAssetCategory(data.primaryCategory || data.category);
+        const confNum = typeof data.confidence === 'number' 
+          ? Math.round(data.confidence <= 1 ? data.confidence * 100 : data.confidence)
+          : 85;
+
+        const isEligible = Boolean(data.inspectionEligible && mappedCat !== 'Person / Human' && mappedCat !== 'Animal' && mappedCat !== 'Indoor Room' && mappedCat !== 'Landscape' && mappedCat !== 'Unknown / Unsupported');
+
+        return {
+          category: mappedCat,
+          confidence: confNum,
+          confidenceLabel: `${confNum}%`,
+          isEligible,
+          subjectDescription: data.assetType || data.primaryCategory || mappedCat,
+          reason: data.reason || (isEligible 
+            ? 'Supported engineering asset identified by visual classifier.' 
+            : 'Subject is not an eligible engineering inspection asset.'),
+          modelUsed: `${data.modelName || 'Google Gemini Vision'} (${data.modelVersion || 'gemini-2.5-flash'})`,
+          source: 'cloud_vision_api',
+          serviceAvailable: true,
+          broadDomain: data.broadDomain
+        };
       }
     } catch (serverErr) {
       console.warn('[VISION CLASSIFIER] Backend server call unavailable, attempting auxiliary offline inspection:', serverErr);

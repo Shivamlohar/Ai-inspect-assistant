@@ -12,63 +12,99 @@ export interface EligibilityResult {
   recommendedAction: string;
 }
 
-const SUPPORTED_INSPECTABLE_CATEGORIES = new Set<AssetCategory>([
-  'Road',
-  'Bridge',
-  'Building',
-  'Industrial Machinery',
-  'Electrical Pole',
-  'Pipeline',
-  'Solar Panel',
-  'Railway Infrastructure',
-  'Vehicle / Equipment'
+// Strict out-of-scope categories that must NEVER be inspected
+const OUT_OF_SCOPE_CATEGORIES = new Set<string>([
+  'Person / Human',
+  'Animal',
+  'Indoor Room',
+  'Landscape'
 ]);
 
-const CONFIDENCE_THRESHOLD = 70; // 70% threshold as requested in Section 3
-
 export function checkInspectionEligibility(
-  category: AssetCategory,
+  category: AssetCategory | string,
   confidence: number
 ): EligibilityResult {
-  // 1. Check if category is in the unsupported set
-  if (!SUPPORTED_INSPECTABLE_CATEGORIES.has(category)) {
-    let specificReason = 'The uploaded image does not appear to contain a supported inspectable asset.';
+  const catNormalized = (category || '').trim();
+  const lower = catNormalized.toLowerCase();
 
-    if (category === 'Person / Human') {
-      specificReason = 'Structural infrastructure defects cannot be reliably assessed from this image.';
-    } else if (category === 'Animal') {
-      specificReason = 'Living organisms and animals are outside the scope of industrial defect metrology.';
-    } else if (category === 'Indoor Room') {
-      specificReason = 'Domestic interiors, furniture, and living spaces do not constitute inspectable industrial assets.';
-    } else if (category === 'Landscape') {
-      specificReason = 'Natural landscapes and open scenery lack physical structural engineering elements.';
-    } else if (category === 'Unknown / Unsupported') {
-      specificReason = 'Unable to verify an engineering subject. The image does not match any recognized industrial asset.';
-    }
-
+  // 1. Strict Out-of-Scope Checks (People, Animals, Domestic Furniture, Scenic Landscapes)
+  if (
+    OUT_OF_SCOPE_CATEGORIES.has(catNormalized) ||
+    lower.includes('person') ||
+    lower.includes('human') ||
+    lower.includes('face') ||
+    lower.includes('selfie') ||
+    lower.includes('portrait')
+  ) {
     return {
       isEligible: false,
       status: 'NOT SUPPORTED',
-      reason: specificReason,
-      recommendedAction: 'Please upload an asset image such as a road, bridge, building, machine, pipeline or solar panel.'
+      reason: 'Human / person image detected. Structural civil and industrial defect metrology is not applicable.',
+      recommendedAction: 'Upload an infrastructure, industrial machinery, or electrical equipment image.'
     };
   }
 
-  // 2. If supported category, check confidence threshold (Section 3: below 70% -> Manual verification required)
-  if (confidence < CONFIDENCE_THRESHOLD) {
+  if (lower.includes('animal') || lower.includes('pet') || lower.includes('dog') || lower.includes('cat')) {
     return {
       isEligible: false,
-      status: 'MANUAL_VERIFICATION_REQUIRED',
-      reason: `Classification confidence (${confidence}%) is below the required ${CONFIDENCE_THRESHOLD}% threshold. Automated flaw metrology has been paused to prevent false-positive conclusions.`,
-      recommendedAction: 'Manual verification required. Have a field officer confirm the asset category or capture a clearer, centered photo.'
+      status: 'NOT SUPPORTED',
+      reason: 'Living animal detected. Living organisms are outside the scope of industrial defect metrology.',
+      recommendedAction: 'Upload an inspectable engineering asset image.'
     };
   }
 
-  // 3. Supported and confidence >= 70%
+  if (lower.includes('indoor room') || lower.includes('bedroom') || lower.includes('living room')) {
+    return {
+      isEligible: false,
+      status: 'NOT SUPPORTED',
+      reason: 'Domestic interior living space detected. Residential furniture is not an inspectable industrial asset.',
+      recommendedAction: 'Upload an industrial plant or civil infrastructure asset.'
+    };
+  }
+
+  if (lower.includes('landscape') || lower.includes('scenery') || lower.includes('wilderness')) {
+    return {
+      isEligible: false,
+      status: 'NOT SUPPORTED',
+      reason: 'Natural scenery detected without structural engineering elements.',
+      recommendedAction: 'Upload an engineered structure, road, bridge, or machinery asset.'
+    };
+  }
+
+  // 2. Low Confidence (< 40%) or Genuinely Uninterpretable Image
+  if (confidence < 40 || catNormalized === 'Unknown / Unsupported') {
+    if (confidence < 40) {
+      return {
+        isEligible: false,
+        status: 'MANUAL_VERIFICATION_REQUIRED',
+        reason: `Image confidence (${confidence}%) is insufficient for reliable automated inspection. The frame may be too dark, blurred, or obstructed.`,
+        recommendedAction: 'Capture a higher-resolution, well-lit, centered photo of the asset.'
+      };
+    }
+    return {
+      isEligible: false,
+      status: 'NOT SUPPORTED',
+      reason: 'The image could not be verified as a recognized infrastructure or industrial asset.',
+      recommendedAction: 'Upload a clear image of an industrial machine, electrical panel, bridge, road, or civil structure.'
+    };
+  }
+
+  // 3. Medium Confidence (40% - 69%): Asset broadly recognizable but exact subtype uncertain
+  // -> ELIGIBLE: Inspect visible condition, clearly indicate uncertainty (Rule Requirement)
+  if (confidence >= 40 && confidence < 70) {
+    return {
+      isEligible: true,
+      status: 'SUPPORTED',
+      reason: `Asset broadly recognized (${catNormalized}) with moderate confidence (${confidence}%). Eligible for visual condition assessment with subtype uncertainty noted.`,
+      recommendedAction: 'Proceed with visual defect analysis. Verify specific component tag on-site.'
+    };
+  }
+
+  // 4. High Confidence (>= 70%): Asset clearly recognizable -> Fully Eligible
   return {
     isEligible: true,
     status: 'SUPPORTED',
-    reason: `Asset verified as ${category} with ${confidence}% confidence. Eligible for visual defect detection.`,
+    reason: `Asset verified as ${catNormalized} with high confidence (${confidence}%). Eligible for visual defect detection and condition scoring.`,
     recommendedAction: 'Proceed with visual defect inspection and anomaly mapping.'
   };
 }

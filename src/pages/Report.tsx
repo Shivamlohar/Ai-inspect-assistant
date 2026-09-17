@@ -433,7 +433,7 @@ export default function Report() {
           <div className="bg-white p-5 rounded-xl border border-slate-200 flex flex-col justify-between shadow-xs">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
               <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
-                Overall Condition Assessment
+                AI Visual Condition Score
               </span>
               <div className="bg-rose-500/10 text-rose-700 border border-rose-500/20 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
@@ -443,6 +443,10 @@ export default function Report() {
 
             <div className="flex items-baseline justify-center gap-2 my-2">
               <span className="text-4xl sm:text-5xl font-black text-slate-900">{data.score}</span>
+            </div>
+
+            <div className="text-[11px] font-medium text-amber-700 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1.5 rounded-lg text-center my-1.5">
+              Visual assessment only — qualified engineer verification required.
             </div>
 
             {/* Defensible component breakdown table */}

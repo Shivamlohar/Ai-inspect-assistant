@@ -61,7 +61,21 @@ export function classifyAsset(
 
   const cleanSelectedAsset = isAutoDetect ? '' : userSelectedAsset;
 
-  // 3. If visual classification was explicitly unknown, honor uncertainty (Rule 9)
+  // 3. If user explicitly specified a verified engineering asset in metadata (post-classification confirmation or preset)
+  if (cleanSelectedAsset && cleanSelectedAsset.trim().length > 2) {
+    const normalized = normalizeCategoryName(cleanSelectedAsset);
+    if (normalized !== 'Unknown / Unsupported') {
+      return {
+        category: normalized,
+        confidence: 80,
+        confidenceLabel: '80%',
+        source: 'metadata_inference',
+        reasoning: `User-specified asset registry metadata (${cleanSelectedAsset}).`
+      };
+    }
+  }
+
+  // 4. If visual classification was explicitly unknown, honor uncertainty (Rule 9)
   if (visualClassification && visualClassification.category === 'Unknown / Unsupported') {
     return {
       category: 'Unknown / Unsupported',
@@ -70,47 +84,6 @@ export function classifyAsset(
       source: 'visual_heuristic',
       reasoning: visualClassification.reason || 'Visual characteristics unverified. Inspection blocked by zero-fabrication policy.'
     };
-  }
-
-  // 4. If user explicitly specified a verified engineering asset in metadata (post-classification confirmation only)
-  if (cleanSelectedAsset && cleanSelectedAsset.trim().length > 3) {
-    const clean = cleanSelectedAsset.toLowerCase();
-    if (clean.includes('motor') || clean.includes('pump') || clean.includes('compressor') || clean.includes('gearbox')) {
-      return {
-        category: 'Industrial Machinery',
-        confidence: 75,
-        confidenceLabel: '75%',
-        source: 'metadata_inference',
-        reasoning: `User-specified asset registry metadata (${cleanSelectedAsset}).`
-      };
-    }
-    if (clean.includes('bridge') || clean.includes('viaduct') || clean.includes('pier')) {
-      return {
-        category: 'Bridge',
-        confidence: 75,
-        confidenceLabel: '75%',
-        source: 'metadata_inference',
-        reasoning: `User-specified asset registry metadata (${cleanSelectedAsset}).`
-      };
-    }
-    if (clean.includes('pillar') || clean.includes('beam') || clean.includes('joint') || clean.includes('concrete')) {
-      return {
-        category: 'Building',
-        confidence: 75,
-        confidenceLabel: '75%',
-        source: 'metadata_inference',
-        reasoning: `User-specified structural metadata (${cleanSelectedAsset}).`
-      };
-    }
-    if (clean.includes('tank') || clean.includes('pipe') || clean.includes('vessel')) {
-      return {
-        category: 'Pipeline',
-        confidence: 75,
-        confidenceLabel: '75%',
-        source: 'metadata_inference',
-        reasoning: `User-specified piping metadata (${cleanSelectedAsset}).`
-      };
-    }
   }
 
   // 5. Unknown / Low Confidence Fallback (Rule 1 & Rule 9: Never guess engineering asset from filename)
@@ -123,20 +96,91 @@ export function classifyAsset(
   };
 }
 
-function normalizeCategoryName(raw: string): AssetCategory {
-  const lower = raw.toLowerCase();
-  if (lower.includes('road') || lower.includes('pothole')) return 'Road';
-  if (lower.includes('bridge') || lower.includes('viaduct')) return 'Bridge';
-  if (lower.includes('building') || lower.includes('concrete') || lower.includes('beam') || lower.includes('ceiling') || lower.includes('wall')) return 'Building';
-  if (lower.includes('machine') || lower.includes('machinery') || lower.includes('motor') || lower.includes('pump') || lower.includes('compressor')) return 'Industrial Machinery';
-  if (lower.includes('pole') || lower.includes('transformer') || lower.includes('power line')) return 'Electrical Pole';
-  if (lower.includes('pipe') || lower.includes('pipeline') || lower.includes('tank')) return 'Pipeline';
-  if (lower.includes('solar')) return 'Solar Panel';
-  if (lower.includes('rail') || lower.includes('train')) return 'Railway Infrastructure';
-  if (lower.includes('vehicle') || lower.includes('equipment') || lower.includes('truck')) return 'Vehicle / Equipment';
-  if (lower.includes('person') || lower.includes('human') || lower.includes('face') || lower.includes('selfie')) return 'Person / Human';
-  if (lower.includes('animal') || lower.includes('pet') || lower.includes('dog') || lower.includes('cat')) return 'Animal';
-  if (lower.includes('room') || lower.includes('bedroom') || lower.includes('interior')) return 'Indoor Room';
-  if (lower.includes('landscape') || lower.includes('nature') || lower.includes('scenery')) return 'Landscape';
+export function normalizeCategoryName(raw: string): AssetCategory {
+  if (!raw || typeof raw !== 'string') return 'Unknown / Unsupported';
+  const trimmed = raw.trim();
+  const lower = trimmed.toLowerCase();
+
+  // 1. Strict Non-Asset / Out-of-Scope Detection
+  if (lower.includes('person') || lower.includes('human') || lower.includes('face') || lower.includes('selfie') || lower.includes('portrait')) {
+    return 'Person / Human';
+  }
+  if (lower.includes('animal') || lower.includes('pet') || lower.includes('dog') || lower.includes('cat') || lower.includes('bird')) {
+    return 'Animal';
+  }
+  if (lower.includes('indoor room') || lower.includes('bedroom') || lower.includes('living room') || lower.includes('furniture')) {
+    return 'Indoor Room';
+  }
+  if (lower.includes('landscape') || lower.includes('nature') || lower.includes('scenery') || lower.includes('mountain') || lower.includes('forest')) {
+    return 'Landscape';
+  }
+
+  // 2. Specific Industrial & Mechanical Assets
+  if (
+    lower.includes('motor') || lower.includes('pump') || lower.includes('compressor') ||
+    lower.includes('generator') || lower.includes('engine') || lower.includes('gearbox') ||
+    lower.includes('bearing') || lower.includes('shaft') || lower.includes('valve') ||
+    lower.includes('conveyor') || lower.includes('hydraulic') || lower.includes('turbine') ||
+    lower.includes('rotating') || lower.includes('machin') || lower.includes('mechanical') ||
+    lower.includes('lathe') || lower.includes('cnc') || lower.includes('mill')
+  ) {
+    return 'Industrial Machinery';
+  }
+
+  // 3. Pressure Vessels, Tanks & Fluid Conduits
+  if (lower.includes('pressure vessel') || lower.includes('vessel') || lower.includes('boiler') || lower.includes('autoclave')) {
+    return 'Pressure Vessel';
+  }
+  if (lower.includes('pipe') || lower.includes('pipeline') || lower.includes('conduit') || lower.includes('tank') || lower.includes('storage tank') || lower.includes('silo')) {
+    return 'Pipeline';
+  }
+
+  // 4. Specific Civil Infrastructure & Transportation
+  if (lower.includes('road') || lower.includes('pothole') || lower.includes('asphalt') || lower.includes('highway') || lower.includes('pavement') || lower.includes('street') || lower.includes('sidewalk')) {
+    return 'Road';
+  }
+  if (lower.includes('bridge') || lower.includes('viaduct') || lower.includes('overpass') || lower.includes('flyover') || lower.includes('pier') || lower.includes('abutment') || lower.includes('deck')) {
+    return 'Bridge';
+  }
+  if (lower.includes('tunnel') || lower.includes('culvert') || lower.includes('drainage') || lower.includes('dam') || lower.includes('shed') || lower.includes('roof') || lower.includes('retaining wall') || lower.includes('foundation') || lower.includes('civil')) {
+    return 'Civil Infrastructure';
+  }
+  if (lower.includes('building') || lower.includes('concrete') || lower.includes('pillar') || lower.includes('column') || lower.includes('beam') || lower.includes('slab') || lower.includes('wall') || lower.includes('masonry') || lower.includes('structure')) {
+    return 'Building';
+  }
+  if (lower.includes('rail') || lower.includes('train') || lower.includes('track') || lower.includes('locomotive')) {
+    return 'Railway Infrastructure';
+  }
+
+  // 5. Electrical & Power Equipment
+  if (lower.includes('transformer') || lower.includes('switchgear') || lower.includes('electrical panel') || lower.includes('control panel') || lower.includes('circuit') || lower.includes('substation') || lower.includes('busbar') || lower.includes('electric') || lower.includes('cabinet')) {
+    return 'Electrical Equipment';
+  }
+  if (lower.includes('pole') || lower.includes('transmission') || lower.includes('utility pole') || lower.includes('pylon')) {
+    return 'Electrical Pole';
+  }
+  if (lower.includes('solar') || lower.includes('photovoltaic') || lower.includes('pv module')) {
+    return 'Solar Panel';
+  }
+
+  // 6. Materials & Structural Components
+  if (lower.includes('steel') || lower.includes('weld') || lower.includes('flange') || lower.includes('bolt') || lower.includes('fastener') || lower.includes('bracket') || lower.includes('joint') || lower.includes('metal')) {
+    return 'Structural Component';
+  }
+
+  if (lower.includes('vehicle') || lower.includes('equipment') || lower.includes('truck') || lower.includes('excavator') || lower.includes('crane') || lower.includes('forklift')) {
+    return 'Vehicle / Equipment';
+  }
+
+  // 7. Broad Fallback for Unfamiliar Engineering Assets
+  if (lower.includes('industrial') || lower.includes('plant') || lower.includes('factory') || lower.includes('hardware') || lower.includes('device') || lower.includes('unit') || lower.includes('assembly')) {
+    return 'Industrial Machinery';
+  }
+
+  // 8. If the string itself looks like a specific asset name (e.g. "Centrifugal Pump P-204"), preserve it
+  if (trimmed.length > 2 && !lower.includes('unknown') && !lower.includes('unsupported')) {
+    return trimmed as AssetCategory;
+  }
+
   return 'Unknown / Unsupported';
 }
