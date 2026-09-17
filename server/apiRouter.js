@@ -236,6 +236,7 @@ Return strict JSON only matching this schema:
 
           let geminiResp = null;
           let activeModel = GEMINI_VISION_MODEL;
+          let lastGeminiStatus = null;
 
           for (const modelName of candidateModels) {
             try {
