@@ -181,7 +181,7 @@ export async function runInspectionPipeline(
 
   // 4. First-Stage Visual Image Classification Gate
   let visualClassification = providedVisualClassification;
-  if (!visualClassification && !modelResult && mediaUrl) {
+  if (!visualClassification && mediaUrl) {
     try {
       visualClassification = await classifyVisualInput(mediaUrl, fileName);
     } catch (visErr) {
