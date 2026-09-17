@@ -37,7 +37,8 @@ export function sendJson(res, statusCode, data) {
   res.end(JSON.stringify(data));
 }
 
-export async function handleApiRequest(req, res, reqPath) {
+export async function handleApiRequest(req, res, inputPath) {
+  const reqPath = inputPath || (req.url ? new URL(req.url, 'http://localhost').pathname : '');
   // CORS Preflight
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
