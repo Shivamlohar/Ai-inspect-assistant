@@ -1390,7 +1390,7 @@ export default function NewInspection() {
                   <div className="flex-1">
                     <p className="font-bold">{micError}</p>
                     <p className="text-[11px] font-normal text-slate-500 dark:text-slate-400 mt-1">
-                      Tip: In Chrome or Edge, click the icon next to <code>http://localhost:10000</code> in your URL bar and toggle "Microphone" to ON.
+                      Tip: In Chrome, Edge, or Safari, click the lock/settings icon in your browser URL bar and toggle "Microphone" to Allow.
                     </p>
                   </div>
                   <button

@@ -339,11 +339,25 @@ Respond strictly in valid JSON matching this schema:
       ? Math.max(0, Math.min(100, Math.round(parsed.conditionScore)))
       : (isEligible ? 80 : null);
 
+    const topSeverity = defects.length > 0 
+      ? (defects.some(d => d.severity === 'CRITICAL' || d.severity === 'HIGH') ? 'High'
+        : defects.some(d => d.severity === 'MEDIUM') ? 'Medium' : 'Low')
+      : 'Informational';
+
+    const evidenceSummary = defects.length > 0
+      ? defects.map(d => `${d.name}: ${d.visualEvidence}`).join('; ')
+      : 'Nominal surface condition under current visual view; zero acute visible defects.';
+
+    const affectedAreaSummary = defects.length > 0
+      ? defects.map(d => d.affectedArea).filter(Boolean).join(', ') || 'Surface area'
+      : 'N/A';
+
     return {
       success: true,
       serviceAvailable: true,
       status: isEligible ? 'SUCCESS' : 'NOT_APPLICABLE',
       assetType: parsed.assetType || parsed.assetCategory || 'Engineering Asset',
+      assetSubtype: parsed.assetSubtype || parsed.assetType || null,
       assetCategory: parsed.assetCategory || 'Industrial Machinery',
       broadDomain: parsed.broadDomain || 'Industrial / Infrastructure',
       confidence: typeof parsed.confidence === 'number' ? Math.round(parsed.confidence) : 88,
@@ -354,7 +368,10 @@ Respond strictly in valid JSON matching this schema:
       conditionScore: finalScore,
       conditionRating: finalScore !== null ? `${parsed.overallCondition || 'Good'} (${finalScore}/100)` : 'N/A',
       conditionDisclaimer: 'Visual assessment only — qualified engineer verification required.',
-      summaryObservation: parsed.summaryObservation || 'Automated visual analysis completed.',
+      severity: topSeverity,
+      evidence: evidenceSummary,
+      affectedArea: affectedAreaSummary,
+      summaryObservation: parsed.summaryObservation || evidenceSummary,
       engineeringAssessment: parsed.engineeringAssessment || 'Visual inspection only. Physical and internal integrity must be confirmed with calibrated instruments.',
       visibleDefects: defects,
       recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : [

@@ -120,7 +120,7 @@ export async function analyzeAssetWithGemini(
   const data = await response.json().catch(() => ({}));
 
   if (response.status === 503 || data.serviceAvailable === false) {
-    throw new Error(data.reason || 'AI Vision Service Unavailable. Please verify the server-side GEMINI_API_KEY in Render environment settings.');
+    throw new Error(data.reason || 'AI Vision Service Unavailable. Please verify the server-side GEMINI_API_KEY in deployment environment settings (Vercel / Render).');
   }
 
   if (!response.ok) {

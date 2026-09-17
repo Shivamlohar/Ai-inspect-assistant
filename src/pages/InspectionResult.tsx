@@ -894,23 +894,29 @@ export default function InspectionResult() {
             </p>
           </div>
 
-          {/* Render.com setup instructions callout */}
+          {/* Platform setup instructions callout */}
           <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 max-w-2xl mx-auto text-left space-y-3">
             <div className="flex items-center gap-2 text-primary font-bold text-sm">
               <Database className="w-4 h-4" />
-              <span>Enable Server Multimodal Vision on Render.com:</span>
+              <span>Enable Server Multimodal Vision in Deployment Environment:</span>
             </div>
-            <ol className="text-xs text-slate-600 dark:text-slate-300 space-y-2 list-decimal list-inside leading-relaxed">
-              <li>Open your <strong>Render Dashboard</strong> and navigate to this Web Service.</li>
-              <li>Click on the <strong>Environment</strong> tab in the left sidebar.</li>
-              <li>Add the following environment variable:
-                <div className="mt-1 font-mono font-bold text-[11px] bg-slate-200 dark:bg-slate-900 p-2 rounded-lg border border-slate-300 dark:border-slate-700 select-all">
-                  Key: GEMINI_API_KEY<br />
-                  Value: your_google_gemini_api_key
-                </div>
-              </li>
-              <li>Click <strong>Save Changes</strong>. Render will restart the service with multimodal vision active.</li>
-            </ol>
+            <div className="text-xs text-slate-600 dark:text-slate-300 space-y-2.5 leading-relaxed">
+              <div>
+                <strong className="text-slate-800 dark:text-slate-100">On Vercel:</strong>
+                <ol className="list-decimal list-inside ml-2 mt-0.5 space-y-1">
+                  <li>Go to <strong>Project Settings → Environment Variables</strong>.</li>
+                  <li>Add <code>GEMINI_API_KEY</code> with your Google Gemini API key as value.</li>
+                  <li>Redeploy or push a new commit to apply.</li>
+                </ol>
+              </div>
+              <div>
+                <strong className="text-slate-800 dark:text-slate-100">On Render:</strong>
+                <ol className="list-decimal list-inside ml-2 mt-0.5 space-y-1">
+                  <li>Go to <strong>Environment</strong> tab in your Web Service dashboard.</li>
+                  <li>Add <code>GEMINI_API_KEY</code> with your key and click <strong>Save Changes</strong>.</li>
+                </ol>
+              </div>
+            </div>
           </div>
 
           {/* Diagnostic Metrics */}
@@ -924,12 +930,12 @@ export default function InspectionResult() {
               <span className="text-sm font-black text-slate-500 block truncate">None (Awaiting Key)</span>
             </div>
             <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Engineered Models</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Target Models</span>
               <span className="text-sm font-black text-cyan-600 dark:text-cyan-400 block truncate">gemini-2.5-flash</span>
             </div>
             <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Platform</span>
-              <span className="text-sm font-black text-primary block">Render.com</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Target Platforms</span>
+              <span className="text-sm font-black text-primary block">Vercel / Render</span>
             </div>
           </div>
 

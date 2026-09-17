@@ -1,5 +1,25 @@
 import { analyzeInspectionMultimodal } from '../../server/inspectionEngine.js';
 
+async function parseBody(req) {
+  if (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) {
+    return req.body;
+  }
+  if (typeof req.body === 'string') {
+    try { return JSON.parse(req.body); } catch { return {}; }
+  }
+  if (Buffer.isBuffer(req.body)) {
+    try { return JSON.parse(req.body.toString('utf8')); } catch { return {}; }
+  }
+  return new Promise((resolve) => {
+    let data = '';
+    req.on('data', chunk => { data += chunk; });
+    req.on('end', () => {
+      try { resolve(JSON.parse(data)); } catch { resolve({}); }
+    });
+    req.on('error', () => resolve({}));
+  });
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -14,7 +34,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
+    const body = await parseBody(req);
     const { imageBase64, mimeType = 'image/jpeg', assetName, userNotes, isDemoMode } = body;
 
     const result = await analyzeInspectionMultimodal({
@@ -26,7 +46,8 @@ export default async function handler(req, res) {
       reqHeaders: req.headers
     });
 
-    return res.status(200).json(result);
+    const statusCode = result.serviceAvailable === false ? 503 : 200;
+    return res.status(statusCode).json(result);
   } catch (err) {
     console.error('[VERCEL API /api/inspection/analyze ERROR]:', err);
     return res.status(500).json({ success: false, error: err.message });
