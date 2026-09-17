@@ -83,17 +83,18 @@ const geminiResult = await analyzeAssetWithGemini(
           sessionStorage.setItem('currentInspection', JSON.stringify(updatedPayload));
           sessionStorage.setItem('currentInspectionResult', JSON.stringify(pipelineResult));
         }
-       } catch (pipelineErr) {
-  console.error('Inspection pipeline error:', pipelineErr);
+      } catch (pipelineErr) {
+        console.error('Inspection pipeline error:', pipelineErr);
 
-  if (!isCancelled) {
-    const message =
-      pipelineErr instanceof Error
-        ? pipelineErr.message
-        : 'Unknown inspection error occurred.';
+        if (!isCancelled) {
+          const message =
+            pipelineErr instanceof Error
+              ? pipelineErr.message
+              : 'Unknown inspection error occurred.';
 
-    setStatusMessage(`Inspection failed: ${message}`);
-  }
+          setStatusMessage(`Inspection failed: ${message}`);
+        }
+      }
     };
 
     runAnalysis();
