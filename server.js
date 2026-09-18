@@ -4,7 +4,7 @@ import path from 'path';
 import zlib from 'zlib';
 import { fileURLToPath } from 'url';
 
-// Load environment variables from .env if present (Server-side Gemini configuration)
+// Load environment variables from .env if present (Server-side OpenAI configuration)
 try {
   if (typeof process.loadEnvFile === 'function') {
     process.loadEnvFile();
@@ -166,7 +166,7 @@ function applySecurityHeaders(res, contentType, ext) {
     "font-src 'self' https://fonts.gstatic.com data:",
     "img-src 'self' data: blob:",
     "media-src 'self' blob: data:",
-    "connect-src 'self' https://generativelanguage.googleapis.com",
+    "connect-src 'self' https://api.openai.com",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -353,7 +353,7 @@ const server = http.createServer(async (req, res) => {
           ruleViolations: firewallMetrics.ruleViolations
         },
         activeProtections: [
-          'Content Security Policy (Strict Self + Gemini API)',
+          'Content Security Policy (Strict Self + OpenAI API)',
           'Anti-Clickjacking (X-Frame-Options: DENY)',
           'Anti-MIME Confuse (X-Content-Type-Options: nosniff)',
           'Strict Transport Security (HSTS 1-Year Preload)',

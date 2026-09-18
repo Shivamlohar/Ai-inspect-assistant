@@ -1,4 +1,4 @@
-﻿export default function handler(req, res) {
+export default function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -21,7 +21,7 @@
       ruleViolations: {}
     },
     activeProtections: [
-      'Content Security Policy (Strict Self + Gemini API)',
+      'Content Security Policy (Strict Self + OpenAI API)',
       'Anti-Clickjacking (X-Frame-Options: DENY)',
       'Anti-MIME Confuse (X-Content-Type-Options: nosniff)',
       'Strict Transport Security (HSTS 1-Year Preload)',

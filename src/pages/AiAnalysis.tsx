@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sparkles, CheckCircle2, CircleDashed, ArrowRight, ShieldCheck } from 'lucide-react';
 import { runInspectionPipeline } from '../services/inspectionPipeline';
-import { analyzeAssetWithGemini } from '../services/aiApi';
+import { analyzeAssetWithOpenAI } from '../services/aiApi';
 
 export default function AiAnalysis() {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(0);
   const [assetName, setAssetName] = useState('Industrial Machine #M-401');
-  const isGeminiActive = true;
+  const isOpenAIActive = true;
   const [statusMessage, setStatusMessage] = useState<string>('Validating image and asset context...');
 
   useEffect(() => {
@@ -41,10 +41,10 @@ export default function AiAnalysis() {
           throw new Error('No uploaded image was found.');
         }
 
-        let geminiResult = null;
+        let openAiResult = null;
         try {
           setStatusMessage('Analyzing machine with Server-Side OpenAI Vision (GPT-4o)...');
-          geminiResult = await analyzeAssetWithGemini(
+          openAiResult = await analyzeAssetWithOpenAI(
             '',
             imageBase64,
             mimeType,
@@ -61,7 +61,7 @@ export default function AiAnalysis() {
           userSelectedAsset: parsed.assetName || '',
           userAssetId: parsed.assetId || '',
           userNotes: parsed.description || parsed.userNotes || '',
-          modelResult: geminiResult,
+          modelResult: openAiResult,
           isDemoMode: Boolean(parsed.isDemoData)
         });
 
@@ -75,6 +75,8 @@ export default function AiAnalysis() {
           const updatedPayload = {
             ...parsed,
             ...pipelineResult,
+            isOpenAI: true,
+            openAiPending: false,
             geminiPending: false,
             pipelineResult
           };
@@ -103,7 +105,7 @@ export default function AiAnalysis() {
     };
   }, []);
 
-  const steps = isGeminiActive ? [
+  const steps = isOpenAIActive ? [
     "CLASSIFIER: Image validation & OpenAI multimodal machine classification",
     "ELIGIBILITY GATE: Supported machine verification & mechanical boundary check",
     "DEFECT AI: Specialized visual flaw & anomaly detection (GPT-4o Vision)",
@@ -130,10 +132,10 @@ export default function AiAnalysis() {
           return prev;
         }
       });
-    }, isGeminiActive ? 1400 : 1100);
+    }, isOpenAIActive ? 1400 : 1100);
 
     return () => clearInterval(timer);
-  }, [navigate, steps.length, isGeminiActive]);
+  }, [navigate, steps.length, isOpenAIActive]);
 
   return (
     <div className="min-h-[85vh] flex items-center justify-center p-6 animate-in fade-in duration-300">
@@ -151,7 +153,7 @@ export default function AiAnalysis() {
 
         <div className="text-center mb-8">
           <span className="text-xs font-black uppercase tracking-widest text-ai bg-ai/10 px-3 py-1 rounded-full flex items-center justify-center gap-1.5 w-fit mx-auto">
-            {isGeminiActive ? (
+            {isOpenAIActive ? (
               <>
                 <Sparkles className="w-3.5 h-3.5 text-ai" /> Live OpenAI Vision Active (GPT-4o)
               </>

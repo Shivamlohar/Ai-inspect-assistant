@@ -130,7 +130,7 @@ export default function Report() {
           duration: parsed.duration || '02:10 minutes',
           mediaUrl: pipelineResult?.mediaUrl || parsed.mediaUrl || (isM ? windTurbine401Img : bridge102Img),
           isGemini: isG,
-          modelUsed: pipelineResult?.modelUsed || (isG ? (gResult.modelUsed || 'Google Gemini 1.5 Flash Vision') : 'Built-in Asset Validation & Inspection Pipeline'),
+          modelUsed: pipelineResult?.modelUsed || (isG ? (gResult.modelUsed || 'OpenAI GPT-4o Vision') : 'Built-in Asset Validation & Inspection Pipeline'),
           diagnosticSummary: isNonAsset 
             ? (pipelineResult?.ineligibilityReason || parsed.rejectionReason || gResult.rejectionReason || 'Non-industrial image detected. Defect metrology and crack scoring withheld.') 
             : (pipelineResult?.summaryObservation || (isG ? gResult.diagnosticSummary : 'Visual defect detection completed.')),

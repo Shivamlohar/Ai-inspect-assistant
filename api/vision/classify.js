@@ -23,7 +23,7 @@ async function parseBody(req) {
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-openai-key, x-gemini-key');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     return res.status(204).end();
@@ -39,8 +39,7 @@ export default async function handler(req, res) {
 
     const result = await classifyAssetMultimodal({
       imageBase64,
-      mimeType,
-      reqHeaders: req.headers
+      mimeType
     });
 
     const statusCode = result.serviceAvailable === false ? 503 : 200;

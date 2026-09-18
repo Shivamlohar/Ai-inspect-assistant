@@ -18,7 +18,6 @@ import {
   MonitorOff
 } from 'lucide-react';
 import { validateAndSanitizeFile } from '../utils/security';
-import { getGeminiApiKey } from '../services/aiApi';
 import { optimizeImageForInspection } from '../utils/imageOptimizer';
 import { saveSessionDraft, loadSessionDraft, clearSessionDraft, type InspectionDraft } from '../utils/sessionRecovery';
 import { JitterFilter } from '../utils/jitterFilter';
@@ -340,12 +339,12 @@ export default function NewInspection() {
         setSelectedAsset(selectedAsset || 'Industrial Machinery / Equipment');
         setAiDetectionResult({
           category: 'Industrial / Infrastructure Asset',
-          description: visualResult.reason || 'Server-side GEMINI_API_KEY pending in deployment environment.',
+          description: visualResult.reason || 'Server-side OPENAI_API_KEY pending in deployment environment.',
           defects: ['Visual anomaly scan queued for pipeline'],
           confidence: 'Offline Metrology Active',
           measurements: 'Evidence-based inspection ready'
         });
-        setSecurityNotice('ℹ️ Cloud AI Vision requires server GEMINI_API_KEY in Render environment. Precision metrology engine active.');
+        setSecurityNotice('ℹ️ Cloud AI Vision requires server OPENAI_API_KEY in deployment environment. Precision metrology engine active.');
         return;
       }
 
@@ -809,8 +808,7 @@ export default function NewInspection() {
   const handleStartInspection = () => {
     stopRecording();
     clearSessionDraft();
-    const apiKey = getGeminiApiKey();
-    const hasGemini = Boolean(apiKey && apiKey.trim().length > 10 && mediaFile?.base64);
+    const hasMedia = Boolean(mediaFile?.base64);
 
     const isVideo = mediaFile?.type === 'video';
     const isCamera = isCameraActive || (mediaFile?.name && mediaFile.name.includes('machine_capture_'));
@@ -835,7 +833,7 @@ export default function NewInspection() {
       rejectionReason: nonIndustrialReason,
       isDemoData: Boolean((mediaFile as any)?.isDemoData),
       securityHash: mediaFile?.securityHash || 'SHA256:7f3a9e10c4b281d5',
-      geminiPending: hasGemini,
+      openAiPending: hasMedia,
       imageBase64: mediaFile?.base64,
       mimeType: mediaFile?.mimeType || 'image/jpeg'
     };

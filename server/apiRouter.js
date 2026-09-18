@@ -1,9 +1,7 @@
-import { classifyAssetMultimodal, analyzeInspectionMultimodal, getServerGeminiApiKey } from './inspectionEngine.js';
+import { classifyAssetMultimodal, analyzeInspectionMultimodal, getServerOpenAIApiKey, OPENAI_VISION_MODEL } from './inspectionEngine.js';
 import crypto from 'node:crypto';
 import { db, assetDb, inspectionDb, defectDb, traceDb, datasetDb } from './db/database.js';
 import { queryKnowledgeBase, ingestNewSource, sourceDb } from './rag/ragEngine.js';
-
-export const GEMINI_VISION_MODEL = process.env.GEMINI_VISION_MODEL || 'gemini-2.5-flash';
 
 export function readJsonBody(req) {
   return new Promise((resolve, reject) => {
@@ -31,7 +29,7 @@ export function sendJson(res, statusCode, data) {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, x-openai-key, x-gemini-key',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
     'Cache-Control': 'no-store'
   });
   res.end(JSON.stringify(data));
@@ -44,21 +42,20 @@ export async function handleApiRequest(req, res, inputPath) {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, x-openai-key, x-gemini-key'
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With'
     });
     res.end();
     return true;
   }
   // 0. HEALTH CHECK & AI ENGINE STATUS
   if (reqPath === '/api/health' && req.method === 'GET') {
-    const apiKey = getServerGeminiApiKey(req.headers);
+    const apiKey = getServerOpenAIApiKey();
     sendJson(res, 200, {
       status: 'ONLINE',
       service: 'Inspectra AI Machine Inspection Gateway',
       timestamp: new Date().toISOString(),
       openaiConfigured: Boolean(apiKey && apiKey.length > 10),
-      geminiConfigured: Boolean(apiKey && apiKey.length > 10),
-      model: GEMINI_VISION_MODEL
+      model: OPENAI_VISION_MODEL
     });
     return true;
   }

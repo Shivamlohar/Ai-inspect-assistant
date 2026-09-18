@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { 
   CheckCircle2, 
   ArrowRight, 
@@ -10,37 +10,34 @@ import {
   ArrowLeft, 
   Copy, 
   Check, 
-  Key,
-  Trash2,
-  Loader2,
   Download, 
   Layers, 
   ShieldCheck, 
   Sliders, 
   Ruler, 
-  Lock,
-  Sparkles,
-  Save,
-  Clock,
-  Calendar,
-  Wrench,
-  Split,
-  History,
-  TrendingDown,
-  Eye,
-  CheckSquare,
-  XSquare,
-  HelpCircle,
-  Plus,
-  FileSpreadsheet,
-  Database,
-  X,
-  Mic,
-  Volume2,
-  VolumeX,
-  Send,
-  BookOpen,
-  ExternalLink
+  Lock, 
+  Sparkles, 
+  Save, 
+  Clock, 
+  Calendar, 
+  Wrench, 
+  Split, 
+  History, 
+  TrendingDown, 
+  Eye, 
+  CheckSquare, 
+  XSquare, 
+  HelpCircle, 
+  Plus, 
+  FileSpreadsheet, 
+  Database, 
+  X, 
+  Mic, 
+  Volume2, 
+  VolumeX, 
+  Send, 
+  BookOpen, 
+  ExternalLink 
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { getActiveOfficer, saveOfficerInspection, autoSaveCurrentInspection, getAssetPastInspections } from '../utils/officerStore';
@@ -54,10 +51,8 @@ import {
 } from '../utils/multilingualSpeech';
 import { bridge102Img } from '../assets/assetImages';
 import type { PipelineInspectionResult } from '../services/inspectionPipeline';
-import { getGeminiApiKey, setGeminiApiKey, clearGeminiApiKey, testGeminiApiKey } from '../services/aiApi';
 
 export default function InspectionResult() {
-  const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<'ORIGINAL' | 'AI_OVERLAY' | 'COMPARE'>('AI_OVERLAY');
   const [compareSlider, setCompareSlider] = useState<number>(50);
   const [activeLayer, setActiveLayer] = useState<'ALL' | 'CRACK' | 'RUST' | 'WEAR'>('ALL');
@@ -69,48 +64,6 @@ export default function InspectionResult() {
   const [saveToast, setSaveToast] = useState(false);
   const [workOrderDispatched, setWorkOrderDispatched] = useState(false);
   const [dispatchToast, setDispatchToast] = useState(false);
-
-  // API Key Management & Diagnostics
-  const [inputApiKey, setInputApiKey] = useState<string>(() => getGeminiApiKey());
-  const [isTestingKey, setIsTestingKey] = useState<boolean>(false);
-  const [keyFeedback, setKeyFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
-  const hasStoredKey = Boolean(typeof localStorage !== 'undefined' && (localStorage.getItem('openai_api_key') || localStorage.getItem('gemini_api_key')));
-
-  const handleTestKey = async () => {
-    if (!inputApiKey.trim()) {
-      setKeyFeedback({ type: 'error', message: 'Please enter an API key to test.' });
-      return;
-    }
-    setIsTestingKey(true);
-    setKeyFeedback(null);
-    try {
-      const res = await testGeminiApiKey(inputApiKey.trim());
-      if (res.success) {
-        setKeyFeedback({ type: 'success', message: 'OpenAI Vision API key is valid and active!' });
-      } else {
-        setKeyFeedback({ type: 'error', message: res.message || 'Key rejected by OpenAI API.' });
-      }
-    } catch (e: any) {
-      setKeyFeedback({ type: 'error', message: e.message || 'Verification failed.' });
-    } finally {
-      setIsTestingKey(false);
-    }
-  };
-
-  const handleSaveAndRerun = () => {
-    if (!inputApiKey.trim()) {
-      setKeyFeedback({ type: 'error', message: 'Please enter a valid OpenAI API key.' });
-      return;
-    }
-    setGeminiApiKey(inputApiKey.trim());
-    navigate('/analysis');
-  };
-
-  const handleClearKey = () => {
-    clearGeminiApiKey();
-    setInputApiKey('');
-    setKeyFeedback({ type: 'info', message: 'Stored API key removed from browser storage.' });
-  };
 
   // Video Ref & Inspection Timeline (Screenshot 1)
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -249,6 +202,7 @@ export default function InspectionResult() {
     description: string;
     securityHash?: string;
     isMachine?: boolean;
+    isOpenAI?: boolean;
     isGemini?: boolean;
     geminiResult?: any;
     healthScore?: number;
@@ -302,7 +256,8 @@ export default function InspectionResult() {
   });
 
   const isMachine = inspectionData.isMachine;
-  const isGemini = Boolean(inspectionData.isGemini && inspectionData.geminiResult);
+  const isOpenAI = Boolean(inspectionData.isOpenAI || inspectionData.isGemini || inspectionData.geminiResult || pipelineResult?.modelUsed);
+  const isGemini = isOpenAI;
   const geminiData = inspectionData.geminiResult;
 
   // Domain Relevance & Inspection Eligibility (Section 2 & 16)
@@ -326,7 +281,7 @@ export default function InspectionResult() {
     (pipelineResult?.modelUsed && pipelineResult.modelUsed.includes('Service Unavailable')) ||
     (inspectionData as any)?.serviceAvailable === false ||
     (pipelineResult?.ineligibilityReason && (
-      pipelineResult.ineligibilityReason.includes('GEMINI_API_KEY') || 
+      pipelineResult.ineligibilityReason.includes('OPENAI_API_KEY') || 
       pipelineResult.ineligibilityReason.includes('Service Unavailable') || 
       pipelineResult.ineligibilityReason.includes('could not be reached')
     ))
@@ -334,7 +289,7 @@ export default function InspectionResult() {
 
   const serviceUnavailableReason = pipelineResult?.serviceUnavailableReason || 
     pipelineResult?.ineligibilityReason || 
-    'Server-side GEMINI_API_KEY is not configured in Render.com environment settings.';
+    'Server-side OPENAI_API_KEY is not configured in deployment environment settings.';
 
   const isKeyInvalid = Boolean(
     pipelineResult?.isKeyInvalid || 
@@ -883,12 +838,12 @@ export default function InspectionResult() {
             <ShieldCheck className="w-3.5 h-3.5" /> 0 Threats • Sandboxed Clean
           </span>
           <span className={`text-[11px] font-bold px-2.5 py-1 rounded-md flex items-center gap-1.5 ${
-            isGemini 
-              ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20' 
+            isOpenAI 
+              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' 
               : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
           }`}>
             <Sparkles className="w-3.5 h-3.5" />
-            {isGemini ? 'Google Gemini 1.5 Flash' : 'Precision Metrology Engine'}
+            {pipelineResult?.modelUsed || (isOpenAI ? 'OpenAI GPT-4o Vision' : 'Precision Metrology Engine')}
           </span>
         </div>
       </div>
@@ -956,9 +911,9 @@ export default function InspectionResult() {
             </h2>
             <p className="text-slate-600 dark:text-slate-300 text-sm md:text-base leading-relaxed">
               {isQuotaExhausted
-                ? 'Your OpenAI API Key is successfully connected and verified, but your account has 0 remaining credits ($0.00 balance). Please recharge billing credits at platform.openai.com/settings/organization/billing, use a free Google Gemini key, or proceed immediately below with Precision Offline Metrology.'
+                ? 'Your OpenAI API Key is configured on the server, but your account has exhausted credits ($0.00 balance). Please recharge billing credits at platform.openai.com/settings/organization/billing, or proceed immediately below with Precision Offline Metrology.'
                 : (isKeyInvalid
-                  ? 'The configured API key was rejected by the vision service. Please update or clear your key below, or proceed immediately with built-in Precision Offline Metrology.'
+                  ? 'The configured server OPENAI_API_KEY was rejected by OpenAI. Please verify your server environment variable, or proceed immediately with built-in Precision Offline Metrology.'
                   : serviceUnavailableReason)}
             </p>
           </div>
@@ -995,85 +950,6 @@ export default function InspectionResult() {
             </div>
           </div>
 
-          {/* IN-PLACE GEMINI API KEY MANAGER */}
-          <div className="p-6 rounded-3xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 max-w-2xl mx-auto text-left space-y-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500">
-                  <Key className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-extrabold text-slate-900 dark:text-white">
-                    Update or Clear OpenAI Vision API Key
-                  </h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Configure your personal OpenAI API key (sk-...) directly in browser
-                  </p>
-                </div>
-              </div>
-              {hasStoredKey && (
-                <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                  Active in Browser
-                </span>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex flex-col sm:flex-row items-center gap-2">
-                <input
-                  type="password"
-                  value={inputApiKey}
-                  onChange={(e) => setInputApiKey(e.target.value)}
-                  placeholder="Paste OpenAI API Key (sk-...)"
-                  className="w-full text-xs font-mono px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-                <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
-                  <button
-                    type="button"
-                    disabled={isTestingKey || !inputApiKey.trim()}
-                    onClick={handleTestKey}
-                    className="flex-1 sm:flex-none px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-100 disabled:opacity-50 transition flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    {isTestingKey ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-primary" />}
-                    Test Key
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!inputApiKey.trim()}
-                    onClick={handleSaveAndRerun}
-                    className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary/90 disabled:opacity-50 transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
-                  >
-                    <Save className="w-3.5 h-3.5" />
-                    Save & Re-run
-                  </button>
-                  {hasStoredKey && (
-                    <button
-                      type="button"
-                      onClick={handleClearKey}
-                      className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400 hover:bg-rose-100 transition cursor-pointer"
-                      title="Clear invalid key from browser"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {keyFeedback && (
-                <div className={`p-3 rounded-xl text-xs flex items-center gap-2 font-medium animate-in fade-in ${
-                  keyFeedback.type === 'success' 
-                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' 
-                    : keyFeedback.type === 'error'
-                    ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
-                    : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
-                }`}>
-                  {keyFeedback.type === 'success' ? <Check className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
-                  <span>{keyFeedback.message}</span>
-                </div>
-              )}
-            </div>
-          </div>
-
           {/* Platform setup instructions callout */}
           <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 max-w-2xl mx-auto text-left space-y-3">
             <div className="flex items-center gap-2 text-primary font-bold text-sm">
@@ -1085,7 +961,7 @@ export default function InspectionResult() {
                 <strong className="text-slate-800 dark:text-slate-100">On Vercel:</strong>
                 <ol className="list-decimal list-inside ml-2 mt-0.5 space-y-1">
                   <li>Go to <strong>Project Settings → Environment Variables</strong>.</li>
-                  <li>Add <code>GEMINI_API_KEY</code> with your Google Gemini API key as value.</li>
+                  <li>Add <code>OPENAI_API_KEY</code> with your OpenAI API key (<code>sk-...</code>) as value.</li>
                   <li>Redeploy or push a new commit to apply.</li>
                 </ol>
               </div>
@@ -1093,7 +969,7 @@ export default function InspectionResult() {
                 <strong className="text-slate-800 dark:text-slate-100">On Render:</strong>
                 <ol className="list-decimal list-inside ml-2 mt-0.5 space-y-1">
                   <li>Go to <strong>Environment</strong> tab in your Web Service dashboard.</li>
-                  <li>Add <code>GEMINI_API_KEY</code> with your key and click <strong>Save Changes</strong>.</li>
+                  <li>Add <code>OPENAI_API_KEY</code> with your key and click <strong>Save Changes</strong>.</li>
                 </ol>
               </div>
             </div>
@@ -1107,11 +983,11 @@ export default function InspectionResult() {
             </div>
             <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Active Vision Model</span>
-              <span className="text-sm font-black text-slate-500 block truncate">None (Awaiting Key)</span>
+              <span className="text-sm font-black text-slate-500 block truncate">None (Server Key Missing)</span>
             </div>
             <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Target Models</span>
-              <span className="text-sm font-black text-cyan-600 dark:text-cyan-400 block truncate">gemini-2.5-flash</span>
+              <span className="text-sm font-black text-cyan-600 dark:text-cyan-400 block truncate">gpt-4o / gpt-4o-mini</span>
             </div>
             <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Target Platforms</span>
@@ -1211,7 +1087,7 @@ export default function InspectionResult() {
           {/* Active Model / API Badge */}
           <div className="inline-flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-4 py-2 rounded-xl text-xs font-mono text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 mx-auto">
             <span className="font-bold text-primary">Active Vision Model:</span>
-            <span>{pipelineResult?.modelUsed ? (pipelineResult.modelUsed.includes('Biometric') ? 'Conservative Local Fallback' : pipelineResult.modelUsed) : 'Google Gemini 2.5 Flash (Gemini Vision — Asset Classification)'}</span>
+            <span>{pipelineResult?.modelUsed ? (pipelineResult.modelUsed.includes('Biometric') ? 'Conservative Local Fallback' : pipelineResult.modelUsed) : 'OpenAI GPT-4o Vision (Multimodal Asset Classification)'}</span>
           </div>
 
           {/* User Guidance Callout */}

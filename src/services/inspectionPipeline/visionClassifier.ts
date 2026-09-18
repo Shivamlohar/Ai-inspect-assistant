@@ -6,15 +6,6 @@
 
 import type { AssetCategory } from './types';
 
-function getStoredApiKey(): string {
-  try {
-    if (typeof localStorage !== 'undefined') {
-      return localStorage.getItem('openai_api_key') || localStorage.getItem('gemini_api_key') || '';
-    }
-  } catch {}
-  return '';
-}
-
 export interface VisionClassificationResult {
   category: AssetCategory;
   confidence: number; // 0 - 100
@@ -348,7 +339,7 @@ export function mapCategoryStringToAssetCategory(cat: string): AssetCategory {
 /**
  * First-Stage Vision Classifier Orchestrator
  * Canonical classification runs server-side via POST /api/vision/classify
- * using the configured GEMINI_VISION_MODEL with zero browser API key exposure.
+ * using the configured OPENAI_VISION_MODEL with zero browser API key exposure.
  */
 export async function classifyVisualInput(
   mediaUrlOrBase64: string,
@@ -362,12 +353,7 @@ export async function classifyVisualInput(
         ? mediaUrlOrBase64 
         : (mediaUrlOrBase64.length > 200 ? `data:${mimeType};base64,${mediaUrlOrBase64}` : mediaUrlOrBase64);
 
-      const clientKey = getStoredApiKey();
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (clientKey) {
-        headers['x-openai-key'] = clientKey;
-        headers['x-gemini-key'] = clientKey;
-      }
 
       const serverResp = await fetch('/api/vision/classify', {
         method: 'POST',

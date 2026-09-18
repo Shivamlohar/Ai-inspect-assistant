@@ -15,7 +15,7 @@ AI Inspection Assistance is an industrial metrology and asset health management 
 
 ## Technical Specifications
 - Architecture: Single Page Web Application (Vite, React 19, TypeScript, Tailwind CSS)
-- AI Model: Multimodal Gemini 1.5 Flash Vision API with air-gapped heuristic failover
+- AI Model: Multimodal OpenAI GPT-4o Vision API with air-gapped heuristic failover
 - Supported Asset Categories: Industrial Machinery, Structural Infrastructure, Electrical Systems, Storage & Pipeline
 - Security: Client-side local persistence, strict Content Security Policy, zero cloud telemetry tracking
 

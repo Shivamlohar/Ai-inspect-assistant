@@ -1,107 +1,29 @@
 ﻿/**
  * OpenAI Multimodal Vision Diagnostic Service for Industrial Machines
- * Strictly adheres to machine-only inspection and non-fabrication principles.
+ * 
+ * SECURITY: Zero client-side API keys.
+ * All OpenAI API calls are routed through the secure serverless backend (/api/inspection/analyze)
+ * where OPENAI_API_KEY is resolved strictly from server-side environment variables.
  */
 
 import type { AssetCategory, DefectSeverity, VisualDefect } from './inspectionPipeline/types';
 
-const STORAGE_KEY = 'openai_api_key';
-const LEGACY_STORAGE_KEY = 'gemini_api_key';
-
+// Safe no-op helpers to preserve interface compatibility without storing secrets
 export function getOpenAIApiKey(): string {
-  try {
-    return (
-      (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env.VITE_OPENAI_API_KEY || import.meta.env.OPENAI_API_KEY || import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY)) ||
-      localStorage.getItem(STORAGE_KEY) ||
-      localStorage.getItem(LEGACY_STORAGE_KEY) ||
-      ''
-    );
-  } catch {
-    return '';
-  }
+  return '';
 }
 
-export function setOpenAIApiKey(key: string): void {
-  try {
-    const cleanKey = key.trim();
-    localStorage.setItem(STORAGE_KEY, cleanKey);
-    localStorage.setItem(LEGACY_STORAGE_KEY, cleanKey);
-  } catch (err) {
-    console.error('Failed to store API key in localStorage:', err);
-  }
+export function setOpenAIApiKey(_key: string): void {
+  // No-op: client-side storage removed for security
 }
 
 export function clearOpenAIApiKey(): void {
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(LEGACY_STORAGE_KEY);
-  } catch (err) {
-    console.error('Failed to clear API key:', err);
-  }
+  // No-op: client-side storage removed for security
 }
 
-// Backward-compatibility aliases
 export const getGeminiApiKey = getOpenAIApiKey;
 export const setGeminiApiKey = setOpenAIApiKey;
 export const clearGeminiApiKey = clearOpenAIApiKey;
-
-export async function testOpenAIApiKey(apiKey: string): Promise<{ success: boolean; message: string }> {
-  if (!apiKey || apiKey.trim().length < 10) {
-    return { success: false, message: 'Please enter a valid OpenAI API key (sk-...).' };
-  }
-
-  const cleanKey = apiKey.trim();
-
-  // 1. OpenAI Key Check (sk-...)
-  if (cleanKey.startsWith('sk-')) {
-    try {
-      const response = await fetch('https://api.openai.com/v1/models', {
-        method: 'GET',
-        headers: { Authorization: `Bearer ${cleanKey}` }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        if (response.status === 429) {
-          return {
-            success: false,
-            message: 'OpenAI key verified, but account credit quota is exhausted. Please add billing credits at platform.openai.com/settings/organization/billing/.'
-          };
-        }
-        const msg = errorData.error?.message || `HTTP ${response.status}: OpenAI API key verification failed.`;
-        return { success: false, message: msg };
-      }
-
-      return { success: true, message: 'OpenAI Vision API Key verified and active!' };
-    } catch (err: any) {
-      return { success: false, message: err.message || 'Network error connecting to OpenAI API.' };
-    }
-  }
-
-  // 2. Google Gemini Fallback Check
-  try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(cleanKey)}`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: 'Respond with OK.' }] }]
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const msg = errorData.error?.message || `HTTP ${response.status}: API key verification failed.`;
-      return { success: false, message: msg };
-    }
-
-    return { success: true, message: 'Vision API Key verified and active!' };
-  } catch (err: any) {
-    return { success: false, message: err.message || 'Network error connecting to Vision API.' };
-  }
-}
-
-export const testGeminiApiKey = testOpenAIApiKey;
 
 export interface OpenAIDiagnosticResult {
   isIndustrialAsset: boolean;
@@ -136,7 +58,7 @@ export interface OpenAIDiagnosticResult {
 export type GeminiDiagnosticResult = OpenAIDiagnosticResult;
 
 export async function analyzeAssetWithOpenAI(
-  apiKey: string = '',
+  _ignoredKey: string = '',
   base64Data: string,
   mimeType: string = 'image/jpeg',
   userNotes: string = ''
@@ -145,17 +67,10 @@ export async function analyzeAssetWithOpenAI(
     ? base64Data
     : (base64Data.length > 200 ? `data:${mimeType};base64,${base64Data}` : base64Data);
 
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  const clientKey = apiKey.trim() || getOpenAIApiKey();
-  if (clientKey) {
-    headers['x-openai-key'] = clientKey;
-    headers['x-gemini-key'] = clientKey;
-  }
-
   // Secure Server-Side Multimodal Machine Inspection Call
   const response = await fetch('/api/inspection/analyze', {
     method: 'POST',
-    headers,
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       imageBase64: pureBase64,
       mimeType,
@@ -166,7 +81,7 @@ export async function analyzeAssetWithOpenAI(
   const data = await response.json().catch(() => ({}));
 
   if (response.status === 503 || data.serviceAvailable === false) {
-    throw new Error(data.reason || 'AI Vision Service Unavailable. Please verify the server-side OPENAI_API_KEY in deployment environment settings (Vercel / Render).');
+    throw new Error(data.reason || 'AI Vision Service Unavailable. Please verify the server-side OPENAI_API_KEY in deployment environment settings.');
   }
 
   if (!response.ok) {
@@ -190,7 +105,7 @@ export async function analyzeAssetWithOpenAI(
         return {
           id: d.id || `DEFECT_${idx + 1}`,
           type: d.type || d.defectType || 'surface_anomaly',
-          name: (d.name || 'Visual Defect').toUpperCase(),
+          name: (d.name || d.defectType || 'Visual Defect').toUpperCase(),
           confidence: confNum,
           confidenceLabel: `${confNum}%`,
           severity: sev,

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Camera, 
@@ -14,7 +14,6 @@ import {
   Globe,
   Sun
 } from 'lucide-react';
-import { getGeminiApiKey } from '../services/aiApi';
 
 interface CheckItem {
   id: string;
@@ -53,7 +52,7 @@ export default function SystemCheck() {
     { id: 'mic', name: 'Voice Dictation Microphone', status: 'pending', details: 'Awaiting acoustic level sensor check' },
     { id: 'ram', name: 'Memory & CPU Processing Threads', status: 'pending', details: 'Checking memory limits' },
     { id: 'gpu', name: 'WebGL GPU Hardware Acceleration', status: 'pending', details: 'Probing graphics driver delegate' },
-    { id: 'network', name: 'Cloud Vision Engine Latency', status: 'pending', details: 'Testing connectivity to Gemini API' },
+    { id: 'network', name: 'Cloud Vision Engine Latency', status: 'pending', details: 'Testing connectivity to OpenAI API' },
     { id: 'security', name: 'Anti-Malware Sandbox & CSP', status: 'passed', details: 'Enforced via strict Content Security Policy' }
   ]);
 
@@ -123,7 +122,7 @@ export default function SystemCheck() {
         setChecks(prev => prev.map(c => c.id === 'network' ? {
           ...c,
           status: latency < 350 ? 'passed' : 'warning',
-          details: getGeminiApiKey() ? `Gemini 1.5 Flash Vision Active • Latency: ${latency}ms` : `Built-in Metrology Engine • Latency: ${latency}ms`,
+          details: hardwareInfo.online ? `OpenAI GPT-4o Vision Active • Latency: ${latency}ms` : `Built-in Metrology Engine • Latency: ${latency}ms`,
           value: `${latency}ms`
         } : c));
       })
@@ -364,7 +363,7 @@ export default function SystemCheck() {
           <div>
             <p className="text-xs text-slate-400 font-semibold">AI Diagnostic Latency</p>
             <p className="text-lg font-black text-slate-800">{hardwareInfo.pingMs !== null ? `${hardwareInfo.pingMs} ms` : 'Local Engine'}</p>
-            <p className="text-[10px] text-ai font-bold">{getGeminiApiKey() ? 'Gemini 1.5 Flash' : 'Precision Metrology'}</p>
+            <p className="text-[10px] text-ai font-bold">{hardwareInfo.online ? 'OpenAI GPT-4o Vision' : 'Precision Metrology'}</p>
           </div>
         </div>
       </div>
@@ -561,7 +560,7 @@ export default function SystemCheck() {
               <ul className="text-xs text-slate-600 space-y-1 pl-4 list-disc marker:text-primary">
                 <li><strong>Memory Safeguard:</strong> Camera stream and audio tracks explicitly released when leaving page.</li>
                 <li><strong>Tab Visibility:</strong> Processing automatically suspends when switching tabs to prevent CPU burn.</li>
-                <li><strong>Cloud Architecture:</strong> Heavy reasoning is offloaded to Google Gemini, eliminating thermal throttling.</li>
+                <li><strong>Cloud Architecture:</strong> Heavy reasoning is offloaded to server-side OpenAI Vision, eliminating thermal throttling.</li>
                 <li><strong>Mobile Aspect Locking:</strong> 16:9 viewports prevent bounding-box drift across mobile displays.</li>
               </ul>
             </div>

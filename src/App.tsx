@@ -28,7 +28,6 @@ import {
   KeyRound,
   BookOpen
 } from 'lucide-react';
-import { getGeminiApiKey } from './services/aiApi';
 import type { ThemeMode } from './utils/theme';
 import { getStoredTheme, applyTheme } from './utils/theme';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -891,33 +890,27 @@ function TopNav({
         <div className={`hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-colors ${
           !isOnline 
             ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400' 
-            : getGeminiApiKey() 
-            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400' 
-            : 'bg-cyan-500/10 border-cyan-500/20 text-cyan-600 dark:text-cyan-400'
+            : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400'
         }`}>
           <span className="relative flex h-2 w-2">
             <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-              !isOnline ? 'bg-amber-400' : getGeminiApiKey() ? 'bg-emerald-400' : 'bg-cyan-400'
+              !isOnline ? 'bg-amber-400' : 'bg-emerald-400'
             }`}></span>
             <span className={`relative inline-flex rounded-full h-2 w-2 ${
-              !isOnline ? 'bg-amber-500' : getGeminiApiKey() ? 'bg-emerald-500' : 'bg-cyan-500'
+              !isOnline ? 'bg-amber-500' : 'bg-emerald-500'
             }`}></span>
           </span>
           <span>
             {!isOnline 
               ? 'Vault Offline Safe' 
-              : getGeminiApiKey() 
-              ? 'OpenAI Vision (GPT-4o)' 
-              : 'Precision Metrology'}
+              : 'OpenAI Vision (GPT-4o)'}
           </span>
           <span className={`text-[10px] opacity-75 font-mono px-1.5 py-0.5 rounded ${
             !isOnline 
               ? 'bg-amber-500/15' 
-              : getGeminiApiKey() 
-              ? 'bg-emerald-500/15' 
-              : 'bg-cyan-500/15'
+              : 'bg-emerald-500/15'
           }`}>
-            {!isOnline ? 'Air-Gapped' : '42ms'}
+            {!isOnline ? 'Air-Gapped' : 'Live Cloud AI'}
           </span>
         </div>
 

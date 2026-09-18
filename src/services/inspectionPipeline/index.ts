@@ -233,7 +233,7 @@ export async function runInspectionPipeline(
     assetId: resolvedAssetId,
     userSelectedAsset,
     inputType,
-    modelUsed: modelResult?.modelUsed || visualClassification?.modelUsed || (classification.source === 'ai_model' ? 'Google Gemini Vision' : 'Local Visual Classifier'),
+    modelUsed: modelResult?.modelUsed || visualClassification?.modelUsed || (classification.source === 'ai_model' ? 'OpenAI GPT-4o Vision' : 'Local Visual Classifier'),
     mediaUrl,
     serviceAvailable: isServiceAvail,
     serviceUnavailableReason: !isServiceAvail ? serviceUnavailReason : undefined,
