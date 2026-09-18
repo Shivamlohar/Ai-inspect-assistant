@@ -47,6 +47,7 @@ export interface VisualDefect {
   color: 'critical' | 'attention' | 'healthy';
   icon: string;
   tag: string;
+  affectedArea?: string;
   limitations?: string;
   sourceCitation?: {
     title: string;

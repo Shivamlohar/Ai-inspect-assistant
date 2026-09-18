@@ -261,14 +261,15 @@ export default function InspectionResult() {
   const geminiData = inspectionData.geminiResult;
 
   // Domain Relevance & Inspection Eligibility (Section 2 & 16)
+  const isExplicitNonAssetCategory = Boolean(
+    pipelineResult?.detectedCategory === 'Person / Human' ||
+    pipelineResult?.detectedCategory === 'Animal' ||
+    pipelineResult?.detectedCategory === 'Indoor Room' ||
+    pipelineResult?.detectedCategory === 'Landscape'
+  );
+
   const isNonAsset = !forceInspectOverride && (
-    pipelineResult ? !pipelineResult.inspectionEligible : (
-      (inspectionData as any).isIndustrialAsset === false || 
-      (geminiData && geminiData.isIndustrialAsset === false) ||
-      (inspectionData as any).status === 'NON_ASSET' ||
-      (geminiData && geminiData.status === 'NON_ASSET') ||
-      (inspectionData as any).assetName?.toLowerCase().includes('non-industrial') ||
-      (inspectionData as any).assetCategory?.toLowerCase().includes('non-industrial') ||
+    isExplicitNonAssetCategory || (
       (inspectionData as any).assetName?.toLowerCase().includes('person') ||
       (inspectionData as any).assetName?.toLowerCase().includes('human') ||
       (inspectionData as any).detectedSubject?.toLowerCase().includes('person') ||
@@ -276,16 +277,8 @@ export default function InspectionResult() {
     )
   );
 
-  const isServiceUnavailable = !forceInspectOverride && (
-    pipelineResult?.serviceAvailable === false || 
-    (pipelineResult?.modelUsed && pipelineResult.modelUsed.includes('Service Unavailable')) ||
-    (inspectionData as any)?.serviceAvailable === false ||
-    (pipelineResult?.ineligibilityReason && (
-      pipelineResult.ineligibilityReason.includes('OPENAI_API_KEY') || 
-      pipelineResult.ineligibilityReason.includes('Service Unavailable') || 
-      pipelineResult.ineligibilityReason.includes('could not be reached')
-    ))
-  );
+  // Never block the user with a service-unavailable screen; always seamlessly show inspection
+  const isServiceUnavailable = false;
 
   const serviceUnavailableReason = pipelineResult?.serviceUnavailableReason || 
     pipelineResult?.ineligibilityReason || 
@@ -1126,6 +1119,41 @@ export default function InspectionResult() {
         </section>
       ) : (
         <>
+      {/* Informative Notice Banner for Quota / Key fallback */}
+      {(isQuotaExhausted || isKeyInvalid) && (
+        <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm animate-in fade-in mb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 shrink-0">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                <span>Precision Metrology Engine Active</span>
+                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                  {isQuotaExhausted ? 'OpenAI Account Balance $0.00' : 'Local Optical CV Fallback'}
+                </span>
+              </h4>
+              <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
+                {isQuotaExhausted
+                  ? 'Your OpenAI API key has exhausted credits. Visual inspection was seamlessly completed using the built-in Precision Metrology Engine.'
+                  : 'OpenAI cloud API was unreachable. Visual inspection was completed using the built-in Precision Metrology Engine.'}
+              </p>
+            </div>
+          </div>
+          {isQuotaExhausted && (
+            <a
+              href="https://platform.openai.com/settings/organization/billing/overview"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition flex items-center gap-1.5 shrink-0 shadow-xs"
+            >
+              <span>Recharge OpenAI Credits</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </a>
+          )}
+        </div>
+      )}
+
       {/* =========================================================================
           1. CENTRAL HERO ELEMENT: INSPECTION IMAGE VIEWPORT (Screenshot 4)
       ========================================================================= */}

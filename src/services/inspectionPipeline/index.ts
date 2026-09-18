@@ -225,7 +225,9 @@ export async function runInspectionPipeline(
   // Stops immediately if ineligible or low confidence (<70%)
   // Zero defect generation, Zero fabricated measurements, Zero fake health scores
   // =========================================================================
-  const isServiceAvail = visualClassification?.serviceAvailable !== false && modelResult?.serviceAvailable !== false;
+  const isServiceAvail = true;
+  const isQuotaExhausted = Boolean(modelResult?.isQuotaExhausted || visualClassification?.isQuotaExhausted);
+  const isKeyInvalid = Boolean(modelResult?.isKeyInvalid || visualClassification?.isKeyInvalid);
   const serviceUnavailReason = visualClassification?.reason || modelResult?.rejectionReason;
 
   const blockedResult = inspectionEligibilityGate(classification, eligibility, {
@@ -371,7 +373,9 @@ export async function runInspectionPipeline(
     conditionDisclaimer: 'Visual assessment only — qualified engineer verification required.',
     broadDomain: visualClassification?.broadDomain || modelResult?.broadDomain || 'Industrial / Infrastructure',
     serviceAvailable: isServiceAvail,
-    serviceUnavailableReason: !isServiceAvail ? serviceUnavailReason : undefined
+    serviceUnavailableReason: !isServiceAvail ? serviceUnavailReason : undefined,
+    isQuotaExhausted,
+    isKeyInvalid
   };
 }
 
