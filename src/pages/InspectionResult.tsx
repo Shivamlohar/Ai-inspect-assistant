@@ -51,6 +51,7 @@ import {
 } from '../utils/multilingualSpeech';
 import { bridge102Img } from '../assets/assetImages';
 import type { PipelineInspectionResult } from '../services/inspectionPipeline';
+import { resolveInspectionDomain, WORKFLOW_STAGES } from '../data/domainRegistry';
 
 export default function InspectionResult() {
   const [viewMode, setViewMode] = useState<'ORIGINAL' | 'AI_OVERLAY' | 'COMPARE'>('AI_OVERLAY');
@@ -307,6 +308,28 @@ export default function InspectionResult() {
     : (pipelineResult?.healthScore?.finalScore !== undefined && pipelineResult?.healthScore?.finalScore !== null
       ? (pipelineResult.healthScore.finalScore >= 80 ? 'Healthy' : pipelineResult.healthScore.finalScore >= 60 ? 'Attention Needed' : 'Critical') 
       : 'Healthy');
+
+  // 7-Domain Multi-Domain Architecture Fields (Infographic Standard)
+  const rawInspectionDomain = (pipelineResult as any)?.inspectionDomain || 
+                              (inspectionData as any)?.inspectionDomain || 
+                              (pipelineResult as any)?.detectedCategory ||
+                              inspectionData.assetName;
+  const domainConfig = resolveInspectionDomain(rawInspectionDomain);
+  const inspectionDomain = isNonAsset ? 'Non-Engineering / Rejected' : domainConfig.name;
+
+  const overallCondition: 'Good' | 'Fair' | 'Poor' = isNonAsset 
+    ? 'Poor' 
+    : ((pipelineResult as any)?.overallCondition ||
+       (currentScore >= 80 ? 'Good' : currentScore >= 60 ? 'Fair' : 'Poor'));
+
+  const detectedAssetType = isNonAsset
+    ? (nonAssetSubject || 'Non-Industrial Subject')
+    : ((pipelineResult as any)?.detectedAssetType || 
+       (pipelineResult as any)?.detectedCategory || 
+       inspectionData.assetName);
+
+  const engineerVerificationStatus = (pipelineResult as any)?.engineerVerificationStatus || 
+                                     'Pending Qualified Engineer Review';
 
   // Mathematically defensible inspection score breakdown (Section 8: 40/30/20/10 formula)
   const scoreBreakdown = pipelineResult?.healthScore?.components ? [
@@ -821,6 +844,25 @@ export default function InspectionResult() {
             <span className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
               <CheckCircle2 className="w-3.5 h-3.5" /> {isNonAsset ? 'Scan Evaluated' : `${inspectionModeTitle} Completed`}
             </span>
+            {!isNonAsset && (
+              <span className={`inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-wider px-3 py-1 rounded-full border ${domainConfig.color.bg} ${domainConfig.color.text} ${domainConfig.color.border}`}>
+                <Layers className="w-3.5 h-3.5" /> Domain: {inspectionDomain}
+              </span>
+            )}
+            {!isNonAsset && (
+              <span className={`inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-wider px-3 py-1 rounded-full border ${
+                overallCondition === 'Good' ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' :
+                overallCondition === 'Fair' ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30' :
+                'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30'
+              }`}>
+                <span className={`w-2 h-2 rounded-full ${
+                  overallCondition === 'Good' ? 'bg-emerald-500' :
+                  overallCondition === 'Fair' ? 'bg-amber-500' :
+                  'bg-rose-500'
+                }`}></span>
+                Condition: {overallCondition}
+              </span>
+            )}
             {isDemoData && (
               <span className="inline-flex items-center gap-1 text-xs font-black uppercase tracking-wider bg-amber-500/15 text-amber-600 dark:text-amber-400 px-3 py-1 rounded-full border border-amber-500/30">
                 🔶 DEMO DATA
@@ -860,6 +902,96 @@ export default function InspectionResult() {
           </button>
         </div>
       </div>
+
+      {/* 7-STAGE PIPELINE PROGRESS TRACKER & STANDARDIZED REPORT FIELDS DOSSIER */}
+      {!isNonAsset && (
+        <section className="card p-5 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 text-white rounded-2xl border border-slate-800 shadow-xl space-y-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span className="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5" /> 7-Stage Visual Inspection Workflow Complete
+              </span>
+            </div>
+            <span className="text-[11px] font-mono text-slate-300">
+              Classified Domain: <strong className={domainConfig.color.darkText}>{inspectionDomain}</strong>
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+            {WORKFLOW_STAGES.map((st) => (
+              <div 
+                key={st.stageNumber} 
+                className="p-2.5 rounded-xl border border-slate-800/90 bg-slate-950/60 text-xs flex flex-col justify-between"
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-black text-[10px] border border-emerald-500/40">
+                    ✓
+                  </span>
+                  <span className="text-[8px] font-bold text-slate-500 uppercase">
+                    STAGE {st.stageNumber}
+                  </span>
+                </div>
+                <p className="font-extrabold text-[11px] text-slate-200 truncate leading-tight">
+                  {st.title}
+                </p>
+                <p className="text-[9px] text-slate-400 truncate mt-0.5">
+                  {st.stageNumber === 4 ? inspectionDomain : st.stageNumber === 5 ? `${visibleIssues.length} defects` : st.stageNumber === 6 ? `${currentScore}/100 • ${overallCondition}` : st.summary}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {/* Infographic Standardized Report Fields Summary */}
+          <div className="mt-3 pt-3 border-t border-slate-800/80 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
+            <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800">
+              <span className="text-[10px] font-bold uppercase text-slate-400 block">Inspection Domain</span>
+              <span className={`font-extrabold text-xs ${domainConfig.color.darkText} truncate block`}>
+                {inspectionDomain}
+              </span>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800">
+              <span className="text-[10px] font-bold uppercase text-slate-400 block">Detected Asset</span>
+              <span className="font-extrabold text-xs text-slate-200 truncate block">
+                {detectedAssetType}
+              </span>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800">
+              <span className="text-[10px] font-bold uppercase text-slate-400 block">Overall Condition</span>
+              <span className={`font-black text-xs ${
+                overallCondition === 'Good' ? 'text-emerald-400' :
+                overallCondition === 'Fair' ? 'text-amber-400' :
+                'text-rose-400'
+              } block`}>
+                {overallCondition} ({currentScore}/100)
+              </span>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800">
+              <span className="text-[10px] font-bold uppercase text-slate-400 block">Visible Defects</span>
+              <span className="font-extrabold text-xs text-rose-400 block">
+                {visibleIssues.length} Candidate(s)
+              </span>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800">
+              <span className="text-[10px] font-bold uppercase text-slate-400 block">Applicable Standard</span>
+              <span className="font-mono text-[11px] text-cyan-300 truncate block">
+                {domainConfig.standards[0] || 'ISO 17359 / ASME XI'}
+              </span>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800">
+              <span className="text-[10px] font-bold uppercase text-slate-400 block">Engineer Status</span>
+              <span className="font-bold text-[11px] text-amber-400 truncate block">
+                {engineerVerificationStatus}
+              </span>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* SECTION 16: SERVICE UNAVAILABLE OR INSPECTION NOT APPLICABLE VIEW */}
       {isServiceUnavailable ? (

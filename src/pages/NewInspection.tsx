@@ -15,7 +15,8 @@ import {
   Sun, 
   AlertTriangle, 
   Activity, 
-  MonitorOff
+  MonitorOff,
+  Layers
 } from 'lucide-react';
 import { validateAndSanitizeFile } from '../utils/security';
 import { optimizeImageForInspection } from '../utils/imageOptimizer';
@@ -34,9 +35,11 @@ import {
   transformerTrImg,
   storageTankImg,
   pipelinePlImg,
-  pressureVesselImg
+  pressureVesselImg,
+  windTurbine401Img
 } from '../assets/assetImages';
 import { classifyVisualInput, type VisionClassificationResult } from '../services/inspectionPipeline/visionClassifier';
+import { SUPPORTED_DOMAINS, WORKFLOW_STAGES, resolveInspectionDomain } from '../data/domainRegistry';
 
 export default function NewInspection() {
   const navigate = useNavigate();
@@ -51,6 +54,9 @@ export default function NewInspection() {
   const [luminance, setLuminance] = useState<number | null>(null);
   const [tabNotice, setTabNotice] = useState<string | null>(null);
   
+  // Domain filter selector for sample assets and presets
+  const [selectedDomainFilter, setSelectedDomainFilter] = useState<string>('all');
+
   // Screen-split & window blur tracking
   const [windowBlurAlert, setWindowBlurAlert] = useState<string | null>(null);
   const [focusLostCount, setFocusLostCount] = useState<number>(0);
@@ -114,10 +120,12 @@ export default function NewInspection() {
   const animFrameRef = useRef<number | null>(null);
   const baseTextRef = useRef<string>('');
 
-  // Preset sample media for quick testing
+  // Preset sample media for quick testing across all 7 supported engineering domains
   const samplePresets = [
     {
       name: 'Industrial Motor M-401',
+      domainId: 'industrial-machines',
+      domainName: 'Industrial Machines',
       type: 'image' as const,
       url: industrialMotorImg,
       size: '0.9 MB',
@@ -127,6 +135,8 @@ export default function NewInspection() {
     },
     {
       name: 'Centrifugal Pump P-204',
+      domainId: 'industrial-machines',
+      domainName: 'Industrial Machines',
       type: 'image' as const,
       url: centrifugalPumpImg,
       size: '1.0 MB',
@@ -136,6 +146,8 @@ export default function NewInspection() {
     },
     {
       name: 'Gearbox G-118 Speed Reducer',
+      domainId: 'industrial-machines',
+      domainName: 'Industrial Machines',
       type: 'image' as const,
       url: gearboxImg,
       size: '1.0 MB',
@@ -145,6 +157,8 @@ export default function NewInspection() {
     },
     {
       name: 'Air Compressor C-305',
+      domainId: 'industrial-machines',
+      domainName: 'Industrial Machines',
       type: 'image' as const,
       url: airCompressorImg,
       size: '0.9 MB',
@@ -154,6 +168,8 @@ export default function NewInspection() {
     },
     {
       name: 'Concrete Pillar CP-021',
+      domainId: 'civil-infrastructure',
+      domainName: 'Civil Infrastructure',
       type: 'image' as const,
       url: concretePillarImg,
       size: '1.0 MB',
@@ -163,6 +179,8 @@ export default function NewInspection() {
     },
     {
       name: 'Steel Beam SB-114',
+      domainId: 'civil-infrastructure',
+      domainName: 'Civil Infrastructure',
       type: 'image' as const,
       url: steelBeamImg,
       size: '1.1 MB',
@@ -172,6 +190,8 @@ export default function NewInspection() {
     },
     {
       name: 'Structural Joint SJ-087',
+      domainId: 'civil-infrastructure',
+      domainName: 'Civil Infrastructure',
       type: 'image' as const,
       url: structuralJointImg,
       size: '0.9 MB',
@@ -181,6 +201,8 @@ export default function NewInspection() {
     },
     {
       name: 'Electrical Panel EP-052',
+      domainId: 'electrical-systems',
+      domainName: 'Electrical Systems',
       type: 'image' as const,
       url: electricalPanelImg,
       size: '0.9 MB',
@@ -190,6 +212,8 @@ export default function NewInspection() {
     },
     {
       name: 'Transformer TR-009',
+      domainId: 'electrical-systems',
+      domainName: 'Electrical Systems',
       type: 'image' as const,
       url: transformerTrImg,
       size: '1.1 MB',
@@ -199,6 +223,8 @@ export default function NewInspection() {
     },
     {
       name: 'Storage Tank ST-301',
+      domainId: 'hvac-piping',
+      domainName: 'HVAC & Piping',
       type: 'image' as const,
       url: storageTankImg,
       size: '1.0 MB',
@@ -208,6 +234,8 @@ export default function NewInspection() {
     },
     {
       name: 'High-Pressure Pipeline PL-201',
+      domainId: 'hvac-piping',
+      domainName: 'HVAC & Piping',
       type: 'image' as const,
       url: pipelinePlImg,
       size: '1.0 MB',
@@ -217,12 +245,25 @@ export default function NewInspection() {
     },
     {
       name: 'Pressure Vessel PV-102',
+      domainId: 'hvac-piping',
+      domainName: 'HVAC & Piping',
       type: 'image' as const,
       url: pressureVesselImg,
       size: '1.0 MB',
       category: 'Storage & Pipeline',
       asset: 'Pressure Vessel PV-102 (PV-102)',
       note: 'Statutory 6-month ASME compliance audit scheduled today. Hydrostatic & NDT probe queued.'
+    },
+    {
+      name: 'Wind Turbine WT-401',
+      domainId: 'renewable-energy',
+      domainName: 'Renewable Energy',
+      type: 'image' as const,
+      url: windTurbine401Img,
+      size: '1.2 MB',
+      category: 'Renewable Energy',
+      asset: 'Wind Turbine Blade & Nacelle WT-401 (WT-401)',
+      note: 'Leading-edge aerodynamic profile nominal. Blade shell composite acoustic integrity within IEC 61400 standards.'
     }
   ];
 
@@ -818,8 +859,13 @@ export default function NewInspection() {
       ? (nonIndustrialSubject || 'Person / Human (Non-Inspectable)')
       : (selectedAsset || 'Auto-detected Asset');
 
+    const resolvedDomain = isNonIndustrial 
+      ? 'Non-Industrial' 
+      : resolveInspectionDomain(resolvedAssetName).name;
+
     const inspectionPayload = {
       assetName: resolvedAssetName,
+      inspectionDomain: resolvedDomain,
       assetCategory: isNonIndustrial ? nonIndustrialSubject : undefined,
       mediaUrl: mediaFile?.url || samplePresets[0].url,
       mediaType: mediaFile?.type || 'image',
@@ -869,6 +915,61 @@ export default function NewInspection() {
           <span>Run System Check</span>
           <ArrowRight className="w-3.5 h-3.5" />
         </Link>
+      </div>
+
+      {/* 7-Stage Multi-Domain Visual Inspection Workflow Tracker */}
+      <div className="card p-5 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 text-white rounded-2xl border border-slate-800 shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping"></span>
+            <span className="text-xs font-black uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5" /> 7-Stage Visual Inspection Workflow Process
+            </span>
+          </div>
+          <span className="text-[11px] font-mono text-slate-400">
+            Intake Phase: <strong className="text-emerald-400 font-bold">Stage 1 (Image Input) & Stage 2 (Preprocessing)</strong>
+          </span>
+        </div>
+
+        {/* Responsive 7-step pill progress */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+          {WORKFLOW_STAGES.map((st) => {
+            const isCurrent = st.stageNumber === 1 || st.stageNumber === 2;
+            return (
+              <div 
+                key={st.stageNumber} 
+                className={`p-2.5 rounded-xl border transition-all text-xs flex flex-col justify-between ${
+                  isCurrent 
+                    ? 'bg-cyan-500/15 border-cyan-400 text-white shadow-sm shadow-cyan-500/20 ring-1 ring-cyan-500/30' 
+                    : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:border-slate-700'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className={`w-5 h-5 rounded-full flex items-center justify-center font-black text-[10px] ${
+                    isCurrent ? 'bg-cyan-400 text-slate-950' : 'bg-slate-800 text-slate-300'
+                  }`}>
+                    {st.stageNumber}
+                  </span>
+                  {isCurrent ? (
+                    <span className="text-[8px] font-black uppercase tracking-wider text-cyan-400 bg-cyan-500/20 px-1 py-0.2 rounded border border-cyan-500/40">
+                      ACTIVE
+                    </span>
+                  ) : (
+                    <span className="text-[8px] font-bold text-slate-500">
+                      STAGE {st.stageNumber}
+                    </span>
+                  )}
+                </div>
+                <p className={`font-bold text-[11px] truncate leading-tight ${isCurrent ? 'text-white font-extrabold' : 'text-slate-300'}`}>
+                  {st.title}
+                </p>
+                <p className="text-[9px] text-slate-400 truncate mt-0.5" title={st.summary}>
+                  {st.summary}
+                </p>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Session Recovery Banner */}
@@ -1005,26 +1106,53 @@ export default function NewInspection() {
           onChange={(e) => setSelectedAsset(e.target.value)}
           className="bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold text-sm rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer w-full sm:w-auto"
         >
-          <option value="">🔍 Auto-detect asset type from image / video</option>
-          <optgroup label="🏭 INDUSTRIAL MACHINERY">
-            <option value="Industrial Motor M-401 (M-401)">Industrial Motor M-401 (M-401)</option>
+          <option value="">🔍 Auto-detect asset & domain from image / video</option>
+          <optgroup label="🏭 1. INDUSTRIAL MACHINES">
+            <option value="Industrial Motor M-401 (M-401)">Electric Motor M-401 (M-401)</option>
             <option value="Centrifugal Pump P-204 (P-204)">Centrifugal Pump P-204 (P-204)</option>
             <option value="Gearbox G-118 (G-118)">Gearbox G-118 (G-118)</option>
             <option value="Air Compressor C-305 (C-305)">Air Compressor C-305 (C-305)</option>
+            <option value="Gas Turbine GT-10 (GT-10)">Gas Turbine GT-10 (GT-10)</option>
+            <option value="Industrial Generator GEN-04 (GEN-04)">Industrial Generator GEN-04 (GEN-04)</option>
           </optgroup>
-          <optgroup label="🏗️ STRUCTURAL INFRASTRUCTURE">
+          <optgroup label="🏗️ 2. CIVIL INFRASTRUCTURE">
             <option value="Concrete Pillar CP-021 (CP-021)">Concrete Pillar CP-021 (CP-021)</option>
             <option value="Steel Beam SB-114 (SB-114)">Steel Beam SB-114 (SB-114)</option>
             <option value="Structural Joint SJ-087 (SJ-087)">Structural Joint SJ-087 (SJ-087)</option>
+            <option value="Bridge Pier BP-102 (BP-102)">Bridge Pier BP-102 (BP-102)</option>
+            <option value="Concrete Wall & Slab CS-04 (CS-04)">Concrete Wall & Slab CS-04 (CS-04)</option>
+            <option value="Structural Foundation Footing (FT-01)">Structural Foundation Footing (FT-01)</option>
           </optgroup>
-          <optgroup label="🔌 ELECTRICAL">
+          <optgroup label="⚡ 3. ELECTRICAL SYSTEMS">
             <option value="Electrical Panel EP-052 (EP-052)">Electrical Panel EP-052 (EP-052)</option>
             <option value="Transformer TR-009 (TR-009)">Transformer TR-009 (TR-009)</option>
+            <option value="High-Voltage Switchgear SW-20 (SW-20)">High-Voltage Switchgear SW-20 (SW-20)</option>
+            <option value="Industrial Circuit Breaker CB-12 (CB-12)">Industrial Circuit Breaker CB-12 (CB-12)</option>
+            <option value="Solar Inverter Unit SI-40 (SI-40)">Solar Inverter Unit SI-40 (SI-40)</option>
           </optgroup>
-          <optgroup label="🛢️ STORAGE & PIPELINE">
+          <optgroup label="⚙️ 4. MECHANICAL COMPONENTS">
+            <option value="Heavy Bearing Assembly BRG-80 (BRG-80)">Heavy Bearing Assembly BRG-80 (BRG-80)</option>
+            <option value="Drive Belt & Pulley System DP-14 (DP-14)">Drive Belt & Pulley System DP-14 (DP-14)</option>
+            <option value="Flexible Shaft Coupling FC-09 (FC-09)">Flexible Shaft Coupling FC-09 (FC-09)</option>
+            <option value="Rotating Drive Shaft DS-22 (DS-22)">Rotating Drive Shaft DS-22 (DS-22)</option>
+          </optgroup>
+          <optgroup label="❄️ 5. HVAC & PIPING">
             <option value="Storage Tank ST-301 (ST-301)">Storage Tank ST-301 (ST-301)</option>
             <option value="High-Pressure Pipeline PL-201 (PL-201)">High-Pressure Pipeline PL-201 (PL-201)</option>
             <option value="Pressure Vessel PV-102 (PV-102)">Pressure Vessel PV-102 (PV-102)</option>
+            <option value="Industrial Water Chiller CH-88 (CH-88)">Industrial Water Chiller CH-88 (CH-88)</option>
+            <option value="Cooling Tower Heat Exchanger CT-03 (CT-03)">Cooling Tower Heat Exchanger CT-03 (CT-03)</option>
+          </optgroup>
+          <optgroup label="☀️ 6. RENEWABLE ENERGY">
+            <option value="Wind Turbine Blade & Nacelle WT-401 (WT-401)">Wind Turbine Blade & Nacelle WT-401 (WT-401)</option>
+            <option value="Solar PV Array Panel SPV-120 (SPV-120)">Solar PV Array Panel SPV-120 (SPV-120)</option>
+            <option value="Battery Energy Storage Rack BESS-01 (BESS-01)">Battery Energy Storage Rack BESS-01 (BESS-01)</option>
+          </optgroup>
+          <optgroup label="🚛 7. VEHICLES & TRANSPORTATION">
+            <option value="Fleet Diesel Engine VDE-55 (VDE-55)">Fleet Diesel Engine VDE-55 (VDE-55)</option>
+            <option value="Transport Vehicle Undercarriage UC-10 (UC-10)">Transport Vehicle Undercarriage UC-10 (UC-10)</option>
+            <option value="Railway Bogie & Suspension RB-44 (RB-44)">Railway Bogie & Suspension RB-44 (RB-44)</option>
+            <option value="Heavy Hydraulic Excavator Arm HE-18 (HE-18)">Heavy Hydraulic Excavator Arm HE-18 (HE-18)</option>
           </optgroup>
         </select>
       </div>
@@ -1293,38 +1421,77 @@ export default function NewInspection() {
             )}
           </div>
 
-          {/* Quick Presets for Demo */}
-          <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center gap-2">
-            <span className="text-xs font-bold text-slate-400">Try Demo Presets:</span>
-            {samplePresets.map((preset, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => {
-                  setMediaFile({
-                    url: preset.url,
-                    type: 'image',
-                    name: preset.name.toLowerCase().replace(/\s+/g, '_') + '.jpg',
-                    size: preset.size,
-                    securityHash: 'SHA256:preset_verified',
-                    isDemoData: true
-                  } as any);
-                  setSelectedAsset(preset.asset);
-                  setDescription(preset.note);
-                  setSecurityNotice('🔶 Demo Dataset: Sandboxed File');
-                  setAiDetectionResult({
-                    category: preset.category,
-                    description: `Demo baseline loaded: ${preset.name}.`,
-                    defects: ['Visual defect detection ready'],
-                    confidence: '🔶 Pre-configured Demo Mode',
-                    measurements: 'Pre-calibrated demonstration baseline'
-                  });
-                }}
-                className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-primary/10 hover:text-primary transition cursor-pointer"
-              >
-                + {preset.name}
-              </button>
-            ))}
+          {/* Quick Presets for Demo with Domain Filter Tabs */}
+          <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-primary" /> Supported Domains & Presets:
+              </span>
+              <div className="flex flex-wrap gap-1">
+                <button
+                  type="button"
+                  onClick={() => setSelectedDomainFilter('all')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    selectedDomainFilter === 'all'
+                      ? 'bg-primary text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  All Domains
+                </button>
+                {SUPPORTED_DOMAINS.map(dom => (
+                  <button
+                    key={dom.id}
+                    type="button"
+                    onClick={() => setSelectedDomainFilter(dom.id)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      selectedDomainFilter === dom.id
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {dom.shortName}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {samplePresets
+                .filter(p => selectedDomainFilter === 'all' || p.domainId === selectedDomainFilter)
+                .map((preset, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => {
+                      setMediaFile({
+                        url: preset.url,
+                        type: 'image',
+                        name: preset.name.toLowerCase().replace(/\s+/g, '_') + '.jpg',
+                        size: preset.size,
+                        securityHash: 'SHA256:preset_verified',
+                        isDemoData: true
+                      } as any);
+                      setSelectedAsset(preset.asset);
+                      setDescription(preset.note);
+                      setSecurityNotice('🔶 Demo Dataset: Sandboxed File');
+                      setAiDetectionResult({
+                        category: `${preset.domainName} • ${preset.category}`,
+                        description: `Demo baseline loaded: ${preset.name}.`,
+                        defects: ['Visual defect detection ready'],
+                        confidence: '🔶 Pre-configured Demo Mode',
+                        measurements: 'Pre-calibrated demonstration baseline'
+                      });
+                    }}
+                    className="text-xs font-semibold px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-primary/10 hover:text-primary transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                  >
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-white text-slate-600 font-mono font-bold shadow-xs">
+                      {preset.domainName}
+                    </span>
+                    <span>+ {preset.name}</span>
+                  </button>
+                ))}
+            </div>
           </div>
         </section>
 

@@ -27,6 +27,7 @@ import {
 import { Link } from 'react-router-dom';
 import { getActiveOfficer, saveOfficerInspection } from '../utils/officerStore';
 import { windTurbine401Img, bridge102Img } from '../assets/assetImages';
+import { resolveInspectionDomain } from '../data/domainRegistry';
 
 export default function Report() {
   const [officer] = useState(() => getActiveOfficer());
@@ -36,6 +37,10 @@ export default function Report() {
   const [data, setData] = useState({
     assetName: 'Industrial Machine #M-401 (Mechanical Hub)',
     assetId: 'MACH-401-HUB',
+    inspectionDomain: 'Industrial Machines',
+    detectedAssetType: 'Electric Motor M-401',
+    overallCondition: 'Fair',
+    engineerVerificationStatus: 'Pending Review by Qualified Engineer',
     location: 'Sector 5 (Mechanical Fabrication Unit)',
     isMachine: true,
     isIndustrialAsset: true,
@@ -111,9 +116,26 @@ export default function Report() {
         const currentStatus = isNonAsset ? 'Out of Scope (Non-Asset)' : (pipelineResult?.healthScore?.status || (isG ? (gResult.status ?? 'At Risk') : 'At Risk'));
         const currentSafetyFactor = isNonAsset ? 'N/A' : (pipelineResult?.defects?.length === 0 ? '1.50' : (isG ? (gResult.safetyFactor ?? '1.15') : (isM ? '1.15' : '1.28')));
 
+        const rawDomain = pipelineResult?.inspectionDomain || parsed.inspectionDomain || parsed.assetCategory || parsed.assetName;
+        const domConfig = resolveInspectionDomain(rawDomain);
+        const resolvedDomain = isNonAsset ? 'Non-Engineering / Rejected' : domConfig.name;
+
+        const numScore = isNonAsset ? 0 : (pipelineResult?.healthScore?.finalScore ?? (isG ? (gResult.healthScore ?? 72) : 72));
+        const resolvedOverallCond = isNonAsset 
+          ? 'Poor' 
+          : (pipelineResult?.overallCondition || (numScore >= 80 ? 'Good' : numScore >= 60 ? 'Fair' : 'Poor'));
+
+        const resolvedAssetType = isNonAsset
+          ? (pipelineResult?.detectedCategory || parsed.detectedSubject || gResult.detectedSubject || 'Non-Industrial Subject')
+          : (pipelineResult?.detectedAssetType || pipelineResult?.detectedCategory || parsed.assetName || 'Industrial Asset');
+
         setData({
           assetName: pipelineResult?.assetName || parsed.assetName || (isNonAsset ? 'Inspection Not Applicable' : (isM ? 'Industrial Machine #M-401 (Mechanical Hub)' : 'Bridge #102')),
           assetId: pipelineResult?.assetId || (isNonAsset ? 'NON-ASSET-01' : (isM ? 'MACH-401-HUB' : 'BRIDGE-102')),
+          inspectionDomain: resolvedDomain,
+          detectedAssetType: resolvedAssetType,
+          overallCondition: resolvedOverallCond,
+          engineerVerificationStatus: pipelineResult?.engineerVerificationStatus || 'Pending Review by Qualified Engineer',
           location: isNonAsset ? 'Out of Engineering Scope' : (isM ? 'Sector 5 (Mechanical Fabrication Unit)' : 'Sector 5 (Highway Crossing)'),
           isMachine: isM,
           isIndustrialAsset: !isNonAsset,
@@ -407,12 +429,32 @@ export default function Report() {
             <table className="w-full text-sm">
               <tbody className="divide-y divide-slate-200/60 text-xs sm:text-sm">
                 <tr>
+                  <th className="py-2 text-slate-500 font-semibold text-left">Inspection Domain:</th>
+                  <td className="py-2 font-black text-primary">{data.inspectionDomain}</td>
+                </tr>
+                <tr>
+                  <th className="py-2 text-slate-500 font-semibold text-left">Detected Asset Type:</th>
+                  <td className="py-2 font-bold text-slate-800">{data.detectedAssetType}</td>
+                </tr>
+                <tr>
                   <th className="py-2 text-slate-500 font-semibold text-left">Equipment Name:</th>
                   <td className="py-2 font-bold text-slate-800">{data.assetName}</td>
                 </tr>
                 <tr>
                   <th className="py-2 text-slate-500 font-semibold text-left">Asset ID / Serial:</th>
                   <td className="py-2 font-mono font-bold text-slate-800">{data.assetId}</td>
+                </tr>
+                <tr>
+                  <th className="py-2 text-slate-500 font-semibold text-left">Overall Condition:</th>
+                  <td className="py-2">
+                    <span className={`px-2 py-0.5 rounded text-xs font-black uppercase ${
+                      data.overallCondition === 'Good' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
+                      data.overallCondition === 'Fair' ? 'bg-amber-100 text-amber-800 border border-amber-300' :
+                      'bg-rose-100 text-rose-800 border border-rose-300'
+                    }`}>
+                      {data.overallCondition}
+                    </span>
+                  </td>
                 </tr>
                 <tr>
                   <th className="py-2 text-slate-500 font-semibold text-left">Facility Location:</th>
@@ -425,6 +467,10 @@ export default function Report() {
                 <tr>
                   <th className="py-2 text-slate-500 font-semibold text-left">Safety Factor (SF):</th>
                   <td className="py-2 font-bold text-rose-600">{data.safetyFactor} SF (Min: 1.50 required)</td>
+                </tr>
+                <tr>
+                  <th className="py-2 text-slate-500 font-semibold text-left">Engineer Verification:</th>
+                  <td className="py-2 font-semibold text-amber-700">{data.engineerVerificationStatus}</td>
                 </tr>
               </tbody>
             </table>

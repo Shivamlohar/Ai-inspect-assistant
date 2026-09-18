@@ -17,8 +17,10 @@ import {
   Trash2,
   Download,
   FolderLock,
-  UserCheck
+  UserCheck,
+  Layers
 } from 'lucide-react';
+import InspectionProcessFlow from '../components/InspectionProcessFlow';
 import { 
   industrialMotorImg, 
   centrifugalPumpImg, 
@@ -239,6 +241,15 @@ export default function Dashboard() {
               >
                 <Building2 className="w-4 h-4" /> View Assets
               </Link>
+            </motion.div>
+
+            <motion.div whileHover={{ scale: 1.03, y: -2 }} whileTap={{ scale: 0.97 }} className="w-full sm:w-auto">
+              <a 
+                href="#inspection-workflow-guide" 
+                className="w-full sm:w-auto px-5 py-3.5 rounded-2xl bg-primary/20 hover:bg-primary/30 text-cyan-200 border border-primary/40 font-bold text-sm backdrop-blur-md flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <Layers className="w-4 h-4 text-cyan-400" /> Workflow Guide
+              </a>
             </motion.div>
           </div>
         </div>
@@ -852,7 +863,14 @@ export default function Dashboard() {
       </motion.section>
 
       {/* ==========================================================
-          6. LARGE BOTTOM FIELD INSPECTION CALL-TO-ACTION
+          6. 7-STAGE MULTI-DOMAIN VISUAL INSPECTION WORKFLOW GUIDE
+      ========================================================== */}
+      <motion.section variants={itemVariants} id="inspection-workflow-guide" className="pt-2">
+        <InspectionProcessFlow />
+      </motion.section>
+
+      {/* ==========================================================
+          7. LARGE BOTTOM FIELD INSPECTION CALL-TO-ACTION
       ========================================================== */}
       <motion.section variants={itemVariants} className="pt-2 flex justify-center">
         <motion.div 
