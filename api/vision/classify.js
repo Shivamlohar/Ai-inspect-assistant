@@ -1,4 +1,4 @@
-import { classifyAssetMultimodal } from '../../server/inspectionEngine.js';
+﻿import { classifyAssetMultimodal } from '../../server/inspectionEngine.js';
 
 async function parseBody(req) {
   if (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) {
@@ -23,7 +23,7 @@ async function parseBody(req) {
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-gemini-key');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-openai-key, x-gemini-key');
 
   if (req.method === 'OPTIONS') {
     return res.status(204).end();

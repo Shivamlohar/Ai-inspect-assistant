@@ -9,7 +9,7 @@ import type { AssetCategory } from './types';
 function getStoredApiKey(): string {
   try {
     if (typeof localStorage !== 'undefined') {
-      return localStorage.getItem('gemini_api_key') || '';
+      return localStorage.getItem('openai_api_key') || localStorage.getItem('gemini_api_key') || '';
     }
   } catch {}
   return '';
@@ -365,6 +365,7 @@ export async function classifyVisualInput(
       const clientKey = getStoredApiKey();
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (clientKey) {
+        headers['x-openai-key'] = clientKey;
         headers['x-gemini-key'] = clientKey;
       }
 
@@ -388,7 +389,7 @@ export async function classifyVisualInput(
           confidenceLabel: 'N/A',
           isEligible: false,
           subjectDescription: 'AI Vision Service Unavailable',
-          reason: data.reason || 'The visual classification service could not be reached. Please verify the server-side GEMINI_API_KEY and API configuration.',
+          reason: data.reason || 'The visual classification service could not be reached. Please verify the server-side OPENAI_API_KEY and API configuration.',
           modelUsed: 'None (Service Unavailable)',
           source: 'cloud_vision_api',
           serviceAvailable: false,
@@ -397,26 +398,27 @@ export async function classifyVisualInput(
       }
 
       if (serverResp.ok && data && data.success) {
-        const mappedCat = mapCategoryStringToAssetCategory(data.primaryCategory || data.category);
+        const rawCat = data.machineCategory || data.primaryCategory || data.category;
+        const mappedCat = mapCategoryStringToAssetCategory(rawCat);
         const confNum = typeof data.confidence === 'number' 
           ? Math.round(data.confidence <= 1 ? data.confidence * 100 : data.confidence)
           : 85;
 
-        const isEligible = Boolean(data.inspectionEligible && mappedCat !== 'Person / Human' && mappedCat !== 'Animal' && mappedCat !== 'Indoor Room' && mappedCat !== 'Landscape' && mappedCat !== 'Unknown / Unsupported');
+        const isEligible = Boolean(data.eligible !== false && data.inspectionEligible !== false && mappedCat !== 'Person / Human' && mappedCat !== 'Animal' && mappedCat !== 'Indoor Room' && mappedCat !== 'Landscape' && mappedCat !== 'Unknown / Unsupported');
 
         return {
           category: mappedCat,
           confidence: confNum,
           confidenceLabel: `${confNum}%`,
           isEligible,
-          subjectDescription: data.assetType || data.primaryCategory || mappedCat,
+          subjectDescription: data.machineType || data.assetType || data.primaryCategory || mappedCat,
           reason: data.reason || (isEligible 
-            ? 'Supported engineering asset identified by visual classifier.' 
+            ? 'Supported industrial equipment identified by visual classifier.' 
             : 'Subject is not an eligible engineering inspection asset.'),
-          modelUsed: `${data.modelName || 'Google Gemini Vision'} (${data.modelVersion || 'gemini-2.5-flash'})`,
+          modelUsed: `${data.modelName || 'OpenAI Vision'} (${data.modelVersion || 'gpt-4o'})`,
           source: 'cloud_vision_api',
           serviceAvailable: true,
-          broadDomain: data.broadDomain
+          broadDomain: data.broadDomain || 'Industrial & Mechanical'
         };
       }
     } catch (serverErr) {

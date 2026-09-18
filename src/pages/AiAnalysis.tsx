@@ -43,7 +43,7 @@ export default function AiAnalysis() {
 
         let geminiResult = null;
         try {
-          setStatusMessage('Analyzing asset with Server-Side Gemini Vision...');
+          setStatusMessage('Analyzing machine with Server-Side OpenAI Vision (GPT-4o)...');
           geminiResult = await analyzeAssetWithGemini(
             '',
             imageBase64,
@@ -51,7 +51,7 @@ export default function AiAnalysis() {
             parsed.description || parsed.userNotes || ''
           );
         } catch (visionErr: any) {
-          console.warn('[AI ANALYSIS] Server Gemini Vision analysis notice:', visionErr.message);
+          console.warn('[AI ANALYSIS] Server OpenAI Vision analysis notice:', visionErr.message);
         }
 
         const pipelineResult = await runInspectionPipeline({
@@ -104,18 +104,18 @@ export default function AiAnalysis() {
   }, []);
 
   const steps = isGeminiActive ? [
-    "CLASSIFIER: Image validation & Gemini multimodal asset classification",
-    "ELIGIBILITY GATE: Supported asset verification (Civil / Industrial check)",
-    "DEFECT AI: Specialized visual flaw & anomaly detection",
-    "EVIDENCE: Section 20 optical evidence & 70% confidence validation",
-    "SEVERITY & KNOWLEDGE: Severity grading & RAG standards retrieval (IRC/BIS/ISO/ASME)",
-    "REPORT: Defensible 4-factor scoring & auditable inspection dossier"
+    "CLASSIFIER: Image validation & OpenAI multimodal machine classification",
+    "ELIGIBILITY GATE: Supported machine verification & mechanical boundary check",
+    "DEFECT AI: Specialized visual flaw & anomaly detection (GPT-4o Vision)",
+    "EVIDENCE: Optical surface evidence & confidence validation",
+    "SEVERITY & KNOWLEDGE: Severity grading & RAG machine standards retrieval (ISO 17359 / ASME / API)",
+    "REPORT: Defensible 4-factor scoring & auditable machine inspection dossier"
   ] : [
-    "CLASSIFIER: Image quality check & 14-category asset classification",
-    "ELIGIBILITY GATE: Supported asset verification (Civil / Industrial check)",
+    "CLASSIFIER: Image quality check & machine classification",
+    "ELIGIBILITY GATE: Supported machine verification & mechanical check",
     "DEFECT AI: Specialized visual flaw & anomaly detection",
-    "EVIDENCE: Section 20 optical evidence & 70% confidence validation",
-    "SEVERITY & KNOWLEDGE: Severity grading & RAG standards retrieval (IRC/BIS/ISO/ASME)",
+    "EVIDENCE: Optical surface evidence & confidence validation",
+    "SEVERITY & KNOWLEDGE: Severity grading & machine standards retrieval",
     "REPORT: Defensible 4-factor scoring & auditable inspection dossier"
   ];
 
@@ -153,7 +153,7 @@ export default function AiAnalysis() {
           <span className="text-xs font-black uppercase tracking-widest text-ai bg-ai/10 px-3 py-1 rounded-full flex items-center justify-center gap-1.5 w-fit mx-auto">
             {isGeminiActive ? (
               <>
-                <Sparkles className="w-3.5 h-3.5 text-ai" /> Live Gemini Vision Active
+                <Sparkles className="w-3.5 h-3.5 text-ai" /> Live OpenAI Vision Active (GPT-4o)
               </>
             ) : (
               <>

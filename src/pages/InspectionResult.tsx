@@ -74,7 +74,7 @@ export default function InspectionResult() {
   const [inputApiKey, setInputApiKey] = useState<string>(() => getGeminiApiKey());
   const [isTestingKey, setIsTestingKey] = useState<boolean>(false);
   const [keyFeedback, setKeyFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
-  const hasStoredKey = Boolean(typeof localStorage !== 'undefined' && localStorage.getItem('gemini_api_key'));
+  const hasStoredKey = Boolean(typeof localStorage !== 'undefined' && (localStorage.getItem('openai_api_key') || localStorage.getItem('gemini_api_key')));
 
   const handleTestKey = async () => {
     if (!inputApiKey.trim()) {
@@ -86,9 +86,9 @@ export default function InspectionResult() {
     try {
       const res = await testGeminiApiKey(inputApiKey.trim());
       if (res.success) {
-        setKeyFeedback({ type: 'success', message: 'Gemini Vision API key is valid and active!' });
+        setKeyFeedback({ type: 'success', message: 'OpenAI Vision API key is valid and active!' });
       } else {
-        setKeyFeedback({ type: 'error', message: res.message || 'Key rejected by Google Gemini API.' });
+        setKeyFeedback({ type: 'error', message: res.message || 'Key rejected by OpenAI API.' });
       }
     } catch (e: any) {
       setKeyFeedback({ type: 'error', message: e.message || 'Verification failed.' });
@@ -99,7 +99,7 @@ export default function InspectionResult() {
 
   const handleSaveAndRerun = () => {
     if (!inputApiKey.trim()) {
-      setKeyFeedback({ type: 'error', message: 'Please enter a valid Gemini API key.' });
+      setKeyFeedback({ type: 'error', message: 'Please enter a valid OpenAI API key.' });
       return;
     }
     setGeminiApiKey(inputApiKey.trim());
@@ -1004,10 +1004,10 @@ export default function InspectionResult() {
                 </div>
                 <div>
                   <h4 className="text-sm font-extrabold text-slate-900 dark:text-white">
-                    Update or Clear Google Gemini API Key
+                    Update or Clear OpenAI Vision API Key
                   </h4>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Configure your personal Google AI Studio key directly in browser
+                    Configure your personal OpenAI API key (sk-...) directly in browser
                   </p>
                 </div>
               </div>
@@ -1024,7 +1024,7 @@ export default function InspectionResult() {
                   type="password"
                   value={inputApiKey}
                   onChange={(e) => setInputApiKey(e.target.value)}
-                  placeholder="Paste Gemini API Key (AIzaSy...)"
+                  placeholder="Paste OpenAI API Key (sk-...)"
                   className="w-full text-xs font-mono px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
                 />
                 <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">

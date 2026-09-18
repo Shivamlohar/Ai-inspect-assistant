@@ -907,7 +907,7 @@ function TopNav({
             {!isOnline 
               ? 'Vault Offline Safe' 
               : getGeminiApiKey() 
-              ? 'Gemini 1.5 Flash Vision' 
+              ? 'OpenAI Vision (GPT-4o)' 
               : 'Precision Metrology'}
           </span>
           <span className={`text-[10px] opacity-75 font-mono px-1.5 py-0.5 rounded ${

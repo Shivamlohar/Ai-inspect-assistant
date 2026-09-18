@@ -31,7 +31,7 @@ export function sendJson(res, statusCode, data) {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, x-gemini-key',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, x-openai-key, x-gemini-key',
     'Cache-Control': 'no-store'
   });
   res.end(JSON.stringify(data));
@@ -44,7 +44,7 @@ export async function handleApiRequest(req, res, inputPath) {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, x-gemini-key'
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, x-openai-key, x-gemini-key'
     });
     res.end();
     return true;
@@ -54,8 +54,9 @@ export async function handleApiRequest(req, res, inputPath) {
     const apiKey = getServerGeminiApiKey(req.headers);
     sendJson(res, 200, {
       status: 'ONLINE',
-      service: 'Inspectra AI Inspection Gateway',
+      service: 'Inspectra AI Machine Inspection Gateway',
       timestamp: new Date().toISOString(),
+      openaiConfigured: Boolean(apiKey && apiKey.length > 10),
       geminiConfigured: Boolean(apiKey && apiKey.length > 10),
       model: GEMINI_VISION_MODEL
     });

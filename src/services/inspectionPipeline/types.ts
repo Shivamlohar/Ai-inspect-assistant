@@ -174,4 +174,9 @@ export interface PipelineInspectionResult {
   serviceUnavailableReason?: string;
   isKeyInvalid?: boolean;
   isQuotaExhausted?: boolean;
+  // Machine-Only Inspection Schema Fields
+  machineType?: string;
+  machineCategory?: string;
+  affectedArea?: string;
+  visualEvidence?: string;
 }
