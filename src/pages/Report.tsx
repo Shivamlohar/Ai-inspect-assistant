@@ -99,18 +99,8 @@ export default function Report() {
         const isG = Boolean(parsed.isGemini && parsed.geminiResult);
         const gResult = parsed.geminiResult || {};
 
-        const isNonAsset = pipelineResult ? !pipelineResult.inspectionEligible : (
-          parsed.isIndustrialAsset === false || 
-          gResult.isIndustrialAsset === false ||
-          parsed.status === 'NON_ASSET' ||
-          gResult.status === 'NON_ASSET' ||
-          parsed.assetName?.toLowerCase().includes('non-industrial') ||
-          parsed.assetCategory?.toLowerCase().includes('non-industrial') ||
-          parsed.assetName?.toLowerCase().includes('person') ||
-          parsed.assetName?.toLowerCase().includes('human') ||
-          parsed.detectedSubject?.toLowerCase().includes('person') ||
-          parsed.detectedSubject?.toLowerCase().includes('human')
-        );
+        // Non-engineering rejection bypassed per user request
+        const isNonAsset = false;
 
         const currentScore = isNonAsset ? 'N/A' : (pipelineResult?.healthScore?.finalScore ? `${pipelineResult.healthScore.finalScore} / 100` : (isG ? `${gResult.healthScore ?? 72} / 100` : '72 / 100'));
         const currentStatus = isNonAsset ? 'Out of Scope (Non-Asset)' : (pipelineResult?.healthScore?.status || (isG ? (gResult.status ?? 'At Risk') : 'At Risk'));

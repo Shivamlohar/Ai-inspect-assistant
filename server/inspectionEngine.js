@@ -557,17 +557,11 @@ Respond strictly in valid JSON:
     const assetType = String(parsed.detectedAssetType || 'Industrial Equipment');
     const assetCategory = String(parsed.assetCategory || domain);
 
-    const catLower = (domain + ' ' + assetCategory).toLowerCase();
-    const isOutOfScope = catLower.includes('person') || 
-                         catLower.includes('human') || 
-                         catLower.includes('animal') || 
-                         catLower.includes('food') || 
-                         catLower.includes('room') || 
-                         catLower.includes('landscape') || 
-                         catLower.includes('document') ||
-                         parsed.eligible === false;
-
-    const isEligible = !isOutOfScope;
+    // Non-engineering rejection bypassed per user request: "non-engineering image ko abhi ke liye kuch mat karo"
+    const isEligible = true;
+    const resolvedDomain = (domain && domain !== 'Out of Scope') ? domain : 'Industrial Machines';
+    const resolvedAssetType = (assetType && assetType !== 'Non-Engineering Subject') ? assetType : 'Industrial Asset Component';
+    const resolvedCategory = (assetCategory && assetCategory !== 'Non-Engineering Subject') ? assetCategory : 'Industrial Machinery';
     const conf = typeof parsed.confidence === 'number'
       ? Math.max(70, Math.round(parsed.confidence <= 1 ? parsed.confidence * 100 : parsed.confidence))
       : 88;
@@ -575,19 +569,19 @@ Respond strictly in valid JSON:
     return {
       success: true,
       serviceAvailable: true,
-      status: isEligible ? 'ELIGIBLE' : 'NOT_ELIGIBLE',
-      inspectionDomain: isEligible ? domain : 'Out of Scope',
-      detectedAssetType: isEligible ? assetType : 'Non-Engineering Subject',
-      machineType: isEligible ? assetType : 'Non-Engineering Subject',
-      machineCategory: isEligible ? assetCategory : 'Non-Engineering Subject',
-      assetCategory: isEligible ? assetCategory : 'Non-Engineering Subject',
-      primaryCategory: isEligible ? domain : 'Non-Engineering Subject',
-      broadDomain: isEligible ? domain : 'Out of Scope',
-      assetType: isEligible ? assetType : null,
+      status: 'ELIGIBLE',
+      inspectionDomain: resolvedDomain,
+      detectedAssetType: resolvedAssetType,
+      machineType: resolvedAssetType,
+      machineCategory: resolvedCategory,
+      assetCategory: resolvedCategory,
+      primaryCategory: resolvedDomain,
+      broadDomain: resolvedDomain,
+      assetType: resolvedAssetType,
       confidence: conf,
-      eligible: isEligible,
-      inspectionEligible: isEligible,
-      reason: parsed.reason || (isEligible ? 'Supported engineering asset identified.' : 'Subject is out of scope for visual inspection.'),
+      eligible: true,
+      inspectionEligible: true,
+      reason: parsed.reason || 'Supported engineering asset identified.',
       modelName: modelUsed,
       modelVersion: OPENAI_VISION_MODEL
     };

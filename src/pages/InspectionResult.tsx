@@ -234,22 +234,8 @@ export default function InspectionResult() {
   const isGemini = isOpenAI;
   const geminiData = inspectionData.geminiResult;
 
-  // Domain Relevance & Inspection Eligibility (Section 2 & 16)
-  const isExplicitNonAssetCategory = Boolean(
-    pipelineResult?.detectedCategory === 'Person / Human' ||
-    pipelineResult?.detectedCategory === 'Animal' ||
-    pipelineResult?.detectedCategory === 'Indoor Room' ||
-    pipelineResult?.detectedCategory === 'Landscape'
-  );
-
-  const isNonAsset = !forceInspectOverride && (
-    isExplicitNonAssetCategory || (
-      (inspectionData as any).assetName?.toLowerCase().includes('person') ||
-      (inspectionData as any).assetName?.toLowerCase().includes('human') ||
-      (inspectionData as any).detectedSubject?.toLowerCase().includes('person') ||
-      (inspectionData as any).detectedSubject?.toLowerCase().includes('human')
-    )
-  );
+  // Domain Relevance & Inspection Eligibility: Non-engineering rejection bypassed per user request
+  const isNonAsset = false;
 
   // Never block the user with a service-unavailable screen; always seamlessly show inspection
   const isServiceUnavailable = false;

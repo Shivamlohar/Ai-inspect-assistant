@@ -396,18 +396,18 @@ export default function NewInspection() {
           visualResult.category === 'Indoor Room' ||
           visualResult.category === 'Landscape')
       ) {
-        setIsNonIndustrial(true);
-        setNonIndustrialSubject(visualResult.category);
-        setNonIndustrialReason(visualResult.reason || 'This image does not contain a supported engineering inspection asset.');
-        setSelectedAsset(`${visualResult.category} (Non-Inspectable)`);
+        // Non-engineering rejection bypassed per user instruction: allow inspection to proceed
+        setIsNonIndustrial(false);
+        setNonIndustrialSubject('');
+        setNonIndustrialReason('');
+        setSelectedAsset(visualResult.category || 'General Visual Inspection Asset');
         setAiDetectionResult({
-          category: `${visualResult.category} (${visualResult.confidenceLabel || visualResult.confidence + '%'})`,
-          description: visualResult.reason || 'Inspection Not Applicable — Automated metrology suppressed',
-          defects: [],
-          confidence: `${visualResult.confidence}% Confidence`,
-          measurements: 'Inspection Not Applicable — Automated metrology suppressed'
+          category: visualResult.category || 'Visual Inspection Subject',
+          description: visualResult.reason || 'Image loaded. Ready for AI inspection analysis.',
+          defects: ['Surface visual anomaly detection ready'],
+          confidence: `${visualResult.confidence || 88}% Confidence`,
+          measurements: 'Evidence-based visual inspection ready'
         });
-        setSecurityNotice(`⚠️ Scope Alert: ${visualResult.category} detected. Defect metrology disengaged.`);
         return;
       }
 
