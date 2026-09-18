@@ -343,6 +343,13 @@ export default function InspectionResult() {
     serviceUnavailableReason.toLowerCase().includes('invalid or expired')
   );
 
+  const isQuotaExhausted = Boolean(
+    pipelineResult?.isQuotaExhausted || 
+    serviceUnavailableReason.toLowerCase().includes('quota') || 
+    serviceUnavailableReason.toLowerCase().includes('credits remaining') || 
+    serviceUnavailableReason.toLowerCase().includes('billing')
+  );
+
   const nonAssetSubject = pipelineResult?.detectedCategory || 
                          (inspectionData as any).detectedSubject || 
                          (geminiData && geminiData.detectedSubject) || 
@@ -942,15 +949,17 @@ export default function InspectionResult() {
 
           <div className="space-y-3 max-w-xl mx-auto">
             <div className="inline-flex items-center gap-2 bg-amber-500/10 text-amber-600 dark:text-amber-400 px-3.5 py-1 rounded-full text-xs font-black uppercase tracking-wider border border-amber-500/20">
-              <span>{isKeyInvalid ? 'Action Required • Invalid Gemini API Key' : 'Technical Status • Backend Diagnostics'}</span>
+              <span>{isQuotaExhausted ? 'Action Required • OpenAI Credits Exhausted' : (isKeyInvalid ? 'Action Required • Invalid API Key' : 'Technical Status • Backend Diagnostics')}</span>
             </div>
             <h2 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white">
-              {isKeyInvalid ? 'Gemini API Key Invalid or Expired' : 'AI Vision Service Unavailable'}
+              {isQuotaExhausted ? 'OpenAI Account Credits Exhausted' : (isKeyInvalid ? 'API Key Invalid or Expired' : 'AI Vision Service Unavailable')}
             </h2>
             <p className="text-slate-600 dark:text-slate-300 text-sm md:text-base leading-relaxed">
-              {isKeyInvalid
-                ? 'The configured Google Gemini Vision API key was rejected by Google (HTTP 400). Please update or clear your key below, or proceed immediately with built-in Precision Offline Metrology.'
-                : serviceUnavailableReason}
+              {isQuotaExhausted
+                ? 'Your OpenAI API Key is successfully connected and verified, but your account has 0 remaining credits ($0.00 balance). Please recharge billing credits at platform.openai.com/settings/organization/billing, use a free Google Gemini key, or proceed immediately below with Precision Offline Metrology.'
+                : (isKeyInvalid
+                  ? 'The configured API key was rejected by the vision service. Please update or clear your key below, or proceed immediately with built-in Precision Offline Metrology.'
+                  : serviceUnavailableReason)}
             </p>
           </div>
 

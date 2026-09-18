@@ -173,4 +173,5 @@ export interface PipelineInspectionResult {
   serviceAvailable?: boolean;
   serviceUnavailableReason?: string;
   isKeyInvalid?: boolean;
+  isQuotaExhausted?: boolean;
 }

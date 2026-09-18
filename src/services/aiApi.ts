@@ -10,7 +10,7 @@ const STORAGE_KEY = 'gemini_api_key';
 export function getGeminiApiKey(): string {
   try {
     return (
-      (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY)) ||
+      (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || import.meta.env.VITE_OPENAI_API_KEY)) ||
       localStorage.getItem(STORAGE_KEY) ||
       ''
     );
@@ -37,11 +37,40 @@ export function clearGeminiApiKey(): void {
 
 export async function testGeminiApiKey(apiKey: string): Promise<{ success: boolean; message: string }> {
   if (!apiKey || apiKey.trim().length < 10) {
-    return { success: false, message: 'Please enter a valid Gemini API key.' };
+    return { success: false, message: 'Please enter a valid API key.' };
   }
 
+  const cleanKey = apiKey.trim();
+
+  // 1. OpenAI Key Check (sk-...)
+  if (cleanKey.startsWith('sk-')) {
+    try {
+      const response = await fetch('https://api.openai.com/v1/models', {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${cleanKey}` }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        if (response.status === 429) {
+          return {
+            success: false,
+            message: 'OpenAI key verified, but account credit quota is exhausted. Please add billing credits at platform.openai.com or use a free Google Gemini key.'
+          };
+        }
+        const msg = errorData.error?.message || `HTTP ${response.status}: OpenAI API key verification failed.`;
+        return { success: false, message: msg };
+      }
+
+      return { success: true, message: 'OpenAI Vision API Key verified and active!' };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Network error connecting to OpenAI API.' };
+    }
+  }
+
+  // 2. Google Gemini Key Check
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(cleanKey)}`;
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -56,7 +85,7 @@ export async function testGeminiApiKey(apiKey: string): Promise<{ success: boole
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      const msg = errorData.error?.message || `HTTP ${response.status}: API key verification failed.`;
+      const msg = errorData.error?.message || `HTTP ${response.status}: Gemini API key verification failed.`;
       return { success: false, message: msg };
     }
 

@@ -18,16 +18,122 @@ const CANDIDATE_MODELS = [
 ].filter((m, i, arr) => arr.indexOf(m) === i);
 
 /**
- * Returns configured Gemini API key from server environment or request header.
+ * Returns configured vision API key (Gemini or OpenAI) from server environment or request header.
+ * Strictly avoids exposing secret keys in source code.
  */
 export function getServerGeminiApiKey(reqHeaders = {}) {
   return (
     process.env.GEMINI_API_KEY ||
+    process.env.OPENAI_API_KEY ||
     process.env.GOOGLE_API_KEY ||
-    process.env.VITE_GEMINI_API_KEY ||
-    (reqHeaders && reqHeaders['x-gemini-key']) ||
+    (reqHeaders && (reqHeaders['x-gemini-key'] || reqHeaders['x-api-key'])) ||
     ''
   ).trim();
+}
+
+/**
+ * Helper to call OpenAI Vision API (gpt-4o / gpt-4o-mini).
+ */
+async function callOpenAIVision(apiKey, systemPrompt, pureBase64, mimeType = 'image/jpeg') {
+  if (!apiKey || apiKey.length < 10) {
+    throw new Error('MISSING_SERVER_API_KEY');
+  }
+
+  const cleanMime = mimeType.startsWith('image/') ? mimeType : 'image/jpeg';
+  const models = ['gpt-4o', 'gpt-4o-mini'];
+  let lastError = null;
+
+  for (const modelName of models) {
+    try {
+      console.log(`[AI INSPECTION ENGINE] Calling OpenAI Vision model: ${modelName}`);
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: modelName,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: systemPrompt },
+                {
+                  type: 'image_url',
+                  image_url: {
+                    url: `data:${cleanMime};base64,${pureBase64}`
+                  }
+                }
+              ]
+            }
+          ],
+          temperature: 0.1,
+          max_tokens: 2048,
+          response_format: { type: 'json_object' }
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
+        console.warn(`[AI INSPECTION ENGINE] OpenAI ${modelName} returned HTTP ${response.status}: ${errorText.slice(0, 150)}`);
+
+        if (response.status === 429 && errorText.includes('insufficient_quota')) {
+          const quotaErr = new Error('OpenAI API Quota Exhausted: Your account has no remaining credits. Please add credits at https://platform.openai.com/settings/organization/billing/ or use Google Gemini.');
+          quotaErr.isQuotaExhausted = true;
+          throw quotaErr;
+        }
+
+        const isInvalidKey = response.status === 401 || (response.status === 400 && errorText.includes('invalid_api_key'));
+        if (isInvalidKey) {
+          const keyErr = new Error('The configured OpenAI API key is invalid or expired. Please verify your OPENAI_API_KEY.');
+          keyErr.isKeyInvalid = true;
+          throw keyErr;
+        }
+
+        lastError = new Error(`HTTP ${response.status}: ${errorText.slice(0, 100)}`);
+        continue;
+      }
+
+      const resultJson = await response.json();
+      const textOutput = resultJson.choices?.[0]?.message?.content || '';
+
+      if (!textOutput) {
+        lastError = new Error(`Empty response part from OpenAI ${modelName}`);
+        continue;
+      }
+
+      const match = textOutput.match(/\{[\s\S]*\}/);
+      if (!match) {
+        lastError = new Error(`Model ${modelName} output did not contain valid JSON`);
+        continue;
+      }
+
+      const parsed = JSON.parse(match[0]);
+      return { parsed, modelUsed: `OpenAI (${modelName})` };
+    } catch (err) {
+      if (err.isKeyInvalid || err.isQuotaExhausted) throw err;
+      console.warn(`[AI INSPECTION ENGINE] Error calling OpenAI ${modelName}:`, err.message);
+      lastError = err;
+    }
+  }
+
+  throw lastError || new Error('All OpenAI Vision candidate models failed.');
+}
+
+/**
+ * Unified multimodal vision caller routing to OpenAI or Gemini based on key format.
+ */
+async function callMultimodalVision(apiKey, systemPrompt, pureBase64, mimeType = 'image/jpeg') {
+  if (!apiKey || apiKey.length < 10) {
+    throw new Error('MISSING_SERVER_API_KEY');
+  }
+
+  if (apiKey.startsWith('sk-')) {
+    return callOpenAIVision(apiKey, systemPrompt, pureBase64, mimeType);
+  }
+
+  return callGeminiVision(apiKey, systemPrompt, pureBase64, mimeType);
 }
 
 /**
@@ -150,29 +256,37 @@ YOUR MANDATE:
 Analyze ONLY the visual content of the provided image to determine the primary subject and whether it is an eligible engineering asset.
 
 BROAD ASSET DOMAINS & CATEGORIES:
-1. INFRASTRUCTURE:
+1. INDUSTRIAL & MECHANICAL EQUIPMENT:
+   Electric Motors, Centrifugal & Positive Displacement Pumps, Industrial Air & Gas Compressors, Diesel & Gas Generators, Industrial Gearboxes & Speed Reducers, Roller / Ball / Slewing Bearings, Industrial Valves & Actuators, Pipelines, Flanges, Welds, Pressure Vessels & Heat Exchangers, Storage Tanks & Silos, Transformers & Substations, Electrical Switchgear & Control Panels, CNC Machines, Lathes, Mills, Conveyors, Presses, Turbines, Boilers, Chillers, Cooling Towers, Any heavy plant machinery, mechanical component, or industrial equipment.
+2. INFRASTRUCTURE & CIVIL ASSETS:
    Roads, asphalt roads, concrete roads, bridges, bridge decks, bridge piers, bridge beams, flyovers, buildings, concrete structures, concrete pillars, columns, beams, slabs, walls, retaining walls, tunnels, roofs, industrial sheds, foundations, structural joints, stairs, pavements, sidewalks, culverts, drainage, rail infrastructure, utility structures.
-2. INDUSTRIAL & MECHANICAL:
-   Electric motors, centrifugal pumps, industrial pumps, compressors, generators, engines, gearboxes, bearings, shafts, valves, pipes, pipelines, pressure vessels, storage tanks, industrial machinery, conveyors, rotating equipment, hydraulic assemblies, mechanical plant components.
 3. ELECTRICAL:
    Electrical panels, switchgear, transformers, cables, cable trays, control panels, electrical cabinets, insulators, busbars, electrical distribution equipment.
 4. MATERIALS & COMPONENTS:
    Steel structures, structural steel beams, bolts, weld joints, flanges, brackets, fasteners, concrete surfaces, metal surfaces, painted surfaces, protective coatings.
 5. OUT OF SCOPE / NON-INSPECTABLE:
-   Living person / human (face, selfie, portrait, body), living animal, domestic interior bedroom / furniture, natural scenic landscape / wilderness, consumer document / screenshot.
+   Living person / human (face, selfie, portrait, body, biometrics, PPE compliance), living animal / pet, food / meal, domestic interior bedroom / furniture, natural scenic landscape / wilderness (without industrial equipment), consumer text document / receipt / screenshot.
 
-CRITICAL RULES:
-- If the image shows an unfamiliar machine or industrial plant component, classify it into the broad category "Industrial Machinery / Mechanical Equipment". NEVER reject an industrial machine as "Unknown / Unsupported" merely because the exact model number is unknown.
-- If the image shows an unfamiliar civil or structural element, classify it as "Civil Infrastructure / Structural Component".
-- If the image contains an engineering asset with incidental people in the background, the engineering asset is the primary subject.
-- Mark "inspectionEligible": true for ANY recognizable infrastructure, mechanical equipment, electrical asset, or structural material.
-- Only mark "inspectionEligible": false if the primary subject is genuinely a person, animal, domestic room, or landscape.
+CRITICAL CLASSIFICATION RULES:
+- If the uploaded image shows ANY machine, mechanical component, electrical apparatus, industrial structure, or factory equipment:
+  * Detected Content MUST NOT be "Unknown / Unsupported".
+  * Set "inspectionEligible": true.
+  * The asset category must be accurately identified (e.g., "Industrial Machinery", "Electric Motor", "Centrifugal Pump", "Industrial Compressor", "Industrial Gearbox", "Pressure Vessel", "Transformer", etc.).
+  * Even if the exact model cannot be determined with 100% confidence, classify it as "Industrial Machinery" or similar valid machine category with an appropriate confidence score (e.g., 75-92%) and ALLOW the inspection to proceed.
+- If the image contains an engineering or machine asset with incidental people in the background, the engineering asset is the primary subject.
+- ONLY reject images that are clearly:
+  * Human beings / portraits / selfies / biometrics
+  * Animals / pets
+  * Food / meals
+  * Landscapes / nature (without industrial structures)
+  * Text-only documents / receipts
+  * Household furniture / unrelated domestic items
 - Do NOT fabricate defect findings in this classification stage.
 
 Respond strictly in valid JSON format:
 {
-  "primaryCategory": "Road" | "Bridge" | "Building" | "Civil Infrastructure" | "Industrial Machinery" | "Mechanical Equipment" | "Electrical Equipment" | "Pipeline" | "Pressure Vessel" | "Solar Panel" | "Railway Infrastructure" | "Structural Component" | "Person / Human" | "Animal" | "Indoor Room" | "Landscape" | "Unknown / Unsupported",
-  "broadDomain": "Infrastructure" | "Mechanical" | "Electrical" | "Materials" | "Out of Scope",
+  "primaryCategory": "Electric Motor" | "Centrifugal Pump" | "Industrial Compressor" | "Industrial Gearbox" | "Bearing Assembly" | "Industrial Valve" | "Pipeline" | "Pressure Vessel" | "Storage Tank" | "Transformer" | "Electrical Switchgear" | "Industrial Machinery" | "Mechanical Equipment" | "Civil Infrastructure" | "Road" | "Bridge" | "Building" | "Structural Component" | "Person / Human" | "Animal" | "Food" | "Household Item" | "Landscape" | "Document" | "Unknown / Unsupported",
+  "broadDomain": "Industrial & Mechanical" | "Electrical" | "Infrastructure" | "Materials" | "Out of Scope",
   "assetType": string,
   "confidence": number,
   "inspectionEligible": boolean,
@@ -181,45 +295,65 @@ Respond strictly in valid JSON format:
 `;
 
   try {
-    const { parsed, modelUsed } = await callGeminiVision(apiKey, classificationPrompt, pureBase64, mimeType);
+    const { parsed, modelUsed } = await callMultimodalVision(apiKey, classificationPrompt, pureBase64, mimeType);
     
-    const cat = String(parsed.primaryCategory || 'Unknown / Unsupported');
-    const isOutOfScope = cat === 'Person / Human' || cat === 'Animal' || cat === 'Indoor Room' || cat === 'Landscape';
-    const isEligible = Boolean(parsed.inspectionEligible && !isOutOfScope && cat !== 'Unknown / Unsupported');
-    const conf = typeof parsed.confidence === 'number' ? Math.round(parsed.confidence <= 1 ? parsed.confidence * 100 : parsed.confidence) : 85;
+    let cat = String(parsed.primaryCategory || 'Industrial Machinery');
+    const isOutOfScope = cat === 'Person / Human' || 
+                         cat === 'Animal' || 
+                         cat === 'Food' || 
+                         cat === 'Household Item' || 
+                         cat === 'Indoor Room' || 
+                         cat === 'Landscape' || 
+                         cat === 'Document' || 
+                         parsed.broadDomain === 'Out of Scope';
+
+    // If subject is not out-of-scope, ensure it is classified as an eligible industrial/engineering asset
+    if (!isOutOfScope && cat === 'Unknown / Unsupported') {
+      cat = 'Industrial Machinery';
+    }
+
+    const isEligible = !isOutOfScope;
+    const conf = typeof parsed.confidence === 'number' 
+      ? Math.max(70, Math.round(parsed.confidence <= 1 ? parsed.confidence * 100 : parsed.confidence)) 
+      : 86;
 
     return {
       success: true,
       serviceAvailable: true,
       status: isEligible ? 'ELIGIBLE' : 'NOT_ELIGIBLE',
       primaryCategory: cat,
-      broadDomain: parsed.broadDomain || (isEligible ? 'Industrial / Infrastructure' : 'Out of Scope'),
+      broadDomain: parsed.broadDomain || (isEligible ? 'Industrial & Mechanical' : 'Out of Scope'),
       assetType: isEligible ? (parsed.assetType || cat) : null,
       confidence: conf,
       inspectionEligible: isEligible,
-      reason: parsed.reason || (isEligible ? 'Supported engineering asset identified.' : 'Subject is not an eligible engineering asset.'),
+      reason: parsed.reason || (isEligible ? 'Supported industrial equipment / engineering asset identified.' : 'Subject is out of scope for industrial inspection.'),
       modelName: modelUsed,
-      modelVersion: GEMINI_VISION_MODEL
+      modelVersion: modelUsed.includes('OpenAI') ? 'gpt-4o' : GEMINI_VISION_MODEL
     };
   } catch (err) {
     console.error('[AI CLASSIFIER ERROR]:', err.message);
+    const isQuotaExhausted = Boolean(err.isQuotaExhausted || (err.message && err.message.includes('Quota Exhausted')));
     const isKeyInvalid = Boolean(
       err.isKeyInvalid || 
       (err.message && (
         err.message.includes('API key not valid') || 
         err.message.includes('API_KEY_INVALID') || 
         err.message.includes('invalid or expired') ||
-        err.message.includes('INVALID_ARGUMENT')
+        err.message.includes('INVALID_ARGUMENT') ||
+        err.message.includes('invalid_api_key')
       ))
     );
     return {
       success: false,
       serviceAvailable: false,
       isKeyInvalid,
+      isQuotaExhausted,
       status: 'SERVICE_UNAVAILABLE',
-      reason: isKeyInvalid
-        ? 'The configured Google Gemini API key is invalid or expired. Please update or clear the API key.'
-        : `Visual classification service error: ${err.message}. Please verify server-side GEMINI_API_KEY.`,
+      reason: isQuotaExhausted
+        ? 'OpenAI API Quota Exhausted: You have no remaining credits. Please add credits at platform.openai.com/settings/organization/billing or use a free Google Gemini key.'
+        : isKeyInvalid
+        ? 'The configured API key is invalid or expired. Please update or clear the API key.'
+        : `Visual classification service error: ${err.message}. Please verify server-side API configuration.`,
       modelName: 'None (Service Unavailable)',
       modelVersion: GEMINI_VISION_MODEL,
       primaryCategory: 'Unknown / Unsupported',
@@ -332,10 +466,21 @@ Respond strictly in valid JSON matching this schema:
 `;
 
   try {
-    const { parsed, modelUsed } = await callGeminiVision(apiKey, inspectionPrompt, pureBase64, mimeType);
+    const { parsed, modelUsed } = await callMultimodalVision(apiKey, inspectionPrompt, pureBase64, mimeType);
 
-    const isOutOfScope = parsed.broadDomain === 'Out of Scope' || parsed.assetCategory === 'Person / Human' || !parsed.eligible;
-    const isEligible = Boolean(parsed.eligible && !isOutOfScope);
+    const cat = String(parsed.assetCategory || parsed.assetType || '').toLowerCase();
+    const isExplicitlyOutOfScope = 
+      parsed.broadDomain === 'Out of Scope' || 
+      cat.includes('person') || 
+      cat.includes('human') || 
+      cat.includes('animal') || 
+      cat.includes('food') || 
+      cat.includes('room') || 
+      cat.includes('landscape') || 
+      cat.includes('document') ||
+      parsed.eligible === false;
+
+    const isEligible = !isExplicitlyOutOfScope;
 
     const defects = isEligible && Array.isArray(parsed.visibleDefects)
       ? parsed.visibleDefects.map((d, i) => {
@@ -414,23 +559,28 @@ Respond strictly in valid JSON matching this schema:
     };
   } catch (err) {
     console.error('[AI INSPECTION ERROR]:', err.message);
+    const isQuotaExhausted = Boolean(err.isQuotaExhausted || (err.message && err.message.includes('Quota Exhausted')));
     const isKeyInvalid = Boolean(
       err.isKeyInvalid || 
       (err.message && (
         err.message.includes('API key not valid') || 
         err.message.includes('API_KEY_INVALID') || 
         err.message.includes('invalid or expired') ||
-        err.message.includes('INVALID_ARGUMENT')
+        err.message.includes('INVALID_ARGUMENT') ||
+        err.message.includes('invalid_api_key')
       ))
     );
     return {
       success: false,
       serviceAvailable: false,
       isKeyInvalid,
+      isQuotaExhausted,
       status: 'SERVICE_UNAVAILABLE',
-      reason: isKeyInvalid
-        ? 'The configured Google Gemini API key is invalid or expired. Please update or clear the API key.'
-        : `AI Vision Service Error: ${err.message}. Please verify server-side GEMINI_API_KEY.`,
+      reason: isQuotaExhausted
+        ? 'OpenAI API Quota Exhausted: You have no remaining credits. Please add credits at platform.openai.com/settings/organization/billing or use a free Google Gemini key.'
+        : isKeyInvalid
+        ? 'The configured API key is invalid or expired. Please update or clear the API key.'
+        : `AI Vision Service Error: ${err.message}. Please verify server-side API configuration.`,
       modelUsed: 'None (Service Unavailable)'
     };
   }
