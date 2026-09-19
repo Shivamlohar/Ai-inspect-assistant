@@ -406,6 +406,31 @@ export function generatePrecisionMetrologyInspection({
     ];
   }
 
+  const mediumDefects = defects.filter(d => d.severity === 'MEDIUM').length;
+const highDefects = defects.filter(d => d.severity === 'HIGH').length;
+const criticalDefects = defects.filter(d => d.severity === 'CRITICAL').length;
+
+let fallbackScore = 90;
+let fallbackCondition = 'Good';
+
+if (criticalDefects > 0) {
+  fallbackScore = 20;
+  fallbackCondition = 'Critical';
+} else if (highDefects > 0) {
+  fallbackScore = 40;
+  fallbackCondition = 'Poor';
+} else if (mediumDefects >= 2) {
+  fallbackScore = 65;
+  fallbackCondition = 'Fair';
+} else if (mediumDefects === 1) {
+  fallbackScore = 72;
+  fallbackCondition = 'Fair';
+} else if (defects.length > 0) {
+  fallbackScore = 82;
+  fallbackCondition = 'Good';
+}
+
+const conditionRating = `${fallbackScore}/100`;
   const modelUsedStr = isQuotaExhausted
     ? 'Precision Metrology Engine (OpenAI Quota Fallback)'
     : 'Precision Metrology Engine (Local Optical CV)';
@@ -423,9 +448,33 @@ export function generatePrecisionMetrologyInspection({
     assetCategory: mCat,
     machineCategory: mCat,
     confidence: 88,
-    overallCondition: 'Good',
-    conditionScore: 82,
-    defects,
+    const mediumDefects = defects.filter(d => d.severity === 'MEDIUM').length;
+const highDefects = defects.filter(d => d.severity === 'HIGH').length;
+const criticalDefects = defects.filter(d => d.severity === 'CRITICAL').length;
+
+let fallbackScore = 90;
+let fallbackCondition = 'Good';
+
+if (criticalDefects > 0) {
+  fallbackScore = 20;
+  fallbackCondition = 'Critical';
+} else if (highDefects > 0) {
+  fallbackScore = 40;
+  fallbackCondition = 'Poor';
+} else if (mediumDefects >= 2) {
+  fallbackScore = 65;
+  fallbackCondition = 'Fair';
+} else if (mediumDefects === 1) {
+  fallbackScore = 72;
+  fallbackCondition = 'Fair';
+} else if (defects.length > 0) {
+  fallbackScore = 82;
+  fallbackCondition = 'Good';
+}
+
+const conditionRating = `${fallbackScore}/100`;
+
+return {
     recommendations: [
       { step: 1, title: 'Surface Cleaning & Passivation', detail: 'Clean oxidized/weathered surfaces per relevant engineering standards and reapply protective coating.' },
       { step: 2, title: 'Fastener & Joint Torque Verification', detail: 'Check hold-down bolts with calibrated torque equipment per OEM specifications.' },
