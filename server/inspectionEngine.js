@@ -448,8 +448,6 @@ const conditionRating = `${fallbackScore}/100`;
     assetCategory: mCat,
     machineCategory: mCat,
     confidence: 88,
-
-return {
     recommendations: [
       { step: 1, title: 'Surface Cleaning & Passivation', detail: 'Clean oxidized/weathered surfaces per relevant engineering standards and reapply protective coating.' },
       { step: 2, title: 'Fastener & Joint Torque Verification', detail: 'Check hold-down bolts with calibrated torque equipment per OEM specifications.' },
