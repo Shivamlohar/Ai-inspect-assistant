@@ -448,31 +448,6 @@ const conditionRating = `${fallbackScore}/100`;
     assetCategory: mCat,
     machineCategory: mCat,
     confidence: 88,
-    const mediumDefects = defects.filter(d => d.severity === 'MEDIUM').length;
-const highDefects = defects.filter(d => d.severity === 'HIGH').length;
-const criticalDefects = defects.filter(d => d.severity === 'CRITICAL').length;
-
-let fallbackScore = 90;
-let fallbackCondition = 'Good';
-
-if (criticalDefects > 0) {
-  fallbackScore = 20;
-  fallbackCondition = 'Critical';
-} else if (highDefects > 0) {
-  fallbackScore = 40;
-  fallbackCondition = 'Poor';
-} else if (mediumDefects >= 2) {
-  fallbackScore = 65;
-  fallbackCondition = 'Fair';
-} else if (mediumDefects === 1) {
-  fallbackScore = 72;
-  fallbackCondition = 'Fair';
-} else if (defects.length > 0) {
-  fallbackScore = 82;
-  fallbackCondition = 'Good';
-}
-
-const conditionRating = `${fallbackScore}/100`;
 
 return {
     recommendations: [
