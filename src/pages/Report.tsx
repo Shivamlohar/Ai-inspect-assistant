@@ -39,7 +39,7 @@ export default function Report() {
     assetId: 'MACH-401-HUB',
     inspectionDomain: 'Industrial Machines',
     detectedAssetType: 'Electric Motor M-401',
-    overallCondition: 'Fair',
+    overallCondition: 'Pending',
     engineerVerificationStatus: 'Pending Review by Qualified Engineer',
     location: 'Sector 5 (Mechanical Fabrication Unit)',
     isMachine: true,
@@ -50,8 +50,8 @@ export default function Report() {
     inspectionTimestamp: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
     detectedSubject: '',
     rejectionReason: '',
-    score: '72 / 100',
-    status: 'At Risk',
+    score: '- / 100',
+    status: 'Pending',
     safetyFactor: '1.15',
     securityHash: 'SHA256:7f3a9e10c4b281d5',
     duration: '02:10 minutes',
@@ -493,23 +493,34 @@ export default function Report() {
               </div>
             ) : (
               <div className="text-[11px] font-mono border-t border-slate-100 pt-2 space-y-1 text-slate-600">
-                <div className="flex justify-between">
-                  <span>• Structural integrity (40%):</span>
-                  <strong className="text-slate-800 font-bold">82 (32.8 pts)</strong>
-                </div>
-                <div className="flex justify-between">
-                  <span>• Corrosion & Rust (25%):</span>
-                  <strong className="text-slate-800 font-bold">54 (13.5 pts)</strong>
-                </div>
-                <div className="flex justify-between">
-                  <span>• Surface condition (15%):</span>
-                  <strong className="text-slate-800 font-bold">65 (9.8 pts)</strong>
-                </div>
-                <div className="flex justify-between">
-                  <span>• Electrical / Thermal (20%):</span>
-                  <strong className="text-slate-800 font-bold">91 (18.2 pts)</strong>
-                </div>
-              </div>
+  <div className="flex justify-between">
+    <span>• Detected defects:</span>
+    <strong className="text-slate-800 font-bold">
+      {defectsToRender.length}
+    </strong>
+  </div>
+
+  <div className="flex justify-between">
+    <span>• Overall condition:</span>
+    <strong className="text-slate-800 font-bold">
+      {data.overallCondition}
+    </strong>
+  </div>
+
+  <div className="flex justify-between">
+    <span>• AI condition score:</span>
+    <strong className="text-slate-800 font-bold">
+      {data.score}
+    </strong>
+  </div>
+
+  <div className="flex justify-between">
+    <span>• Assessment basis:</span>
+    <strong className="text-slate-800 font-bold">
+      Visual evidence
+    </strong>
+  </div>
+</div>
             )}
             <p className="text-[9px] text-slate-400 font-mono text-center mt-2">
               ISO 55000 / ASME Defensible Metrology Formula Compliant
