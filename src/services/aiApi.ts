@@ -135,29 +135,21 @@ export async function analyzeAssetWithOpenAI(
       })
     : [];
 
-  if (isEligible && sanitizedDefects.length === 0) {
-    sanitizedDefects = [
-      {
-        id: 'DEF_NOMINAL_1',
-        type: 'wear',
-        name: 'SURFACE INTEGRITY WEAR',
-        confidence: 86,
-        confidenceLabel: '86%',
-        severity: 'LOW',
-        visualEvidence: 'Observable superficial environmental weathering along exterior protective coating.',
-        aiObservation: 'AI OPTICAL OBSERVATION: Localized surface weathering identified. Base substrate structurally intact.',
-        engineeringAssessment: 'ENGINEERING ASSESSMENT: Routine periodic visual inspection recommended during scheduled maintenance.',
-        color: 'healthy',
-        icon: '🟢',
-        tag: 'Low Priority Defect',
-        affectedArea: 'Exterior Protective Surface'
-      }
-    ];
-  }
+  const hasHighDefect = sanitizedDefects.some(d => d.severity === 'HIGH');
+  const hasMedDefect = sanitizedDefects.some(d => d.severity === 'MEDIUM');
 
   let finalScore = isEligible && typeof data?.conditionScore === 'number'
     ? Math.max(0, Math.min(100, Math.round(data.conditionScore)))
-    : (isEligible ? 82 : 0);
+    : (isEligible 
+        ? (hasHighDefect ? 45 : hasMedDefect ? 68 : (sanitizedDefects.length > 0 ? 76 : 92))
+        : 0);
+
+  // Severe defects must cap finalScore appropriately
+  if (hasHighDefect && finalScore > 54) {
+    finalScore = 48;
+  } else if (hasMedDefect && finalScore > 72) {
+    finalScore = 68;
+  }
 
   let fallbackModel = 'Precision Metrology Engine (Local Optical CV)';
   if (isQuotaExhausted) {
@@ -182,11 +174,9 @@ export async function analyzeAssetWithOpenAI(
         'Visual assessment only — certified engineer verification required before operational sign-off.'
       ];
 
-  const overallCond = data?.overallCondition || (
-    isEligible
-      ? (finalScore >= 75 ? 'Good' : finalScore >= 50 ? 'Fair' : 'Poor')
-      : 'Out of Scope'
-  );
+  const overallCond = isEligible
+    ? (hasHighDefect ? 'Poor' : hasMedDefect ? 'Fair' : (data?.overallCondition || (finalScore >= 75 ? 'Good' : finalScore >= 55 ? 'Fair' : 'Poor')))
+    : 'Out of Scope';
 
   return {
     isIndustrialAsset: isEligible,
@@ -200,7 +190,7 @@ export async function analyzeAssetWithOpenAI(
     assetName: assetName,
     category: cat,
     healthScore: finalScore,
-    status: isEligible ? (finalScore >= 75 ? 'HEALTHY' : finalScore >= 50 ? 'ATTENTION' : 'CRITICAL') : 'NON_ASSET',
+    status: isEligible ? (hasHighDefect ? 'CRITICAL' : hasMedDefect ? 'ATTENTION' : (finalScore >= 80 ? 'HEALTHY' : 'ATTENTION')) : 'NON_ASSET',
     overallCondition: overallCond,
     diagnosticSummary: data?.visualEvidence || data?.summaryObservation || `Visual AI ${rawDomain} analysis completed via precision metrology.`,
     aiObservation: data?.visualEvidence || data?.summaryObservation || 'AI visual assessment complete.',

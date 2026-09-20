@@ -59,9 +59,10 @@ export interface VisualDefect {
 
 export interface HealthScoreBreakdown {
   isAvailable: boolean;
-  finalScore: number; // 0 - 100
+  finalScore: number | null; // 0 - 100 or null if insufficient evidence
+  overallCondition?: string;
   unavailabilityReason?: string;
-  components: {
+  components?: {
     visualCondition: { score: number; weight: number; contribution: number };
     defectCondition: { score: number; weight: number; contribution: number };
     severityPenalty: { score: number; weight: number; contribution: number };
@@ -169,7 +170,11 @@ export interface PipelineInspectionResult {
   // Advanced Condition & Service Health
   aiVisualConditionScore?: number | null;
   conditionRating?: string;
+  overallCondition?: string;
   conditionDisclaimer?: string;
+  inspectionDomain?: string;
+  applicableStandard?: string;
+  standardReason?: string;
   broadDomain?: string;
   serviceAvailable?: boolean;
   serviceUnavailableReason?: string;

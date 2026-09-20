@@ -104,6 +104,7 @@ export default function NewInspection() {
   // File inputs
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // Voice recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -438,6 +439,11 @@ export default function NewInspection() {
     // Section 15: Every new upload must reset previous state
     sessionStorage.removeItem('currentInspection');
     sessionStorage.removeItem('currentInspectionResult');
+    sessionStorage.removeItem('currentInspectionFindings');
+    sessionStorage.removeItem('customFindings');
+    sessionStorage.removeItem('humanVerifications');
+    sessionStorage.removeItem('reportDraft');
+    sessionStorage.removeItem('geminiResult');
     sessionStorage.removeItem('selectedAsset');
     clearSessionDraft();
     setAiDetectionResult(null);
@@ -549,6 +555,13 @@ export default function NewInspection() {
   const startCamera = async () => {
     setCameraError(null);
     setTabNotice(null);
+
+    // If mediaDevices is unsupported (e.g. older browser or secure context restriction), trigger native camera file input
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      cameraInputRef.current?.click();
+      return;
+    }
+
     setIsCameraActive(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -580,8 +593,13 @@ export default function NewInspection() {
       }, 700);
     } catch (err: any) {
       console.error('Camera access error:', err);
-      setCameraError('Camera permission denied or device camera is offline.');
+      // If live stream fails, offer native camera picker fallback
       setIsCameraActive(false);
+      if (cameraInputRef.current) {
+        cameraInputRef.current.click();
+      } else {
+        setCameraError('Camera stream unavailable. Please use the Upload Image button or check device permissions.');
+      }
     }
   };
 
@@ -881,8 +899,15 @@ export default function NewInspection() {
       securityHash: mediaFile?.securityHash || 'SHA256:7f3a9e10c4b281d5',
       openAiPending: hasMedia,
       imageBase64: mediaFile?.base64,
-      mimeType: mediaFile?.mimeType || 'image/jpeg'
     };
+
+    // Clear all previous inspection session artifacts to guarantee a pristine, evidence-driven run
+    sessionStorage.removeItem('currentInspectionResult');
+    sessionStorage.removeItem('currentInspectionFindings');
+    sessionStorage.removeItem('customFindings');
+    sessionStorage.removeItem('humanVerifications');
+    sessionStorage.removeItem('reportDraft');
+    sessionStorage.removeItem('geminiResult');
 
     sessionStorage.setItem('currentInspection', JSON.stringify(inspectionPayload));
     navigate('/analysis');
@@ -1158,14 +1183,22 @@ export default function NewInspection() {
       </div>
 
       {/* Hidden File Inputs */}
-      <input name="file" id="input-file" 
+      <input name="image-file" id="input-image-file" 
         type="file" 
         ref={imageInputRef} 
         onChange={handleImageInputChange} 
         accept="image/*" 
         className="hidden" 
        />
-      <input name="file" id="input-file" 
+      <input name="camera-capture-file" id="input-camera-capture-file" 
+        type="file" 
+        ref={cameraInputRef} 
+        onChange={handleImageInputChange} 
+        accept="image/*" 
+        capture="environment"
+        className="hidden" 
+       />
+      <input name="video-file" id="input-video-file" 
         type="file" 
         ref={videoInputRef} 
         onChange={handleVideoInputChange} 
@@ -1299,20 +1332,20 @@ export default function NewInspection() {
                 <div className="flex flex-col md:flex-row items-center gap-5 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
                   
                   {/* Media visual thumbnail */}
-                  <div className="relative w-full md:w-56 h-40 rounded-xl overflow-hidden bg-slate-900 shrink-0 flex items-center justify-center">
+                  <div className="relative w-full md:w-64 min-h-[160px] max-h-[260px] aspect-video md:aspect-4/3 rounded-xl overflow-hidden bg-slate-950 shrink-0 flex items-center justify-center border border-slate-800">
                     {mediaFile.type === 'image' ? (
                       <img 
                         src={mediaFile.url} 
                         alt={mediaFile.name} 
                         loading="lazy"
                         decoding="async"
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain"
                       />
                     ) : (
                       <video 
                         src={mediaFile.url} 
                         controls 
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain"
                       />
                     )}
                     <span className="absolute top-2 left-2 bg-slate-900/80 backdrop-blur-xs text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase">
@@ -1464,6 +1497,12 @@ export default function NewInspection() {
                     key={i}
                     type="button"
                     onClick={() => {
+                      sessionStorage.removeItem('currentInspectionResult');
+                      sessionStorage.removeItem('currentInspectionFindings');
+                      sessionStorage.removeItem('customFindings');
+                      sessionStorage.removeItem('humanVerifications');
+                      sessionStorage.removeItem('reportDraft');
+                      sessionStorage.removeItem('geminiResult');
                       setMediaFile({
                         url: preset.url,
                         type: 'image',

@@ -196,9 +196,16 @@ export async function retrieveInspectionKnowledge(
     // Backend API unavailable or offline; seamlessly fallback to verified standards cache
   }
 
-  // 2. Client-side fallback using verified authoritative cache
+  const isCivilCategory = ['Bridge', 'Building', 'Road', 'Civil', 'Transport'].some(c => category.toLowerCase().includes(c.toLowerCase()));
+  const isMachineryCategory = ['Industrial Machinery', 'Machine', 'Motor', 'Pump', 'Compressor', 'Gearbox'].some(c => category.toLowerCase().includes(c.toLowerCase()));
+
   const matched = BUILTIN_AUTHORITATIVE_KNOWLEDGE.filter(k => {
-    if (k.assetType.toLowerCase() === category.toLowerCase()) return true;
+    // Strictly prevent cross-domain contamination: never cite machinery standards for civil/transport assets
+    if (isCivilCategory && k.assetType === 'Industrial Machinery') return false;
+    // Strictly prevent civil standards on machinery assets
+    if (isMachineryCategory && ['Bridge', 'Building', 'Road'].includes(k.assetType)) return false;
+
+    if (k.assetType.toLowerCase() === category.toLowerCase() || category.toLowerCase().includes(k.assetType.toLowerCase())) return true;
     if (defectNames.some(d => k.defectType.toLowerCase().includes(d.toLowerCase()))) return true;
     return false;
   });

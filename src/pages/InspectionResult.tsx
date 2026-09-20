@@ -51,7 +51,7 @@ import {
 } from '../utils/multilingualSpeech';
 import { bridge102Img } from '../assets/assetImages';
 import type { PipelineInspectionResult } from '../services/inspectionPipeline';
-import { resolveInspectionDomain, WORKFLOW_STAGES } from '../data/domainRegistry';
+import { resolveInspectionDomain, resolveApplicableStandard, WORKFLOW_STAGES } from '../data/domainRegistry';
 
 export default function InspectionResult() {
   const [viewMode, setViewMode] = useState<'ORIGINAL' | 'AI_OVERLAY' | 'COMPARE'>('AI_OVERLAY');
@@ -286,16 +286,11 @@ export default function InspectionResult() {
       ];
   const auditTraceId = pipelineResult?.auditTraceId || '';
 
-  // Defensible Score & Status (Section 8)
-  const currentScore = isNonAsset ? 0 : (pipelineResult?.healthScore?.finalScore ?? 85);
+  // Defensible Score & Status (Evidence-Driven)
+  const currentScore: number | null = isNonAsset ? null : (typeof pipelineResult?.healthScore?.finalScore === 'number' ? pipelineResult.healthScore.finalScore : null);
   const currentSafetyFactor = isNonAsset ? 'N/A' : (pipelineResult?.safetyFactor || (pipelineResult?.defects?.length === 0 ? '1.50' : '1.15'));
-  const currentStatus = isNonAsset 
-    ? 'Out of Scope (Non-Asset)' 
-    : (pipelineResult?.healthScore?.finalScore !== undefined && pipelineResult?.healthScore?.finalScore !== null
-      ? (pipelineResult.healthScore.finalScore >= 80 ? 'Healthy' : pipelineResult.healthScore.finalScore >= 60 ? 'Attention Needed' : 'Critical') 
-      : 'Healthy');
 
-  // 7-Domain Multi-Domain Architecture Fields (Infographic Standard)
+  // 8-Domain Multi-Domain Architecture Fields
   const rawInspectionDomain = (pipelineResult as any)?.inspectionDomain || 
                               (inspectionData as any)?.inspectionDomain || 
                               (pipelineResult as any)?.detectedCategory ||
@@ -303,16 +298,52 @@ export default function InspectionResult() {
   const domainConfig = resolveInspectionDomain(rawInspectionDomain);
   const inspectionDomain = isNonAsset ? 'Non-Engineering / Rejected' : domainConfig.name;
 
-  const overallCondition: 'Good' | 'Fair' | 'Poor' = isNonAsset 
-    ? 'Poor' 
-    : ((pipelineResult as any)?.overallCondition ||
-       (currentScore >= 80 ? 'Good' : currentScore >= 60 ? 'Fair' : 'Poor'));
-
   const detectedAssetType = isNonAsset
     ? (nonAssetSubject || 'Non-Industrial Subject')
     : ((pipelineResult as any)?.detectedAssetType || 
        (pipelineResult as any)?.detectedCategory || 
        inspectionData.assetName);
+
+  const hasHighDefect = !isNonAsset && (
+    (pipelineResult?.defects && pipelineResult.defects.some(d => d.severity === 'HIGH')) ||
+    (customFindings && customFindings.some(f => f.severity === 'High Severity'))
+  );
+  const hasMedDefect = !isNonAsset && (
+    (pipelineResult?.defects && pipelineResult.defects.some(d => d.severity === 'MEDIUM')) ||
+    (customFindings && customFindings.some(f => f.severity === 'Medium Severity'))
+  );
+  const hasAnyDefect = !isNonAsset && (
+    (pipelineResult?.defects && pipelineResult.defects.length > 0) ||
+    (customFindings && customFindings.length > 0)
+  );
+
+  const isCleanAsset = !isNonAsset && !hasAnyDefect;
+
+  // Domain-Aware Applicable Standard Determination (Zero ISO 17359 leakage on civil assets)
+  const standardResolution = resolveApplicableStandard(
+    pipelineResult?.inspectionDomain || inspectionDomain,
+    detectedAssetType,
+    pipelineResult?.defects?.[0]?.type || (pipelineResult?.defects?.[0]?.name)
+  );
+  const applicableStandard = pipelineResult?.applicableStandard || standardResolution.standard;
+  const standardReason = pipelineResult?.standardReason || standardResolution.reason;
+
+  // Evidence-driven Overall Condition Rating
+  const overallCondition: string = isNonAsset 
+    ? 'Out of Scope' 
+    : (currentScore === null
+      ? 'Insufficient Evidence'
+      : (isCleanAsset
+        ? 'Condition Appears Acceptable Based on Available Visual Evidence'
+        : (pipelineResult?.healthScore?.overallCondition || 
+           pipelineResult?.overallCondition || 
+           (hasHighDefect ? (currentScore < 25 ? 'Critical' : 'Poor') : (hasMedDefect ? 'Fair' : (currentScore >= 75 ? 'Good' : 'Fair'))))));
+
+  const currentStatus = isNonAsset 
+    ? 'Out of Scope (Non-Asset)' 
+    : (currentScore === null
+      ? 'Insufficient Evidence'
+      : (hasHighDefect ? 'Critical' : (hasMedDefect ? 'Attention Needed' : (isCleanAsset ? 'Acceptable / Healthy' : 'Attention Needed'))));
 
   const engineerVerificationStatus = (pipelineResult as any)?.engineerVerificationStatus || 
                                      'Pending Qualified Engineer Review';
@@ -450,7 +481,8 @@ export default function InspectionResult() {
           icon: d.icon,
           tag: d.severity === 'HIGH' ? 'Visual Anomaly (High)' : d.severity === 'MEDIUM' ? 'Visual Anomaly' : 'Monitor',
           metricText: d.metricText,
-          measurements: {}
+          measurements: {},
+          boundingBox: d.boundingBox
         }))
       : (isGemini && Array.isArray(geminiData?.defects) && geminiData.defects.length > 0)
         ? geminiData.defects.map((d: any, idx: number) => ({
@@ -463,7 +495,8 @@ export default function InspectionResult() {
             icon: d.icon || '🟡',
             tag: d.tag || d.severity || 'Anomaly',
             metricText: d.metricText || 'Visual indication observed',
-            measurements: d.measurements || {}
+            measurements: d.measurements || {},
+            boundingBox: d.boundingBox
           }))
         : []
   );
@@ -475,8 +508,6 @@ export default function InspectionResult() {
   const primaryDefect = isNonAsset ? null : (allIssues[0] || null);
 
   const secondaryDefect = isNonAsset ? null : (allIssues[1] || null);
-
-  const tertiaryDefect = isNonAsset ? null : (allIssues[2] || null);
 
   // Auto-save inspection audit to active officer's persistent work vault on mount
   useEffect(() => {
@@ -510,22 +541,22 @@ export default function InspectionResult() {
     if (selectedPastAuditId !== 'baseline') {
       const past = pastAudits.find(a => a.id === selectedPastAuditId);
       if (past) {
-        const scoreDiff = currentScore - past.healthScore;
-        const diffText = scoreDiff >= 0 ? `+${scoreDiff} pts` : `${scoreDiff} pts`;
+        const scoreDiff = currentScore !== null ? currentScore - past.healthScore : 0;
+        const diffText = currentScore !== null ? (scoreDiff >= 0 ? `+${scoreDiff} pts` : `${scoreDiff} pts`) : 'N/A';
         return {
           pastDate: past.formattedDate,
           pastDefect: `${past.defectsCount} defects recorded • Status: ${past.status}`,
           pastScore: `${past.healthScore} / 100 Score`,
           currentDate: 'Today (Live)',
           currentDefect: `${visibleIssues.length} active defects • Status: ${currentStatus}`,
-          currentScore: `${currentScore} / 100 (${diffText})`,
+          currentScore: currentScore !== null ? `${currentScore} / 100 (${diffText})` : 'N/A',
           condition: scoreDiff < 0 
             ? 'Condition: Deteriorating (scheduled intervention advised)' 
             : scoreDiff > 0 
             ? 'Condition: Improving (post-maintenance gain)' 
             : 'Condition: Stable',
           detail: `Comparison against past audit by ${past.officerName}. Delta score: ${diffText}. Defect count delta: ${visibleIssues.length - past.defectsCount}.`,
-          failureHorizon: currentScore < 70 ? 'Intervention recommended' : 'Monitor in normal cycle'
+          failureHorizon: (currentScore !== null && currentScore < 70) ? 'Intervention recommended' : 'Monitor in normal cycle'
         };
       }
     }
@@ -541,10 +572,10 @@ export default function InspectionResult() {
         pastScore: `${prev.score} / 100 Score`,
         currentDate: 'Today (Live)',
         currentDefect: `${visibleIssues.length} active defect(s) • Status: ${currentStatus}`,
-        currentScore: `${currentScore} / 100 (${diffText})`,
+        currentScore: currentScore !== null ? `${currentScore} / 100 (${diffText})` : 'N/A',
         condition: diff < 0 ? 'Condition: Deteriorating (scheduled review advised)' : 'Condition: Stable',
         detail: `Verified historical audit comparison for ${pipelineResult.assetId}. Score delta: ${diffText}.`,
-        failureHorizon: currentScore < 70 ? 'Intervention recommended' : 'Standard monitoring'
+        failureHorizon: (currentScore !== null && currentScore < 70) ? 'Intervention recommended' : 'Standard monitoring'
       };
     }
 
@@ -555,7 +586,7 @@ export default function InspectionResult() {
       pastScore: 'N/A',
       currentDate: 'Today (Live)',
       currentDefect: `${visibleIssues.length} visual defect(s) recorded`,
-      currentScore: `${currentScore} / 100 (Initial Baseline)`,
+      currentScore: currentScore !== null ? `${currentScore} / 100 (Initial Baseline)` : 'N/A',
       condition: 'Condition: Initial Baseline Recorded',
       detail: 'No previous audit records found in work vault for this asset ID. Current inspection serves as the baseline for subsequent rate of deterioration tracking.',
       failureHorizon: 'Baseline Established (Trend analysis requires subsequent inspection)'
@@ -601,7 +632,7 @@ export default function InspectionResult() {
   const handleAskCopilot = (questionText: string) => {
     const answer = generateInspectorAnswer(questionText, copilotLang, {
       assetName: inspectionData.assetName,
-      healthScore: currentScore,
+      healthScore: currentScore ?? undefined,
       status: currentStatus,
       defects: allIssues.map(i => ({ name: i.name, severity: i.severity, metricText: i.metricText })),
       failureHorizon: compData.failureHorizon,
@@ -743,10 +774,10 @@ export default function InspectionResult() {
       officerName: officer.name,
       assetName: inspectionData.assetName,
       assetType: isMachine ? 'Industrial Machine Hub' : 'Civil Infrastructure',
-      healthScore: currentScore,
-      status: 'At Risk',
+      healthScore: currentScore ?? 0,
+      status: currentStatus,
       securityHash: inspectionData.securityHash || 'SHA256:7f3a9e10c4b281d5',
-      notes: inspectionData.description || 'Verified AI visual inspection audit with defensible 72/100 score.',
+      notes: inspectionData.description || `Verified AI visual inspection audit (${currentScore !== null ? `${currentScore}/100 score` : 'visual baseline'}).`,
       diagnosticSummary,
       defectsCount: visibleIssues.length,
       isGemini,
@@ -837,14 +868,22 @@ export default function InspectionResult() {
             )}
             {!isNonAsset && (
               <span className={`inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-wider px-3 py-1 rounded-full border ${
-                overallCondition === 'Good' ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' :
-                overallCondition === 'Fair' ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30' :
-                'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30'
+                overallCondition === 'Good' || overallCondition === 'Excellent' || overallCondition.includes('Acceptable')
+                  ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' :
+                overallCondition === 'Fair'
+                  ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30' :
+                overallCondition === 'Insufficient Evidence'
+                  ? 'bg-slate-500/15 text-slate-400 border-slate-500/30' :
+                  'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30'
               }`}>
                 <span className={`w-2 h-2 rounded-full ${
-                  overallCondition === 'Good' ? 'bg-emerald-500' :
-                  overallCondition === 'Fair' ? 'bg-amber-500' :
-                  'bg-rose-500'
+                  overallCondition === 'Good' || overallCondition === 'Excellent' || overallCondition.includes('Acceptable')
+                    ? 'bg-emerald-500' :
+                  overallCondition === 'Fair'
+                    ? 'bg-amber-500' :
+                  overallCondition === 'Insufficient Evidence'
+                    ? 'bg-slate-500' :
+                    'bg-rose-500'
                 }`}></span>
                 Condition: {overallCondition}
               </span>
@@ -922,7 +961,7 @@ export default function InspectionResult() {
                   {st.title}
                 </p>
                 <p className="text-[9px] text-slate-400 truncate mt-0.5">
-                  {st.stageNumber === 4 ? inspectionDomain : st.stageNumber === 5 ? `${visibleIssues.length} defects` : st.stageNumber === 6 ? `${currentScore}/100 • ${overallCondition}` : st.summary}
+                  {st.stageNumber === 4 ? inspectionDomain : st.stageNumber === 5 ? `${visibleIssues.length} defects` : st.stageNumber === 6 ? `${currentScore !== null ? `${currentScore}/100` : 'N/A'} • ${overallCondition}` : st.summary}
                 </p>
               </div>
             ))}
@@ -947,11 +986,12 @@ export default function InspectionResult() {
             <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800">
               <span className="text-[10px] font-bold uppercase text-slate-400 block">Overall Condition</span>
               <span className={`font-black text-xs ${
-                overallCondition === 'Good' ? 'text-emerald-400' :
+                overallCondition === 'Good' || overallCondition === 'Excellent' || overallCondition.includes('Acceptable') ? 'text-emerald-400' :
                 overallCondition === 'Fair' ? 'text-amber-400' :
+                overallCondition === 'Insufficient Evidence' ? 'text-slate-400' :
                 'text-rose-400'
               } block`}>
-                {overallCondition} ({currentScore}/100)
+                {overallCondition} {currentScore !== null ? `(${currentScore}/100)` : '(N/A)'}
               </span>
             </div>
 
@@ -964,8 +1004,8 @@ export default function InspectionResult() {
 
             <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800">
               <span className="text-[10px] font-bold uppercase text-slate-400 block">Applicable Standard</span>
-              <span className="font-mono text-[11px] text-cyan-300 truncate block">
-                {domainConfig.standards[0] || 'ISO 17359 / ASME XI'}
+              <span className="font-mono text-[11px] text-cyan-300 truncate block" title={standardReason}>
+                {applicableStandard}
               </span>
             </div>
 
@@ -1297,7 +1337,7 @@ export default function InspectionResult() {
         </div>
 
         {/* Central Viewport Display */}
-        <div className="relative w-full aspect-[16/10] sm:aspect-[16/9] md:aspect-[21/9] min-h-[380px] md:min-h-[480px] bg-slate-950 overflow-hidden flex items-center justify-center select-none">
+        <div className="relative w-full aspect-[16/10] sm:aspect-[16/9] md:aspect-[21/9] min-h-[300px] sm:min-h-[380px] md:min-h-[480px] bg-slate-950 overflow-hidden flex items-center justify-center select-none">
           
           {/* Compare Mode Split Rendering */}
           {viewMode === 'COMPARE' ? (
@@ -1309,7 +1349,7 @@ export default function InspectionResult() {
                   alt="AI Annotated View"
                   loading="lazy"
                   decoding="async"
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain bg-slate-950"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = bridge102Img;
                   }}
@@ -1317,33 +1357,33 @@ export default function InspectionResult() {
                 
                 {/* Defect Callout 1: Primary Dynamic Defect */}
                 {!isNonAsset && (activeLayer === 'ALL' || activeLayer === 'CRACK') && primaryDefect && (
-                  <div className="absolute top-[18%] left-[22%] z-20 pointer-events-none animate-in fade-in zoom-in-95">
-                    <div className={`bg-slate-950/95 border-2 ${primaryDefect.color === 'critical' ? 'border-rose-500' : 'border-amber-500'} text-white rounded-xl p-2.5 shadow-2xl backdrop-blur-md flex flex-col items-center`}>
-                      <div className={`flex items-center gap-1.5 font-black ${primaryDefect.color === 'critical' ? 'text-rose-400' : 'text-amber-400'} text-xs tracking-wider`}>
-                        <span className={`w-2.5 h-2.5 rounded-full ${primaryDefect.color === 'critical' ? 'bg-rose-500 animate-pulse' : 'bg-amber-400'}`}></span>
-                        <span>{primaryDefect.icon} {primaryDefect.name}</span>
+                  <div className="absolute top-[10%] sm:top-[16%] left-[4%] sm:left-[16%] md:left-[22%] z-20 pointer-events-none animate-in fade-in zoom-in-95">
+                    <div className={`bg-slate-950/95 border-2 ${primaryDefect.color === 'critical' ? 'border-rose-500' : 'border-amber-500'} text-white rounded-xl p-2 sm:p-2.5 shadow-2xl backdrop-blur-md flex flex-col items-center max-w-[160px] sm:max-w-[220px]`}>
+                      <div className={`flex items-center gap-1 sm:gap-1.5 font-black ${primaryDefect.color === 'critical' ? 'text-rose-400' : 'text-amber-400'} text-[10px] sm:text-xs tracking-wider truncate`}>
+                        <span className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${primaryDefect.color === 'critical' ? 'bg-rose-500 animate-pulse' : 'bg-amber-400'}`}></span>
+                        <span className="truncate">{primaryDefect.icon} {primaryDefect.name}</span>
                       </div>
-                      <div className={`${primaryDefect.color === 'critical' ? 'text-rose-400' : 'text-amber-400'} text-lg font-black leading-none my-0.5 animate-bounce`}>↓</div>
-                      <div className={`w-20 h-0.5 ${primaryDefect.color === 'critical' ? 'bg-rose-500' : 'bg-amber-500'} rounded-full mb-1`}></div>
-                      <span className="font-mono text-[10px] text-slate-200 font-bold">{primaryDefect.metricText} • {primaryDefect.conf}</span>
+                      <div className={`${primaryDefect.color === 'critical' ? 'text-rose-400' : 'text-amber-400'} text-sm sm:text-lg font-black leading-none my-0.5 animate-bounce`}>↓</div>
+                      <div className={`w-14 sm:w-20 h-0.5 ${primaryDefect.color === 'critical' ? 'bg-rose-500' : 'bg-amber-500'} rounded-full mb-1`}></div>
+                      <span className="font-mono text-[9px] sm:text-[10px] text-slate-200 font-bold truncate">{primaryDefect.metricText} • {primaryDefect.conf}</span>
                     </div>
-                    <div className={`w-36 h-24 border-2 border-dashed ${primaryDefect.color === 'critical' ? 'border-rose-500 bg-rose-500/15' : 'border-amber-500 bg-amber-500/15'} rounded-lg -mt-2 -ml-4`}></div>
+                    <div className={`w-28 sm:w-36 h-16 sm:h-24 border-2 border-dashed ${primaryDefect.color === 'critical' ? 'border-rose-500 bg-rose-500/15' : 'border-amber-500 bg-amber-500/15'} rounded-lg -mt-1 sm:-mt-2 -ml-2 sm:-ml-4`}></div>
                   </div>
                 )}
 
                 {/* Defect Callout 2: Secondary Dynamic Defect */}
                 {!isNonAsset && (activeLayer === 'ALL' || activeLayer === 'RUST') && secondaryDefect && (
-                  <div className="absolute top-[50%] left-[54%] z-20 pointer-events-none">
-                    <div className={`bg-slate-950/95 border-2 ${secondaryDefect.color === 'critical' ? 'border-rose-500' : 'border-amber-500'} text-white rounded-xl p-2.5 shadow-2xl backdrop-blur-md flex flex-col items-center`}>
-                      <div className={`flex items-center gap-1.5 font-black ${secondaryDefect.color === 'critical' ? 'text-rose-400' : 'text-amber-400'} text-xs tracking-wider`}>
-                        <span className={`w-2.5 h-2.5 rounded-full ${secondaryDefect.color === 'critical' ? 'bg-rose-500' : 'bg-amber-400'}`}></span>
-                        <span>{secondaryDefect.icon} {secondaryDefect.name}</span>
+                  <div className="absolute top-[42%] sm:top-[48%] left-[34%] sm:left-[48%] md:left-[54%] z-20 pointer-events-none">
+                    <div className={`bg-slate-950/95 border-2 ${secondaryDefect.color === 'critical' ? 'border-rose-500' : 'border-amber-500'} text-white rounded-xl p-2 sm:p-2.5 shadow-2xl backdrop-blur-md flex flex-col items-center max-w-[160px] sm:max-w-[220px]`}>
+                      <div className={`flex items-center gap-1 sm:gap-1.5 font-black ${secondaryDefect.color === 'critical' ? 'text-rose-400' : 'text-amber-400'} text-[10px] sm:text-xs tracking-wider truncate`}>
+                        <span className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${secondaryDefect.color === 'critical' ? 'bg-rose-500' : 'bg-amber-400'}`}></span>
+                        <span className="truncate">{secondaryDefect.icon} {secondaryDefect.name}</span>
                       </div>
-                      <div className={`${secondaryDefect.color === 'critical' ? 'text-rose-400' : 'text-amber-400'} text-lg font-black leading-none my-0.5`}>↓</div>
-                      <div className={`w-24 h-0.5 ${secondaryDefect.color === 'critical' ? 'bg-rose-500' : 'bg-amber-500'} rounded-full mb-1`}></div>
-                      <span className="font-mono text-[10px] text-slate-200 font-bold">{secondaryDefect.metricText} • {secondaryDefect.conf}</span>
+                      <div className={`${secondaryDefect.color === 'critical' ? 'text-rose-400' : 'text-amber-400'} text-sm sm:text-lg font-black leading-none my-0.5`}>↓</div>
+                      <div className={`w-14 sm:w-24 h-0.5 ${secondaryDefect.color === 'critical' ? 'bg-rose-500' : 'bg-amber-500'} rounded-full mb-1`}></div>
+                      <span className="font-mono text-[9px] sm:text-[10px] text-slate-200 font-bold truncate">{secondaryDefect.metricText} • {secondaryDefect.conf}</span>
                     </div>
-                    <div className={`w-40 h-20 border-2 border-dashed ${secondaryDefect.color === 'critical' ? 'border-rose-500 bg-rose-500/15' : 'border-amber-500 bg-amber-500/15'} rounded-lg -mt-2 -ml-4`}></div>
+                    <div className={`w-28 sm:w-40 h-14 sm:h-20 border-2 border-dashed ${secondaryDefect.color === 'critical' ? 'border-rose-500 bg-rose-500/15' : 'border-amber-500 bg-amber-500/15'} rounded-lg -mt-1 sm:-mt-2 -ml-2 sm:-ml-4`}></div>
                   </div>
                 )}
               </div>
@@ -1359,7 +1399,7 @@ export default function InspectionResult() {
                     alt="Original Unaltered View"
                     loading="lazy"
                     decoding="async"
-                    className="absolute inset-0 w-full h-full object-cover max-w-none"
+                    className="absolute inset-0 w-full h-full object-contain bg-slate-950 max-w-none"
                     style={{ width: '100%', height: '100%' }}
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = bridge102Img;
@@ -1405,7 +1445,7 @@ export default function InspectionResult() {
                   autoPlay 
                   muted 
                   loop 
-                  className="w-full h-full object-cover" 
+                  className="w-full h-full object-contain bg-slate-950" 
                 />
               ) : (
                 <img 
@@ -1413,7 +1453,7 @@ export default function InspectionResult() {
                   alt="Original Asset" 
                   loading="lazy"
                   decoding="async"
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain bg-slate-950"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = bridge102Img;
                   }}
@@ -1433,7 +1473,7 @@ export default function InspectionResult() {
                   autoPlay 
                   muted 
                   loop 
-                  className="w-full h-full object-cover" 
+                  className="w-full h-full object-contain bg-slate-950" 
                 />
               ) : (
                 <img 
@@ -1441,57 +1481,67 @@ export default function InspectionResult() {
                   alt="AI Detected Asset" 
                   loading="lazy"
                   decoding="async"
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain bg-slate-950"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = bridge102Img;
                   }}
                 />
               )}
 
-              {/* HERO CALLOUT ELEMENT 1: Primary Dynamic Defect */}
+              {/* REAL BOUNDING BOX 1: Primary Defect Location (Zero fabrication) */}
               {!isNonAsset && (activeLayer === 'ALL' || activeLayer === 'CRACK') && primaryDefect && (
-                <div className="absolute top-[18%] left-[24%] z-20 pointer-events-auto group">
-                  <div className={`bg-slate-950/95 border-2 ${primaryDefect.color === 'critical' ? 'border-rose-500' : 'border-amber-500'} text-white rounded-2xl p-3 shadow-2xl backdrop-blur-md flex flex-col items-center transition-transform hover:scale-105`}>
-                    <div className={`flex items-center gap-1.5 font-black ${primaryDefect.color === 'critical' ? 'text-rose-400' : 'text-amber-400'} text-xs tracking-wider uppercase`}>
-                      <span className={`w-2.5 h-2.5 rounded-full ${primaryDefect.color === 'critical' ? 'bg-rose-500 animate-ping' : 'bg-amber-400'}`}></span>
-                      <span>{primaryDefect.icon} {primaryDefect.name}</span>
-                    </div>
-                    <div className={`${primaryDefect.color === 'critical' ? 'text-rose-400' : 'text-amber-400'} text-xl font-black leading-none my-1 animate-bounce`}>↓</div>
-                    <div className={`w-24 h-0.5 ${primaryDefect.color === 'critical' ? 'bg-rose-500' : 'bg-amber-500'} rounded-full mb-1`}></div>
-                    <div className="text-[11px] font-mono text-slate-100 font-bold tracking-tight">
-                      {primaryDefect.metricText} • {primaryDefect.conf}
+                primaryDefect.boundingBox ? (
+                  <div 
+                    className="absolute z-20 pointer-events-none"
+                    style={{
+                      top: `${primaryDefect.boundingBox.y}%`,
+                      left: `${primaryDefect.boundingBox.x}%`,
+                      width: `${Math.max(10, primaryDefect.boundingBox.width)}%`,
+                      height: `${Math.max(8, primaryDefect.boundingBox.height)}%`
+                    }}
+                  >
+                    <div className={`w-full h-full border-2 border-dashed ${primaryDefect.color === 'critical' ? 'border-rose-500 bg-rose-500/15' : 'border-amber-500 bg-amber-500/15'} rounded-xl relative`}>
+                      <div className={`absolute -top-7 left-0 bg-slate-950/95 border ${primaryDefect.color === 'critical' ? 'border-rose-500 text-rose-400' : 'border-amber-500 text-amber-400'} text-[10px] font-mono px-2 py-0.5 rounded shadow-lg whitespace-nowrap`}>
+                        {primaryDefect.name} • {primaryDefect.conf}
+                      </div>
                     </div>
                   </div>
-                  <div className={`w-44 h-28 border-2 border-dashed ${primaryDefect.color === 'critical' ? 'border-rose-500 bg-rose-500/15' : 'border-amber-500 bg-amber-500/15'} rounded-xl -mt-2 -ml-6 pointer-events-none animate-pulse`}></div>
-                </div>
+                ) : (
+                  <div className="absolute top-4 left-4 z-20 pointer-events-auto">
+                    <div className={`bg-slate-950/95 border ${primaryDefect.color === 'critical' ? 'border-rose-500 text-rose-400' : 'border-amber-500 text-amber-400'} rounded-xl px-3 py-1.5 shadow-xl backdrop-blur-md font-mono text-xs flex items-center gap-2`}>
+                      <span className={`w-2 h-2 rounded-full ${primaryDefect.color === 'critical' ? 'bg-rose-500' : 'bg-amber-400'}`}></span>
+                      <span className="truncate">{primaryDefect.name} ({primaryDefect.conf})</span>
+                    </div>
+                  </div>
+                )
               )}
 
-              {/* HERO CALLOUT ELEMENT 2: Secondary Dynamic Defect */}
+              {/* REAL BOUNDING BOX 2: Secondary Defect Location (Zero fabrication) */}
               {!isNonAsset && (activeLayer === 'ALL' || activeLayer === 'RUST') && secondaryDefect && (
-                <div className="absolute top-[50%] left-[54%] z-20 pointer-events-auto group">
-                  <div className={`bg-slate-950/95 border-2 ${secondaryDefect.color === 'critical' ? 'border-rose-500' : 'border-amber-500'} text-white rounded-2xl p-3 shadow-2xl backdrop-blur-md flex flex-col items-center transition-transform hover:scale-105`}>
-                    <div className={`flex items-center gap-1.5 font-black ${secondaryDefect.color === 'critical' ? 'text-rose-400' : 'text-amber-400'} text-xs tracking-wider uppercase`}>
-                      <span className={`w-2.5 h-2.5 rounded-full ${secondaryDefect.color === 'critical' ? 'bg-rose-500' : 'bg-amber-400'}`}></span>
-                      <span>{secondaryDefect.icon} {secondaryDefect.name}</span>
-                    </div>
-                    <div className={`${secondaryDefect.color === 'critical' ? 'text-rose-400' : 'text-amber-400'} text-xl font-black leading-none my-1`}>↓</div>
-                    <div className={`w-28 h-0.5 ${secondaryDefect.color === 'critical' ? 'bg-rose-500' : 'bg-amber-500'} rounded-full mb-1`}></div>
-                    <div className="text-[11px] font-mono text-slate-100 font-bold tracking-tight">
-                      {secondaryDefect.metricText} • {secondaryDefect.conf}
+                secondaryDefect.boundingBox ? (
+                  <div 
+                    className="absolute z-20 pointer-events-none"
+                    style={{
+                      top: `${secondaryDefect.boundingBox.y}%`,
+                      left: `${secondaryDefect.boundingBox.x}%`,
+                      width: `${Math.max(10, secondaryDefect.boundingBox.width)}%`,
+                      height: `${Math.max(8, secondaryDefect.boundingBox.height)}%`
+                    }}
+                  >
+                    <div className={`w-full h-full border-2 border-dashed ${secondaryDefect.color === 'critical' ? 'border-rose-500 bg-rose-500/15' : 'border-amber-500 bg-amber-500/15'} rounded-xl relative`}>
+                      <div className={`absolute -top-7 left-0 bg-slate-950/95 border ${secondaryDefect.color === 'critical' ? 'border-rose-500 text-rose-400' : 'border-amber-500 text-amber-400'} text-[10px] font-mono px-2 py-0.5 rounded shadow-lg whitespace-nowrap`}>
+                        {secondaryDefect.name} • {secondaryDefect.conf}
+                      </div>
                     </div>
                   </div>
-                  <div className={`w-52 h-24 border-2 border-dashed ${secondaryDefect.color === 'critical' ? 'border-rose-500 bg-rose-500/15' : 'border-amber-500 bg-amber-500/15'} rounded-xl -mt-2 -ml-6 pointer-events-none`}></div>
-                </div>
-              )}
-
-              {/* HERO CALLOUT ELEMENT 3: Tertiary Dynamic Defect */}
-              {!isNonAsset && (activeLayer === 'ALL' || activeLayer === 'WEAR') && tertiaryDefect && (
-                <div className="absolute top-[32%] right-[16%] z-20 pointer-events-auto">
-                  <div className="bg-slate-950/95 border border-cyan-400 rounded-xl px-3 py-1.5 shadow-xl backdrop-blur-md text-cyan-300 font-mono text-xs flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
-                    <span>{tertiaryDefect.icon} {tertiaryDefect.name}: {tertiaryDefect.metricText}</span>
+                ) : (
+                  <div className="absolute top-16 left-4 z-20 pointer-events-auto">
+                    <div className={`bg-slate-950/95 border ${secondaryDefect.color === 'critical' ? 'border-rose-500 text-rose-400' : 'border-amber-500 text-amber-400'} rounded-xl px-3 py-1.5 shadow-xl backdrop-blur-md font-mono text-xs flex items-center gap-2`}>
+                      <span className={`w-2 h-2 rounded-full ${secondaryDefect.color === 'critical' ? 'bg-rose-500' : 'bg-amber-400'}`}></span>
+                      <span className="truncate">{secondaryDefect.name} ({secondaryDefect.conf})</span>
+                    </div>
                   </div>
-                </div>
+                )
               )}
             </div>
           )}
@@ -1556,12 +1606,12 @@ export default function InspectionResult() {
           )}
 
           {/* Central Mode Switcher Bar at the bottom of the Hero Canvas (Screenshot 4) */}
-          <div className="absolute bottom-4 inset-x-0 z-30 flex justify-center pointer-events-none">
-            <div className="pointer-events-auto flex items-center gap-2 p-1.5 bg-slate-900/90 backdrop-blur-xl border border-slate-700/90 rounded-2xl shadow-2xl">
+          <div className="absolute bottom-3 sm:bottom-4 inset-x-2 sm:inset-x-0 z-30 flex justify-center pointer-events-none">
+            <div className="pointer-events-auto flex items-center gap-1 sm:gap-2 p-1 sm:p-1.5 bg-slate-900/90 backdrop-blur-xl border border-slate-700/90 rounded-2xl shadow-2xl max-w-full overflow-x-auto">
               <button
                 type="button"
                 onClick={() => setViewMode('ORIGINAL')}
-                className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-black transition-all cursor-pointer flex items-center gap-1 sm:gap-1.5 whitespace-nowrap ${
                   viewMode === 'ORIGINAL'
                     ? 'bg-white text-slate-950 shadow-md scale-105'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800'
@@ -1573,7 +1623,7 @@ export default function InspectionResult() {
               <button
                 type="button"
                 onClick={() => setViewMode('AI_OVERLAY')}
-                className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-black transition-all cursor-pointer flex items-center gap-1 sm:gap-1.5 whitespace-nowrap ${
                   viewMode === 'AI_OVERLAY'
                     ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/30 scale-105'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800'
@@ -1585,7 +1635,7 @@ export default function InspectionResult() {
               <button
                 type="button"
                 onClick={() => setViewMode('COMPARE')}
-                className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-black transition-all cursor-pointer flex items-center gap-1 sm:gap-1.5 whitespace-nowrap ${
                   viewMode === 'COMPARE'
                     ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg shadow-purple-500/30 scale-105'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800'
@@ -1941,16 +1991,26 @@ export default function InspectionResult() {
                     <div>
                       <span className="text-xs font-black uppercase tracking-wider text-slate-400">AI Visual Condition Score</span>
                       <div className="text-4xl sm:text-5xl font-black text-slate-900 dark:text-white tracking-tight">
-                        {currentScore} <span className="text-2xl font-bold text-slate-400">/ 100</span>
+                        {currentScore !== null ? (
+                          <>{currentScore} <span className="text-2xl font-bold text-slate-400">/ 100</span></>
+                        ) : (
+                          <span className="text-slate-400">N/A</span>
+                        )}
                       </div>
                     </div>
                     <div className="text-right">
                       <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold ${
+                        currentScore === null ? 'bg-slate-500/15 text-slate-400 border border-slate-500/25' :
                         currentScore >= 80 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25' :
                         currentScore >= 60 ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25' :
                         'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/25'
                       }`}>
-                        <span className={`w-2 h-2 rounded-full ${currentScore >= 80 ? 'bg-emerald-500' : currentScore >= 60 ? 'bg-amber-500' : 'bg-rose-500'} animate-pulse`}></span>
+                        <span className={`w-2 h-2 rounded-full ${
+                          currentScore === null ? 'bg-slate-500' :
+                          currentScore >= 80 ? 'bg-emerald-500' :
+                          currentScore >= 60 ? 'bg-amber-500' :
+                          'bg-rose-500'
+                        } animate-pulse`}></span>
                         {currentStatus}
                       </span>
                       <p className="text-[11px] text-slate-400 font-mono mt-1">Safety Factor: {currentSafetyFactor} SF</p>
@@ -1960,16 +2020,24 @@ export default function InspectionResult() {
                   {/* Mandatory qualified engineer verification disclaimer */}
                   <div className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs font-semibold">
                     <ShieldAlert className="w-4 h-4 shrink-0 text-amber-500" />
-                    <span>Visual assessment only — qualified engineer verification required.</span>
+                    <span>
+                      {currentScore === null 
+                        ? 'Insufficient visual evidence for a reliable condition assessment.'
+                        : 'Visual assessment only — qualified engineer verification required.'}
+                    </span>
                   </div>
 
                   {/* Visual High-Contrast Horizontal Meter matching Screenshot 2 */}
-                  <div className="w-full h-5 rounded-xl bg-slate-200 dark:bg-slate-700 overflow-hidden relative shadow-inner p-0.5">
-                    <div 
-                      className="h-full rounded-lg bg-gradient-to-r from-emerald-500 via-amber-500 to-orange-500 transition-all duration-1000"
-                      style={{ width: `${Math.max(5, Math.min(100, currentScore))}%` }}
-                    ></div>
-                  </div>
+                  {currentScore !== null ? (
+                    <div className="w-full h-5 rounded-xl bg-slate-200 dark:bg-slate-700 overflow-hidden relative shadow-inner p-0.5">
+                      <div 
+                        className="h-full rounded-lg bg-gradient-to-r from-emerald-500 via-amber-500 to-orange-500 transition-all duration-1000"
+                        style={{ width: `${Math.max(5, Math.min(100, currentScore))}%` }}
+                      ></div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400 italic">Score unavailable: Insufficient visual evidence for a reliable condition assessment.</p>
+                  )}
                 </div>
 
                 {/* Defensible Calculation Table matching Screenshot 5 */}
@@ -2013,7 +2081,7 @@ export default function InspectionResult() {
                   <div className="pt-3 border-t-2 border-slate-800 dark:border-slate-700 flex items-center justify-between text-sm font-black">
                     <span className="text-slate-800 dark:text-white">Overall Health Score</span>
                     <div className="text-right">
-                      <span className="text-lg text-primary font-black">{currentScore} / 100</span>
+                      <span className="text-lg text-primary font-black">{currentScore !== null ? `${currentScore} / 100` : 'N/A'}</span>
                       <p className="text-[10px] font-normal text-slate-400 font-mono">Formula: Visual (40%) + Defects (30%) + Severity (20%) + Confidence (10%)</p>
                     </div>
                   </div>
@@ -2504,28 +2572,36 @@ export default function InspectionResult() {
           <>
             {/* Step Timeline */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-              {historyData.map((point, i) => (
-                <div key={i} className={`p-4 rounded-2xl border-2 ${
-                  point.score >= 90 ? 'border-emerald-500/30 bg-emerald-500/5' :
-                  point.score >= 80 ? 'border-cyan-500/30 bg-cyan-500/5' :
-                  point.score >= 70 ? 'border-amber-500/30 bg-amber-500/5' :
-                  'border-rose-500/30 bg-rose-500/5'
-                } flex flex-col items-center text-center relative`}>
-                  <span className="text-slate-400 font-bold text-xs uppercase mb-1">{point.name}</span>
-                  <span className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">{point.score}/100</span>
-                  <span className={`font-extrabold text-xs mt-1 ${
-                    point.score >= 90 ? 'text-emerald-500' :
-                    point.score >= 80 ? 'text-cyan-500' :
-                    point.score >= 70 ? 'text-amber-500' :
-                    'text-rose-500'
-                  }`}>
-                    {point.score >= 90 ? 'Healthy' : point.score >= 80 ? 'Optimal' : point.score >= 70 ? 'At Risk' : 'Critical'}
-                  </span>
-                  {i < 3 && (
-                    <ArrowRight className="absolute -right-4 top-1/2 -translate-y-1/2 text-slate-300 dark:text-slate-700 hidden md:block w-5 h-5 z-10" />
-                  )}
-                </div>
-              ))}
+              {historyData.map((point, i) => {
+                const hasScore = point.score !== null;
+                const sc = point.score ?? 0;
+                return (
+                  <div key={i} className={`p-4 rounded-2xl border-2 ${
+                    !hasScore ? 'border-slate-500/30 bg-slate-500/5' :
+                    sc >= 90 ? 'border-emerald-500/30 bg-emerald-500/5' :
+                    sc >= 80 ? 'border-cyan-500/30 bg-cyan-500/5' :
+                    sc >= 70 ? 'border-amber-500/30 bg-amber-500/5' :
+                    'border-rose-500/30 bg-rose-500/5'
+                  } flex flex-col items-center text-center relative`}>
+                    <span className="text-slate-400 font-bold text-xs uppercase mb-1">{point.name}</span>
+                    <span className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
+                      {hasScore ? `${point.score}/100` : 'N/A'}
+                    </span>
+                    <span className={`font-extrabold text-xs mt-1 ${
+                      !hasScore ? 'text-slate-400' :
+                      sc >= 90 ? 'text-emerald-500' :
+                      sc >= 80 ? 'text-cyan-500' :
+                      sc >= 70 ? 'text-amber-500' :
+                      'text-rose-500'
+                    }`}>
+                      {!hasScore ? 'Insufficient' : sc >= 90 ? 'Healthy' : sc >= 80 ? 'Optimal' : sc >= 70 ? 'At Risk' : 'Critical'}
+                    </span>
+                    {i < 3 && (
+                      <ArrowRight className="absolute -right-4 top-1/2 -translate-y-1/2 text-slate-300 dark:text-slate-700 hidden md:block w-5 h-5 z-10" />
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             {/* Clean Line Chart */}
@@ -2561,10 +2637,10 @@ export default function InspectionResult() {
       </section>
 
       {/* Bottom Sticky Action Footer */}
-      <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
+      <div className="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3 pt-4">
         <button
           onClick={handleSaveToOfficerLog}
-          className={`px-6 py-3.5 rounded-2xl text-xs font-extrabold transition-all shadow-xl flex items-center gap-2 cursor-pointer ${
+          className={`w-full sm:w-auto min-h-[44px] px-6 py-3.5 rounded-2xl text-xs font-extrabold transition-all shadow-xl flex items-center justify-center gap-2 cursor-pointer ${
             isSaved
               ? 'bg-emerald-600 text-white'
               : 'bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-400 text-white shadow-primary/25 hover:scale-105'
@@ -2576,7 +2652,7 @@ export default function InspectionResult() {
 
         <button
           onClick={handleExportCmmsCsv}
-          className="px-6 py-3.5 rounded-2xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-extrabold shadow-md transition-all flex items-center gap-2 cursor-pointer border border-slate-200 dark:border-slate-700 hover:scale-105"
+          className="w-full sm:w-auto min-h-[44px] px-6 py-3.5 rounded-2xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-extrabold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer border border-slate-200 dark:border-slate-700 hover:scale-105"
           title="Export CSV for SAP PM / Oracle CMMS"
         >
           <FileSpreadsheet className="w-4 h-4 text-emerald-500" /> Export CMMS CSV
@@ -2584,7 +2660,7 @@ export default function InspectionResult() {
 
         <button
           onClick={handleExportMaximoJson}
-          className="px-6 py-3.5 rounded-2xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-extrabold shadow-md transition-all flex items-center gap-2 cursor-pointer border border-slate-200 dark:border-slate-700 hover:scale-105"
+          className="w-full sm:w-auto min-h-[44px] px-6 py-3.5 rounded-2xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-extrabold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer border border-slate-200 dark:border-slate-700 hover:scale-105"
           title="Export IBM Maximo Work Order JSON"
         >
           <Database className="w-4 h-4 text-cyan-500" /> Maximo JSON
@@ -2592,7 +2668,7 @@ export default function InspectionResult() {
 
         <Link
           to="/report"
-          className="px-6 py-3.5 rounded-2xl bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 text-white text-xs font-extrabold shadow-xl transition-all flex items-center gap-2 cursor-pointer border border-slate-700 hover:scale-105"
+          className="w-full sm:w-auto min-h-[44px] px-6 py-3.5 rounded-2xl bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 text-white text-xs font-extrabold shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer border border-slate-700 hover:scale-105 text-center"
         >
           <FileText className="w-4 h-4" /> Generate Formal PDF Report
         </Link>

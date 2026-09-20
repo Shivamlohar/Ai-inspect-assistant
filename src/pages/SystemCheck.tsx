@@ -298,17 +298,17 @@ export default function SystemCheck() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
           <button
             type="button"
             onClick={runFullDiagnostics}
-            className="btn-secondary py-2.5 px-4 text-xs font-bold flex items-center gap-2 shadow-xs cursor-pointer"
+            className="w-full sm:w-auto min-h-[44px] btn-secondary py-2.5 px-4 text-xs font-bold flex items-center justify-center gap-2 shadow-xs cursor-pointer"
           >
             <RotateCcw className="w-4 h-4" /> Run Full Hardware Test
           </button>
           <Link
             to="/inspect"
-            className="btn-primary py-2.5 px-5 text-xs font-bold flex items-center gap-2 shadow-md shadow-primary/20"
+            className="w-full sm:w-auto min-h-[44px] btn-primary py-2.5 px-5 text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-primary/20 text-center"
           >
             <span>Proceed to Inspection</span>
             <ArrowRight className="w-4 h-4" />

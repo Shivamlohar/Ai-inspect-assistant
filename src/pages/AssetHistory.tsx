@@ -395,8 +395,8 @@ export default function AssetHistory() {
               </span>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+            <div className="table-responsive-container overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[540px]">
                 <thead>
                   <tr className="bg-slate-50 dark:bg-slate-800/50 text-slate-400 text-xs font-bold uppercase tracking-wider border-b border-slate-100 dark:border-slate-800">
                     <th className="p-3 pl-4">Date</th>

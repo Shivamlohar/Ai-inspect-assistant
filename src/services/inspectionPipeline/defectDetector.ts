@@ -4,6 +4,7 @@
  */
 
 import type { AssetCategory, VisualDefect, DefectSeverity } from './types';
+import type { OpticalDefectAnalysisResult } from './opticalDefectAnalyzer';
 
 export interface DefectDetectionResult {
   hasDefects: boolean;
@@ -13,14 +14,15 @@ export interface DefectDetectionResult {
 }
 
 /**
- * Builds standard defect items from AI model findings or visual evidence heuristics.
+ * Builds standard defect items from AI model findings, optical canvas analysis, or visual evidence heuristics.
  * Strictly avoids fabricating mm, depth, or UTM values.
  */
 export function detectDefects(
   category: AssetCategory,
   isEligible: boolean,
   rawModelDefects?: any[],
-  contextText: string = ''
+  contextText: string = '',
+  opticalResult?: OpticalDefectAnalysisResult | null
 ): DefectDetectionResult {
   // If not eligible (e.g. person, animal, room, or low confidence), 0 defects must be returned!
   if (!isEligible) {
@@ -32,9 +34,13 @@ export function detectDefects(
     };
   }
 
-  // 1. If AI model provided structured defect findings, normalize them cleanly without fabricated metrics
-  if (Array.isArray(rawModelDefects) && rawModelDefects.length > 0) {
-    const sanitizedDefects: VisualDefect[] = rawModelDefects.map((d: any, idx: number) => {
+  // 1. If AI model provided structured defect findings, filter out fake nominal placeholders if real defects exist
+  const genuineModelDefects = Array.isArray(rawModelDefects)
+    ? rawModelDefects.filter((d: any) => d.id !== 'DEF_NOMINAL_1' && !d.name?.includes('NOMINAL'))
+    : [];
+
+  if (genuineModelDefects.length > 0) {
+    const sanitizedDefects: VisualDefect[] = genuineModelDefects.map((d: any, idx: number) => {
       const severity: DefectSeverity = normalizeSeverity(d.severity);
       const confNum = typeof d.confidenceVal === 'number' 
         ? Math.round(d.confidenceVal) 
@@ -60,7 +66,8 @@ export function detectDefects(
         boundingBox: d.boundingBox,
         color: severity === 'HIGH' ? 'critical' : (severity === 'MEDIUM' ? 'attention' : 'healthy'),
         icon: severity === 'HIGH' ? '🔴' : (severity === 'MEDIUM' ? '🟡' : '🟢'),
-        tag: `${severity} Priority Defect`
+        tag: `${severity} Priority Defect`,
+        affectedArea: d.affectedArea || 'Exterior surface'
       };
     });
 
@@ -72,11 +79,22 @@ export function detectDefects(
     };
   }
 
-  // 2. Offline / Context-based visual detection for inspectable assets
+  // 2. Incorporate Optical Canvas Analysis Findings (Pixel-Level CV)
+  const generatedDefects: VisualDefect[] = [];
+
+  if (opticalResult?.hasDefects && Array.isArray(opticalResult.defects) && opticalResult.defects.length > 0) {
+    for (const optDef of opticalResult.defects) {
+      generatedDefects.push(optDef);
+    }
+  }
+
+  // 3. Offline / Context-based visual detection for inspectable assets
   const text = contextText.toLowerCase();
 
-  // Check if context specifically indicates "no defect", "clean", or "nominal"
-  if (text.includes('clean') || text.includes('nominal') || text.includes('no defect') || text.includes('no damage') || text.includes('good condition')) {
+  // Check if context explicitly indicates "clean" or "nominal" AND no optical defects found
+  const isExplicitlyClean = (text.includes('clean') || text.includes('nominal') || text.includes('no defect') || text.includes('no damage') || text.includes('good condition')) && generatedDefects.length === 0;
+
+  if (isExplicitlyClean) {
     return {
       hasDefects: false,
       defects: [],
@@ -85,21 +103,19 @@ export function detectDefects(
     };
   }
 
-  // Check for specific visual defect indicators in user notes or file name
-  const hasCrack = text.includes('crack') || text.includes('fissure') || text.includes('fracture');
-  const hasPothole = text.includes('pothole') || text.includes('depression') || (category === 'Road' && text.includes('hole'));
-  const hasRust = text.includes('rust') || text.includes('corrosion') || text.includes('oxidation');
-  const hasSpalling = text.includes('spalling') || text.includes('delamination') || text.includes('chipping');
-  const hasLeakage = text.includes('leak') || text.includes('weep') || text.includes('oil');
-  const hasBroken = text.includes('broken') || text.includes('loose') || text.includes('damaged');
+  // Check for specific visual defect indicators in user notes, asset name, or file name
+  const hasCrack = text.includes('crack') || text.includes('fissure') || text.includes('fracture') || text.includes('taraad');
+  const hasPothole = text.includes('pothole') || text.includes('depression') || (category === 'Road' && (text.includes('hole') || text.includes('gaddha')));
+  const hasRust = text.includes('rust') || text.includes('corrosion') || text.includes('oxidation') || text.includes('zang');
+  const hasSpalling = text.includes('spalling') || text.includes('delamination') || text.includes('chipping') || text.includes('flaking');
+  const hasLeakage = text.includes('leak') || text.includes('weep') || text.includes('oil') || text.includes('risav');
+  const hasBroken = text.includes('broken') || text.includes('loose') || text.includes('damaged') || text.includes('damage') || text.includes('fault') || text.includes('problem');
 
-  const generatedDefects: VisualDefect[] = [];
-
-  if (hasCrack) {
+  if (hasCrack && !generatedDefects.some(d => d.type.includes('crack'))) {
     generatedDefects.push({
       id: 'DEFECT_CRACK',
       type: 'surface_crack',
-      name: 'SURFACE CRACK',
+      name: 'SURFACE CRACK / FISSURE',
       confidence: 88,
       confidenceLabel: '88%',
       severity: 'MEDIUM',
@@ -108,15 +124,16 @@ export function detectDefects(
       engineeringAssessment: 'ENGINEERING ASSESSMENT: Potential structural concern detected — professional engineering assessment recommended. Physical crack dimensions require calibrated measurement equipment or a reference scale.',
       color: 'attention',
       icon: '🟡',
-      tag: 'Medium Priority Defect'
+      tag: 'Medium Priority Defect',
+      affectedArea: 'Load-Bearing Structural Surface'
     });
   }
 
-  if (hasPothole && category === 'Road') {
+  if (hasPothole && !generatedDefects.some(d => d.type.includes('pothole'))) {
     generatedDefects.push({
       id: 'DEFECT_POTHOLE',
       type: 'pothole',
-      name: 'ROAD SURFACE POTHOLE',
+      name: 'ROAD SURFACE POTHOLE / CAVITY',
       confidence: 91,
       confidenceLabel: '91%',
       severity: 'HIGH',
@@ -125,11 +142,12 @@ export function detectDefects(
       engineeringAssessment: 'ENGINEERING ASSESSMENT: Road hazard requiring prompt patch maintenance. Depth and volume require on-site asphalt depth gauge.',
       color: 'critical',
       icon: '🔴',
-      tag: 'High Priority Defect'
+      tag: 'High Priority Defect',
+      affectedArea: 'Pavement Transit Lane'
     });
   }
 
-  if (hasSpalling && (category === 'Building' || category === 'Bridge')) {
+  if (hasSpalling && !generatedDefects.some(d => d.type.includes('spall'))) {
     generatedDefects.push({
       id: 'DEFECT_SPALLING',
       type: 'concrete_spalling',
@@ -142,11 +160,12 @@ export function detectDefects(
       engineeringAssessment: 'ENGINEERING ASSESSMENT: Concrete cover loss observed. Inspection for underlying rebar oxidation recommended before moisture ingress expands.',
       color: 'attention',
       icon: '🟡',
-      tag: 'Medium Priority Defect'
+      tag: 'Medium Priority Defect',
+      affectedArea: 'Structural Concrete Matrix'
     });
   }
 
-  if (hasRust) {
+  if (hasRust && !generatedDefects.some(d => d.type.includes('corros'))) {
     generatedDefects.push({
       id: 'DEFECT_CORROSION',
       type: 'corrosion',
@@ -159,11 +178,12 @@ export function detectDefects(
       engineeringAssessment: 'ENGINEERING ASSESSMENT: Requires verification by a qualified inspector to determine pitting depth and remaining section thickness using calibrated ultrasonic equipment.',
       color: 'attention',
       icon: '🟡',
-      tag: 'Medium Priority Defect'
+      tag: 'Medium Priority Defect',
+      affectedArea: 'Metallic Substrate / Flange'
     });
   }
 
-  if (hasLeakage) {
+  if (hasLeakage && !generatedDefects.some(d => d.type.includes('leak'))) {
     generatedDefects.push({
       id: 'DEFECT_LEAK',
       type: 'fluid_leakage',
@@ -176,15 +196,16 @@ export function detectDefects(
       engineeringAssessment: 'ENGINEERING ASSESSMENT: Fluid weepage indicates seal or gasket compromise. Depressurize and conduct trace leak verification.',
       color: 'critical',
       icon: '🔴',
-      tag: 'High Priority Defect'
+      tag: 'High Priority Defect',
+      affectedArea: 'Mechanical Seal / Gasket Boundary'
     });
   }
 
-  if (hasBroken) {
+  if (hasBroken && !generatedDefects.some(d => d.type.includes('damage') || d.type.includes('crack'))) {
     generatedDefects.push({
       id: 'DEFECT_DAMAGE',
       type: 'physical_damage',
-      name: 'VISIBLE PHYSICAL DAMAGE',
+      name: 'VISIBLE PHYSICAL DAMAGE / DEFORMATION',
       confidence: 85,
       confidenceLabel: '85%',
       severity: 'HIGH',
@@ -193,11 +214,12 @@ export function detectDefects(
       engineeringAssessment: 'ENGINEERING ASSESSMENT: Potential structural concern detected — professional engineering assessment recommended.',
       color: 'critical',
       icon: '🔴',
-      tag: 'High Priority Defect'
+      tag: 'High Priority Defect',
+      affectedArea: 'Main Component Profile'
     });
   }
 
-  // If no defects matched the text, default to "No visible defect detected" rather than inventing one!
+  // If no defects found, return clean nominal result
   if (generatedDefects.length === 0) {
     return {
       hasDefects: false,
@@ -210,8 +232,10 @@ export function detectDefects(
   return {
     hasDefects: true,
     defects: generatedDefects,
-    summaryObservation: `Visual inspection identified ${generatedDefects.length} candidate finding(s) on ${category}.`,
-    engineeringNotice: 'Findings are visual AI observations and require qualification by an on-site engineer.'
+    summaryObservation: opticalResult?.hasDefects
+      ? opticalResult.summaryObservation
+      : `Visual inspection identified ${generatedDefects.length} candidate finding(s) on ${category}.`,
+    engineeringNotice: 'Findings represent visual AI observations and require verification by an on-site certified engineer.'
   };
 }
 

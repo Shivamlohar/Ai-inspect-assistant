@@ -27,7 +27,7 @@ import {
 import { Link } from 'react-router-dom';
 import { getActiveOfficer, saveOfficerInspection } from '../utils/officerStore';
 import { windTurbine401Img, bridge102Img } from '../assets/assetImages';
-import { resolveInspectionDomain } from '../data/domainRegistry';
+import { resolveInspectionDomain, resolveApplicableStandard } from '../data/domainRegistry';
 
 export default function Report() {
   const [officer] = useState(() => getActiveOfficer());
@@ -35,13 +35,13 @@ export default function Report() {
   const [saveToast, setSaveToast] = useState(false);
 
   const [data, setData] = useState({
-    assetName: 'Industrial Machine #M-401 (Mechanical Hub)',
-    assetId: 'MACH-401-HUB',
-    inspectionDomain: 'Industrial Machines',
-    detectedAssetType: 'Electric Motor M-401',
-    overallCondition: 'Fair',
+    assetName: 'Asset Visual Inspection Dossier',
+    assetId: 'ASSET-RECORD',
+    inspectionDomain: 'Infrastructure / Machinery',
+    detectedAssetType: 'Engineering Asset',
+    overallCondition: 'Pending Assessment',
     engineerVerificationStatus: 'Pending Review by Qualified Engineer',
-    location: 'Sector 5 (Mechanical Fabrication Unit)',
+    location: 'Designated Field Section',
     isMachine: true,
     isIndustrialAsset: true,
     isDemoData: false,
@@ -50,8 +50,8 @@ export default function Report() {
     inspectionTimestamp: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
     detectedSubject: '',
     rejectionReason: '',
-    score: '72 / 100',
-    status: 'At Risk',
+    score: 'N/A',
+    status: 'Pending Assessment',
     safetyFactor: '1.15',
     securityHash: 'SHA256:7f3a9e10c4b281d5',
     duration: '02:10 minutes',
@@ -61,17 +61,11 @@ export default function Report() {
     diagnosticSummary: '',
     technicalContext: '',
     sourceCitation: '',
+    applicableStandard: '',
     knowledgeSources: [] as any[],
     limitationsOfVisualInspection: [] as string[],
     auditTraceId: '',
-    humanVerifications: {
-      'CRACK': 'Confirmed',
-      'RUST': 'Confirmed',
-      'WEAR': 'Needs Review',
-      'defect-crack': 'Confirmed',
-      'defect-corrosion': 'Confirmed',
-      'defect-wear': 'Needs Review'
-    } as Record<string, string>,
+    humanVerifications: {} as Record<string, string>,
     defects: [] as any[],
     customDefects: [] as any[],
     recommendations: [] as any[]
@@ -102,22 +96,60 @@ export default function Report() {
         // Non-engineering rejection bypassed per user request
         const isNonAsset = false;
 
-        const currentScore = isNonAsset ? 'N/A' : (pipelineResult?.healthScore?.finalScore ? `${pipelineResult.healthScore.finalScore} / 100` : (isG ? `${gResult.healthScore ?? 72} / 100` : '72 / 100'));
-        const currentStatus = isNonAsset ? 'Out of Scope (Non-Asset)' : (pipelineResult?.healthScore?.status || (isG ? (gResult.status ?? 'At Risk') : 'At Risk'));
-        const currentSafetyFactor = isNonAsset ? 'N/A' : (pipelineResult?.defects?.length === 0 ? '1.50' : (isG ? (gResult.safetyFactor ?? '1.15') : (isM ? '1.15' : '1.28')));
+        const hasHigh = !isNonAsset && (
+          (pipelineResult?.defects && pipelineResult.defects.some((d: any) => d.severity === 'HIGH')) ||
+          (parsed.customDefects && parsed.customDefects.some((f: any) => f.severity === 'High Severity'))
+        );
+        const hasMed = !isNonAsset && (
+          (pipelineResult?.defects && pipelineResult.defects.some((d: any) => d.severity === 'MEDIUM')) ||
+          (parsed.customDefects && parsed.customDefects.some((f: any) => f.severity === 'Medium Severity'))
+        );
+        const hasAny = !isNonAsset && (
+          (pipelineResult?.defects && pipelineResult.defects.length > 0) ||
+          (parsed.customDefects && parsed.customDefects.length > 0)
+        );
+
+        const isClean = !isNonAsset && !hasAny;
+
+        const numScore: number | null = isNonAsset
+          ? null
+          : (typeof pipelineResult?.healthScore?.finalScore === 'number'
+            ? pipelineResult.healthScore.finalScore
+            : (typeof gResult.healthScore === 'number' ? gResult.healthScore : null));
+
+        const currentScore = numScore !== null ? `${numScore} / 100` : 'N/A';
+        const currentSafetyFactor = isNonAsset ? 'N/A' : (pipelineResult?.defects?.length === 0 ? '1.50' : hasHigh ? '1.08' : (isG ? (gResult.safetyFactor ?? '1.15') : (isM ? '1.15' : '1.28')));
 
         const rawDomain = pipelineResult?.inspectionDomain || parsed.inspectionDomain || parsed.assetCategory || parsed.assetName;
         const domConfig = resolveInspectionDomain(rawDomain);
         const resolvedDomain = isNonAsset ? 'Non-Engineering / Rejected' : domConfig.name;
 
-        const numScore = isNonAsset ? 0 : (pipelineResult?.healthScore?.finalScore ?? (isG ? (gResult.healthScore ?? 72) : 72));
-        const resolvedOverallCond = isNonAsset 
-          ? 'Poor' 
-          : (pipelineResult?.overallCondition || (numScore >= 80 ? 'Good' : numScore >= 60 ? 'Fair' : 'Poor'));
-
         const resolvedAssetType = isNonAsset
           ? (pipelineResult?.detectedCategory || parsed.detectedSubject || gResult.detectedSubject || 'Non-Industrial Subject')
           : (pipelineResult?.detectedAssetType || pipelineResult?.detectedCategory || parsed.assetName || 'Industrial Asset');
+
+        const standardInfo = resolveApplicableStandard(
+          resolvedDomain,
+          resolvedAssetType,
+          pipelineResult?.defects?.[0]?.type || pipelineResult?.defects?.[0]?.name
+        );
+        const resolvedStandard = pipelineResult?.applicableStandard || standardInfo.standard;
+
+        const resolvedOverallCond = isNonAsset 
+          ? 'Out of Scope' 
+          : (numScore === null
+            ? 'Insufficient Evidence'
+            : (isClean
+              ? 'Condition Appears Acceptable Based on Available Visual Evidence'
+              : (pipelineResult?.healthScore?.overallCondition || 
+                 pipelineResult?.overallCondition || 
+                 (hasHigh ? (numScore < 25 ? 'Critical' : 'Poor') : hasMed ? 'Fair' : (numScore >= 75 ? 'Good' : 'Fair')))));
+
+        const currentStatus = isNonAsset 
+          ? 'Out of Scope (Non-Asset)' 
+          : (numScore === null
+            ? 'Insufficient Evidence'
+            : (hasHigh ? 'Critical' : hasMed ? 'Attention Needed' : (isClean ? 'Acceptable / Healthy' : 'Attention Needed')));
 
         setData({
           assetName: pipelineResult?.assetName || parsed.assetName || (isNonAsset ? 'Inspection Not Applicable' : (isM ? 'Industrial Machine #M-401 (Mechanical Hub)' : 'Bridge #102')),
@@ -169,6 +201,7 @@ export default function Report() {
                 'Physical dimension measurements require verified calibration targets and mechanical gauges on-site.',
                 'Repair protocols must be reviewed and certified by an accredited structural or mechanical engineer.'
               ],
+          applicableStandard: resolvedStandard,
           auditTraceId: pipelineResult?.auditTraceId || ''
         });
       } catch (e) {
@@ -310,10 +343,10 @@ export default function Report() {
         >
           <ArrowLeft className="w-4 h-4" /> Back to Inspection Result
         </Link>
-        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row flex-wrap items-center gap-2.5 w-full sm:w-auto">
           <button
             onClick={handleSaveReportToOfficerLog}
-            className={`px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer ${
+            className={`w-full sm:w-auto min-h-[44px] px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer ${
               isSaved
                 ? 'bg-emerald-500/15 text-emerald-600 border border-emerald-500/30'
                 : 'bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-400 text-white shadow-primary/25 hover:scale-105'
@@ -325,7 +358,7 @@ export default function Report() {
 
           <button 
             onClick={handleExportCmmsCsv}
-            className="btn-secondary py-2.5 px-3.5 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+            className="w-full sm:w-auto min-h-[44px] btn-secondary py-2.5 px-3.5 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
             title="Export CSV for SAP PM / Oracle CMMS"
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-600" /> Export CSV
@@ -333,7 +366,7 @@ export default function Report() {
           
           <button 
             onClick={handleExportMaximoJson}
-            className="btn-secondary py-2.5 px-3.5 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+            className="w-full sm:w-auto min-h-[44px] btn-secondary py-2.5 px-3.5 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
             title="Export IBM Maximo JSON"
           >
             <Database className="w-4 h-4 text-cyan-600" /> Maximo JSON
@@ -341,7 +374,7 @@ export default function Report() {
           
           <button 
             onClick={handlePrint}
-            className="btn-secondary py-2.5 px-3.5 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+            className="w-full sm:w-auto min-h-[44px] btn-secondary py-2.5 px-3.5 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
           >
             <Printer className="w-4 h-4" /> Print
           </button>
@@ -349,7 +382,7 @@ export default function Report() {
           {/* Action: "Download PDF Report" button matching Screenshot 2 */}
           <button 
             onClick={handleDownloadPdf}
-            className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-black transition-all flex items-center gap-2 cursor-pointer shadow-lg shadow-slate-900/20 hover:scale-105"
+            className="w-full sm:w-auto min-h-[44px] px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-slate-900/20 hover:scale-105"
           >
             <Download className="w-4 h-4 text-cyan-400" /> Download PDF Report
           </button>
@@ -371,12 +404,12 @@ export default function Report() {
                   Automated Inspection Report
                 </h1>
                 <p className="text-xs font-bold text-slate-500 tracking-wider">
-                  ASME Section XI & ISO 55000 Industrial Metrology Audit
+                  {data.applicableStandard ? `${data.applicableStandard} Engineering Metrology Audit` : 'Engineering Asset Visual Metrology Audit'}
                 </p>
               </div>
             </div>
             <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider flex flex-wrap items-center gap-2">
-              <span>{data.isMachine ? 'Mechanical Turbomachinery Defect Metrology' : 'Civil Infrastructure Autonomous Diagnostic System'}</span>
+              <span>{data.isMachine ? 'Mechanical Turbomachinery Defect Metrology' : 'Infrastructure Asset Diagnostic System'}</span>
               <span className="text-primary font-bold">• {data.modelUsed}</span>
             </p>
           </div>
@@ -427,6 +460,10 @@ export default function Report() {
                   <td className="py-2 font-bold text-slate-800">{data.detectedAssetType}</td>
                 </tr>
                 <tr>
+                  <th className="py-2 text-slate-500 font-semibold text-left">Applicable Standard:</th>
+                  <td className="py-2 font-mono font-bold text-cyan-700">{data.applicableStandard || 'Standard: Not specified'}</td>
+                </tr>
+                <tr>
                   <th className="py-2 text-slate-500 font-semibold text-left">Equipment Name:</th>
                   <td className="py-2 font-bold text-slate-800">{data.assetName}</td>
                 </tr>
@@ -438,8 +475,9 @@ export default function Report() {
                   <th className="py-2 text-slate-500 font-semibold text-left">Overall Condition:</th>
                   <td className="py-2">
                     <span className={`px-2 py-0.5 rounded text-xs font-black uppercase ${
-                      data.overallCondition === 'Good' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
+                      data.overallCondition === 'Good' || data.overallCondition.includes('Acceptable') ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
                       data.overallCondition === 'Fair' ? 'bg-amber-100 text-amber-800 border border-amber-300' :
+                      data.overallCondition === 'Insufficient Evidence' || data.overallCondition === 'Out of Scope' ? 'bg-slate-100 text-slate-700 border border-slate-300' :
                       'bg-rose-100 text-rose-800 border border-rose-300'
                     }`}>
                       {data.overallCondition}
@@ -529,7 +567,7 @@ export default function Report() {
               alt="Inspected Asset Evidence"
               loading="lazy"
               decoding="async"
-              className="w-full h-full object-cover opacity-90"
+              className="w-full h-full object-contain bg-slate-950 opacity-90"
               onError={(e) => {
                 (e.target as HTMLImageElement).src = bridge102Img;
               }}
@@ -582,7 +620,7 @@ export default function Report() {
             </span>
           </div>
           
-          <div className="overflow-x-auto">
+          <div className="table-responsive-container overflow-x-auto">
             <table className="w-full text-left text-xs border border-slate-200 rounded-xl overflow-hidden">
               <thead className="bg-slate-100 text-slate-700 font-bold uppercase tracking-wider">
                 <tr>
@@ -698,15 +736,22 @@ export default function Report() {
             )}
           </div>
 
+          <div className="p-3 rounded-lg bg-white border border-slate-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs">
+            <span className="text-slate-600 font-semibold">Applicable Engineering Standard:</span>
+            <span className="font-mono font-bold text-cyan-700 bg-cyan-50 px-3 py-1 rounded border border-cyan-200">
+              {data.applicableStandard || data.sourceCitation || 'Standard: Not specified'}
+            </span>
+          </div>
+
           {data.technicalContext && (
             <p className="text-xs text-slate-700 leading-relaxed font-medium">
               <strong className="text-slate-900">Technical Context & Thresholds:</strong> {data.technicalContext}
             </p>
           )}
 
-          {data.sourceCitation && (
+          {data.sourceCitation && data.sourceCitation !== data.applicableStandard && (
             <p className="text-[11px] font-mono text-slate-600">
-              Primary Standard Reference: <strong className="text-slate-800">{data.sourceCitation}</strong>
+              Technical Citation: <strong className="text-slate-800">{data.sourceCitation}</strong>
             </p>
           )}
 

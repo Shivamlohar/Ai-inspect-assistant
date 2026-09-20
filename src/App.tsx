@@ -26,7 +26,10 @@ import {
   Check,
   ArrowLeft,
   KeyRound,
-  BookOpen
+  BookOpen,
+  Menu,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import type { ThemeMode } from './utils/theme';
 import { getStoredTheme, applyTheme } from './utils/theme';
@@ -831,7 +834,10 @@ function TopNav({
   currentTheme,
   onToggleTheme,
   officer,
-  onOpenOfficerModal
+  onOpenOfficerModal,
+  onToggleMobileDrawer,
+  isSidebarCollapsed,
+  onToggleSidebarCollapse
 }: { 
   onOpenAlerts: () => void; 
   onOpenSettings: () => void; 
@@ -839,8 +845,12 @@ function TopNav({
   onToggleTheme: () => void;
   officer: OfficerProfile;
   onOpenOfficerModal: () => void;
+  onToggleMobileDrawer: () => void;
+  isSidebarCollapsed: boolean;
+  onToggleSidebarCollapse: () => void;
 }) {
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -854,173 +864,437 @@ function TopNav({
   }, []);
 
   return (
-    <header className="glass-nav border-b border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between px-6 py-3.5 sticky top-0 z-20 shadow-xs transition-colors">
-      <div className="flex items-center gap-3">
-        <Link to="/" className="flex items-center gap-3 group">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-primary to-cyan-400 flex items-center justify-center text-white shadow-md shadow-primary/25 group-hover:scale-105 transition-transform">
-            <ShieldCheck className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="font-extrabold text-slate-800 text-lg tracking-tight">AI Inspection</span>
-              <span className="text-[10px] uppercase font-bold tracking-widest bg-primary/10 text-primary px-2 py-0.5 rounded-full">Assistance</span>
-            </div>
-            <p className="text-[11px] text-slate-400 font-medium hidden sm:block">Inspect Smarter. Detect Earlier. Maintain Better.</p>
-          </div>
-        </Link>
-      </div>
-      
-      {/* Center Command Search Bar (Desktop) */}
-      <div className="hidden md:flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 text-slate-400 text-xs w-64 lg:w-80 focus-within:w-96 focus-within:border-primary/50 transition-all">
-        <Search className="w-4 h-4 text-slate-400 shrink-0" />
-        <input 
-          id="global-command-search"
-          name="searchQuery"
-          type="text" 
-          placeholder="Search assets, telemetry, reports..." 
-          aria-label="Search assets, telemetry, and reports"
-          className="bg-transparent border-none outline-none text-xs text-slate-700 dark:text-slate-200 placeholder:text-slate-400 w-full"
-        />
-        <kbd className="text-[10px] font-mono bg-white dark:bg-slate-700 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-600 text-slate-400 shadow-xs shrink-0">Ctrl+K</kbd>
-      </div>
+    <header className="glass-nav border-b border-slate-200/60 dark:border-slate-800/60 px-3 sm:px-6 py-2.5 sm:py-3.5 sticky top-0 z-30 shadow-xs transition-colors">
+      <div className="flex items-center justify-between gap-2 sm:gap-4">
+        
+        {/* Left Side: Hamburger (Mobile) + Tablet Sidebar Toggle + Brand Logo */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Mobile Hamburger Button */}
+          <button
+            type="button"
+            onClick={onToggleMobileDrawer}
+            aria-label="Open navigation drawer"
+            className="md:hidden w-10 h-10 flex items-center justify-center rounded-xl text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
 
-      {/* Top Nav Right Action Cluster */}
-      <div className="hidden md:flex items-center gap-3">
-        {/* Live AI Engine Telemetry & Connectivity Badge */}
-        <div className={`hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-colors ${
-          !isOnline 
-            ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400' 
-            : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400'
-        }`}>
-          <span className="relative flex h-2 w-2">
-            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-              !isOnline ? 'bg-amber-400' : 'bg-emerald-400'
-            }`}></span>
-            <span className={`relative inline-flex rounded-full h-2 w-2 ${
-              !isOnline ? 'bg-amber-500' : 'bg-emerald-500'
-            }`}></span>
-          </span>
-          <span>
-            {!isOnline 
-              ? 'Vault Offline Safe' 
-              : 'OpenAI Vision (GPT-4o)'}
-          </span>
-          <span className={`text-[10px] opacity-75 font-mono px-1.5 py-0.5 rounded ${
-            !isOnline 
-              ? 'bg-amber-500/15' 
-              : 'bg-emerald-500/15'
-          }`}>
-            {!isOnline ? 'Air-Gapped' : 'Live Cloud AI'}
-          </span>
+          {/* Tablet/Desktop Sidebar Collapse Toggle Button */}
+          <button
+            type="button"
+            onClick={onToggleSidebarCollapse}
+            aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            className="hidden md:flex lg:hidden w-9 h-9 items-center justify-center rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+            title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {isSidebarCollapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+          </button>
+
+          {/* Logo & Application Title */}
+          <Link to="/" className="flex items-center gap-2.5 sm:gap-3 group min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-primary to-cyan-400 flex items-center justify-center text-white shadow-md shadow-primary/25 group-hover:scale-105 transition-transform shrink-0">
+              <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="font-extrabold text-slate-800 dark:text-white text-base sm:text-lg tracking-tight truncate">
+                  AI Inspection
+                </span>
+                <span className="text-[9px] sm:text-[10px] uppercase font-bold tracking-widest bg-primary/10 text-primary px-2 py-0.5 rounded-full shrink-0">
+                  Assistance
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 font-medium hidden sm:block truncate">
+                Inspect Smarter. Detect Earlier. Maintain Better.
+              </p>
+            </div>
+          </Link>
+        </div>
+        
+        {/* Center Command Search Bar (Desktop / Laptop) */}
+        <div className="hidden md:flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 text-slate-400 text-xs w-48 lg:w-72 xl:w-80 focus-within:w-96 focus-within:border-primary/50 transition-all">
+          <Search className="w-4 h-4 text-slate-400 shrink-0" />
+          <input 
+            id="global-command-search"
+            name="searchQuery"
+            type="text" 
+            placeholder="Search assets, telemetry, reports..." 
+            aria-label="Search assets, telemetry, and reports"
+            className="bg-transparent border-none outline-none text-xs text-slate-700 dark:text-slate-200 placeholder:text-slate-400 w-full"
+          />
+          <kbd className="hidden lg:inline text-[10px] font-mono bg-white dark:bg-slate-700 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-600 text-slate-400 shadow-xs shrink-0">Ctrl+K</kbd>
         </div>
 
-        {/* 1-Click Dark/Light Theme Quick Toggle */}
-        <button
-          onClick={onToggleTheme}
-          aria-label={currentTheme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-          className="p-2 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
-          title={currentTheme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-        >
-          {currentTheme === 'dark' ? (
-            <Sun className="w-5 h-5 text-amber-400" />
+        {/* Top Nav Right Action Cluster (Desktop / Tablet) */}
+        <div className="hidden md:flex items-center gap-2 lg:gap-3 shrink-0">
+          {/* Live AI Engine Telemetry & Connectivity Badge */}
+          <div className={`hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-colors ${
+            !isOnline 
+              ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400' 
+              : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+          }`}>
+            <span className="relative flex h-2 w-2">
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                !isOnline ? 'bg-amber-400' : 'bg-emerald-400'
+              }`}></span>
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${
+                !isOnline ? 'bg-amber-500' : 'bg-emerald-500'
+              }`}></span>
+            </span>
+            <span className="truncate">
+              {!isOnline 
+                ? 'Vault Offline Safe' 
+                : 'OpenAI Vision (GPT-4o)'}
+            </span>
+            <span className={`text-[10px] opacity-75 font-mono px-1.5 py-0.5 rounded ${
+              !isOnline 
+                ? 'bg-amber-500/15' 
+                : 'bg-emerald-500/15'
+            }`}>
+              {!isOnline ? 'Air-Gapped' : 'Live Cloud AI'}
+            </span>
+          </div>
+
+          {/* 1-Click Dark/Light Theme Quick Toggle */}
+          <button
+            onClick={onToggleTheme}
+            aria-label={currentTheme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            className="w-9 h-9 flex items-center justify-center text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
+            title={currentTheme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          >
+            {currentTheme === 'dark' ? (
+              <Sun className="w-5 h-5 text-amber-400" />
+            ) : (
+              <Moon className="w-5 h-5 text-slate-600" />
+            )}
+          </button>
+
+          <button 
+            onClick={onOpenAlerts}
+            aria-label="View system alerts and notifications"
+            className="relative w-9 h-9 flex items-center justify-center text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
+            title="View Alerts"
+          >
+            <Bell className="w-5 h-5" />
+            <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-critical rounded-full ring-2 ring-white dark:ring-slate-900"></span>
+          </button>
+
+          <button 
+            onClick={onOpenSettings}
+            aria-label="Open application settings"
+            className="w-9 h-9 flex items-center justify-center text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
+            title="Settings"
+          >
+            <Settings className="w-5 h-5" />
+          </button>
+
+          {/* Officer Profile Pill or Login Button */}
+          {officer.isLoggedIn ? (
+            <button
+              onClick={onOpenOfficerModal}
+              aria-label={`Officer profile for ${officer.name}`}
+              className="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800 hover:opacity-85 transition cursor-pointer text-left group"
+              title="Officer Profile & Work Vault"
+            >
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-cyan-400 text-white font-bold flex items-center justify-center text-xs shadow-sm group-hover:scale-105 transition-transform shrink-0">
+                {officer.avatarInitials}
+              </div>
+              <div className="hidden xl:block text-left max-w-[120px] truncate">
+                <p className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-tight flex items-center gap-1 truncate">
+                  <span className="truncate">{officer.name}</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                </p>
+                <p className="text-[10px] text-slate-400 font-mono truncate">{officer.id}</p>
+              </div>
+            </button>
           ) : (
-            <Moon className="w-5 h-5 text-slate-600" />
+            <button
+              onClick={onOpenOfficerModal}
+              aria-label="Officer sign in"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-400 text-white font-bold text-xs shadow-md shadow-primary/25 transition cursor-pointer ml-1"
+              title="Sign In Officer"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span className="hidden lg:inline">Officer Login</span>
+            </button>
           )}
-        </button>
+        </div>
 
-        <button 
-          onClick={onOpenAlerts}
-          aria-label="View system alerts and notifications"
-          className="relative p-2 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
-          title="View Alerts"
-        >
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-critical rounded-full ring-2 ring-white dark:ring-slate-900"></span>
-        </button>
+        {/* Mobile Top Actions (Compact, Touch-Friendly >= 44px) */}
+        <div className="md:hidden flex items-center gap-1 shrink-0">
+          {/* Mobile Search Toggle */}
+          <button
+            onClick={() => setIsMobileSearchOpen(!isMobileSearchOpen)}
+            aria-label="Toggle search input"
+            className="w-10 h-10 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
+            title="Search"
+          >
+            <Search className="w-4 h-4" />
+          </button>
 
-        <button 
-          onClick={onOpenSettings}
-          aria-label="Open application settings"
-          className="p-2 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
-          title="Settings"
-        >
-          <Settings className="w-5 h-5" />
-        </button>
+          <button
+            onClick={onToggleTheme}
+            aria-label="Toggle theme appearance"
+            className="w-10 h-10 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
+            title="Toggle Theme"
+          >
+            {currentTheme === 'dark' ? (
+              <Sun className="w-5 h-5 text-amber-400" />
+            ) : (
+              <Moon className="w-5 h-5 text-slate-600" />
+            )}
+          </button>
 
-        {/* Officer Profile Pill or Login Button */}
-        {officer.isLoggedIn ? (
+          <button 
+            onClick={onOpenAlerts}
+            aria-label="View system alerts"
+            className="relative w-10 h-10 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
+            title="Alerts"
+          >
+            <Bell className="w-5 h-5" />
+            <span className="absolute top-2 right-2 w-2 h-2 bg-critical rounded-full"></span>
+          </button>
+
+          {/* Mobile Officer Button */}
           <button
             onClick={onOpenOfficerModal}
-            aria-label={`Officer profile for ${officer.name}`}
-            className="flex items-center gap-2.5 pl-2 border-l border-slate-200 dark:border-slate-800 hover:opacity-85 transition cursor-pointer text-left group"
+            aria-label="Officer account and vault"
+            className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+            title="Officer Account"
+          >
+            {officer.isLoggedIn ? (
+              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-primary to-cyan-400 text-white font-bold flex items-center justify-center text-[10px]">
+                {officer.avatarInitials}
+              </div>
+            ) : (
+              <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
+                <LogIn className="w-4 h-4" />
+              </div>
+            )}
+          </button>
+        </div>
+
+      </div>
+
+      {/* Mobile Expandable Search Bar */}
+      {isMobileSearchOpen && (
+        <div className="mt-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-800/60 flex items-center gap-2 md:hidden animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs">
+            <Search className="w-4 h-4 text-slate-400 shrink-0" />
+            <input 
+              id="mobile-command-search"
+              name="mobileSearchQuery"
+              type="text" 
+              autoFocus
+              placeholder="Search assets, telemetry, reports..." 
+              aria-label="Search assets, telemetry, and reports on mobile"
+              className="bg-transparent border-none outline-none text-xs text-slate-700 dark:text-slate-200 placeholder:text-slate-400 w-full"
+            />
+          </div>
+          <button 
+            type="button"
+            onClick={() => setIsMobileSearchOpen(false)}
+            className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg text-xs font-bold"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+    </header>
+  );
+}
+
+{/* Off-Canvas Mobile Drawer Navigation */}
+function MobileDrawer({
+  isOpen,
+  onClose,
+  onOpenAlerts,
+  onOpenSettings,
+  currentTheme,
+  onToggleTheme,
+  officer,
+  onOpenOfficerModal
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onOpenAlerts: () => void;
+  onOpenSettings: () => void;
+  currentTheme: ThemeMode;
+  onToggleTheme: () => void;
+  officer: OfficerProfile;
+  onOpenOfficerModal: () => void;
+}) {
+  const location = useLocation();
+
+  const navItems = [
+    { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
+    { path: '/system-check', icon: Activity, label: 'System Check & Sensors' },
+    { path: '/assets', icon: Building2, label: 'Assets Registry' },
+    { path: '/history', icon: History, label: 'Asset History & Audits' },
+    { path: '/inspect', icon: Camera, label: 'New Inspection' },
+    { path: '/report', icon: FileText, label: 'Reports & Export' },
+    { path: '/knowledge-admin', icon: BookOpen, label: 'Knowledge Base' },
+  ];
+
+  // Close drawer on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    if (isOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = '';
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 md:hidden">
+      {/* Dimmed Backdrop with Blur - Clicking closes the drawer */}
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.25 }}
+        onClick={onClose}
+        className="fixed inset-0 bg-slate-950/65 backdrop-blur-xs"
+        aria-hidden="true"
+      />
+
+      {/* Drawer Panel */}
+      <motion.aside
+        initial={{ x: '-100%' }}
+        animate={{ x: 0 }}
+        exit={{ x: '-100%' }}
+        transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+        className="fixed top-0 bottom-0 left-0 w-72 max-w-[85vw] bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 p-5 shadow-2xl flex flex-col justify-between overflow-y-auto"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Mobile Navigation"
+      >
+        <div className="space-y-5">
+          {/* Header with Logo and Close button */}
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-primary to-cyan-400 flex items-center justify-center text-white shadow-md shadow-primary/25">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="font-extrabold text-slate-900 dark:text-white text-base tracking-tight block">
+                  AI Inspection
+                </span>
+                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                  Field Diagnostics
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close navigation menu"
+              className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Navigation Items */}
+          <nav className="space-y-1">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = location.pathname === item.path;
+              return (
+                <Link
+                  key={item.label}
+                  to={item.path}
+                  onClick={onClose}
+                  className={`flex items-center justify-between px-3.5 py-3 rounded-2xl transition font-semibold text-sm ${
+                    isActive 
+                      ? 'bg-primary/15 text-primary shadow-xs font-bold border border-primary/25' 
+                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon className="w-5 h-5 shrink-0" />
+                    <span>{item.label}</span>
+                  </div>
+                  {isActive && (
+                    <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_1px_rgba(14,165,233,0.8)]" />
+                  )}
+                </Link>
+              );
+            })}
+          </nav>
+
+          {/* Secondary Actions in Drawer */}
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-1">
+            <button
+              onClick={() => { onToggleTheme(); }}
+              className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-semibold text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition"
+            >
+              <div className="flex items-center gap-3">
+                {currentTheme === 'dark' ? (
+                  <Sun className="w-4 h-4 text-amber-400" />
+                ) : (
+                  <Moon className="w-4 h-4 text-slate-500" />
+                )}
+                <span>Theme</span>
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500">
+                {currentTheme}
+              </span>
+            </button>
+
+            <button
+              onClick={() => { onClose(); onOpenAlerts(); }}
+              className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-semibold text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition"
+            >
+              <div className="flex items-center gap-3">
+                <Bell className="w-4 h-4 text-slate-500" />
+                <span>Alerts</span>
+              </div>
+              <span className="bg-critical text-white text-[10px] font-bold px-2 py-0.5 rounded-full">3</span>
+            </button>
+
+            <button
+              onClick={() => { onClose(); onOpenSettings(); }}
+              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition"
+            >
+              <Settings className="w-4 h-4 text-slate-500" />
+              <span>Settings</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Officer Profile Pill in Drawer Footer */}
+        <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800">
+          <button 
+            onClick={() => { onClose(); onOpenOfficerModal(); }}
+            className="w-full p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700/60 flex items-center gap-3 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer text-left"
             title="Officer Profile & Work Vault"
           >
-            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-cyan-400 text-white font-bold flex items-center justify-center text-xs shadow-sm group-hover:scale-105 transition-transform">
-              {officer.avatarInitials}
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-primary to-cyan-400 text-white font-bold flex items-center justify-center text-xs shadow-xs shrink-0">
+              {officer.isLoggedIn ? officer.avatarInitials : <User className="w-4 h-4" />}
             </div>
-            <div className="hidden lg:block text-left">
-              <p className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-tight flex items-center gap-1">
-                {officer.name}
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <div className="text-xs flex-1 min-w-0">
+              <p className="font-bold text-slate-800 dark:text-white truncate">
+                {officer.isLoggedIn ? officer.name : 'Officer Login'}
               </p>
-              <p className="text-[10px] text-slate-400 font-mono">{officer.id}</p>
+              <p className="text-[10px] text-slate-400 font-mono truncate">
+                {officer.isLoggedIn ? `${officer.id} • ${officer.role}` : 'Click to sign in'}
+              </p>
             </div>
           </button>
-        ) : (
-          <button
-            onClick={onOpenOfficerModal}
-            aria-label="Officer sign in"
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-400 text-white font-bold text-xs shadow-md shadow-primary/25 transition cursor-pointer ml-1"
-            title="Sign In Officer"
-          >
-            <LogIn className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Officer Login</span>
-          </button>
-        )}
-      </div>
-
-      {/* Mobile Top Actions */}
-      <div className="md:hidden flex items-center gap-1.5">
-        <button
-          onClick={onToggleTheme}
-          aria-label="Toggle theme appearance"
-          className="p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
-          title="Toggle Theme"
-        >
-          {currentTheme === 'dark' ? (
-            <Sun className="w-5 h-5 text-amber-400" />
-          ) : (
-            <Moon className="w-5 h-5 text-slate-600" />
-          )}
-        </button>
-
-        <button 
-          onClick={onOpenAlerts}
-          aria-label="View system alerts"
-          className="relative p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
-        >
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-critical rounded-full"></span>
-        </button>
-
-        {/* Mobile Officer Button */}
-        <button
-          onClick={onOpenOfficerModal}
-          className="p-1 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-          title="Officer Account"
-        >
-          {officer.isLoggedIn ? (
-            <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-primary to-cyan-400 text-white font-bold flex items-center justify-center text-[10px]">
-              {officer.avatarInitials}
-            </div>
-          ) : (
-            <div className="p-1 rounded-lg bg-primary/10 text-primary">
-              <LogIn className="w-4 h-4" />
-            </div>
-          )}
-        </button>
-      </div>
-    </header>
+        </div>
+      </motion.aside>
+    </div>
   );
 }
 
@@ -1030,7 +1304,9 @@ function Sidebar({
   currentTheme,
   onToggleTheme,
   officer,
-  onOpenOfficerModal
+  onOpenOfficerModal,
+  isCollapsed,
+  onToggleCollapse
 }: { 
   onOpenAlerts: () => void; 
   onOpenSettings: () => void;
@@ -1038,6 +1314,8 @@ function Sidebar({
   onToggleTheme: () => void;
   officer: OfficerProfile;
   onOpenOfficerModal: () => void;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
 }) {
   const location = useLocation();
   
@@ -1052,8 +1330,10 @@ function Sidebar({
   ];
 
   return (
-    <aside className="w-64 glass-nav border-r border-slate-200/60 dark:border-slate-800/60 flex flex-col fixed left-0 top-[69px] bottom-0 hidden md:flex z-10 transition-colors">
-      <nav className="flex-1 p-4 space-y-1.5 mt-2">
+    <aside 
+      className={`${isCollapsed ? 'w-20' : 'w-64'} glass-nav border-r border-slate-200/60 dark:border-slate-800/60 flex flex-col fixed left-0 top-[61px] sm:top-[69px] bottom-0 hidden md:flex z-10 transition-all duration-300`}
+    >
+      <nav className="flex-1 p-3 space-y-1.5 mt-2 overflow-y-auto">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
@@ -1061,80 +1341,103 @@ function Sidebar({
             <Link
               key={item.label}
               to={item.path}
-              className={`flex items-center justify-between px-4 py-3 rounded-2xl transition-all duration-200 ease-out font-semibold text-sm ${
+              title={isCollapsed ? item.label : undefined}
+              className={`flex items-center ${isCollapsed ? 'justify-center px-2 py-3' : 'justify-between px-4 py-3'} rounded-2xl transition-all duration-200 ease-out font-semibold text-sm ${
                 isActive 
-                  ? 'bg-primary/15 text-primary shadow-xs font-bold border border-primary/25 translate-x-1' 
-                  : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100/70 dark:hover:bg-slate-800/70 hover:text-slate-900 dark:hover:text-white hover:translate-x-1'
+                  ? 'bg-primary/15 text-primary shadow-xs font-bold border border-primary/25' 
+                  : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100/70 dark:hover:bg-slate-800/70 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              <div className="flex items-center gap-3">
-                <Icon className="w-5 h-5" />
-                <span>{item.label}</span>
+              <div className="flex items-center gap-3 min-w-0">
+                <Icon className="w-5 h-5 shrink-0" />
+                {!isCollapsed && <span className="truncate">{item.label}</span>}
               </div>
-              {isActive && (
+              {isActive && !isCollapsed && (
                 <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_1px_rgba(14,165,233,0.8)] animate-pulse" />
               )}
             </Link>
           );
         })}
 
-        <div className="pt-4 mt-4 border-t border-slate-100 space-y-1.5">
+        <div className="pt-3 mt-3 border-t border-slate-100 dark:border-slate-800 space-y-1">
           {/* Theme Mode Toggle in Sidebar */}
           <button
             onClick={onToggleTheme}
-            className="w-full flex items-center justify-between px-4 py-3 rounded-2xl transition-all font-semibold text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-800 cursor-pointer"
+            title={isCollapsed ? (currentTheme === 'dark' ? 'Light Theme' : 'Dark Theme') : undefined}
+            className={`w-full flex items-center ${isCollapsed ? 'justify-center p-3' : 'justify-between px-4 py-3'} rounded-2xl transition-all font-semibold text-sm text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-white cursor-pointer`}
           >
             <div className="flex items-center gap-3.5">
               {currentTheme === 'dark' ? (
-                <Sun className="w-5 h-5 text-amber-400" />
+                <Sun className="w-5 h-5 text-amber-400 shrink-0" />
               ) : (
-                <Moon className="w-5 h-5 text-slate-500" />
+                <Moon className="w-5 h-5 text-slate-500 shrink-0" />
               )}
-              <span>{currentTheme === 'dark' ? 'Light Theme' : 'Dark Theme'}</span>
+              {!isCollapsed && <span>{currentTheme === 'dark' ? 'Light Theme' : 'Dark Theme'}</span>}
             </div>
-            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-slate-100 text-slate-500">
-              {currentTheme}
-            </span>
+            {!isCollapsed && (
+              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500">
+                {currentTheme}
+              </span>
+            )}
           </button>
 
           <button
             onClick={onOpenAlerts}
-            className="w-full flex items-center justify-between px-4 py-3 rounded-2xl transition-all font-semibold text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-800 cursor-pointer"
+            title={isCollapsed ? 'Alerts' : undefined}
+            className={`w-full flex items-center ${isCollapsed ? 'justify-center p-3' : 'justify-between px-4 py-3'} rounded-2xl transition-all font-semibold text-sm text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-white cursor-pointer`}
           >
             <div className="flex items-center gap-3.5">
-              <Bell className="w-5 h-5" />
-              <span>Alerts</span>
+              <Bell className="w-5 h-5 shrink-0" />
+              {!isCollapsed && <span>Alerts</span>}
             </div>
-            <span className="bg-critical text-white text-[11px] font-bold px-2 py-0.5 rounded-full">3</span>
+            {!isCollapsed && (
+              <span className="bg-critical text-white text-[11px] font-bold px-2 py-0.5 rounded-full">3</span>
+            )}
           </button>
 
           <button
             onClick={onOpenSettings}
-            className="w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl transition-all font-semibold text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-800 cursor-pointer"
+            title={isCollapsed ? 'Settings' : undefined}
+            className={`w-full flex items-center ${isCollapsed ? 'justify-center p-3' : 'gap-3.5 px-4 py-3'} rounded-2xl transition-all font-semibold text-sm text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-white cursor-pointer`}
           >
-            <Settings className="w-5 h-5" />
-            <span>Settings</span>
+            <Settings className="w-5 h-5 shrink-0" />
+            {!isCollapsed && <span>Settings</span>}
           </button>
         </div>
       </nav>
 
+      {/* Collapse/Expand Toggle Handle at bottom of Sidebar */}
+      <div className="p-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-center">
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          className="w-full py-2 flex items-center justify-center gap-2 rounded-xl text-xs font-bold text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+          title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <><ChevronLeft className="w-4 h-4" /> <span>Collapse</span></>}
+        </button>
+      </div>
+
       {/* Officer Profile Badge in Sidebar */}
       <button 
         onClick={onOpenOfficerModal}
-        className="p-3.5 m-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700/60 flex items-center gap-3 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer text-left"
-        title="Officer Profile & Work Vault"
+        className={`p-3 m-2 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700/60 flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer text-left`}
+        title={isCollapsed ? officer.name : "Officer Profile & Work Vault"}
       >
         <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-primary to-cyan-400 text-white font-bold flex items-center justify-center text-xs shadow-xs shrink-0">
           {officer.isLoggedIn ? officer.avatarInitials : <User className="w-4 h-4" />}
         </div>
-        <div className="text-xs flex-1 truncate">
-          <p className="font-bold text-slate-800 dark:text-white truncate">
-            {officer.isLoggedIn ? officer.name : 'Officer Login'}
-          </p>
-          <p className="text-[10px] text-slate-400 font-mono truncate">
-            {officer.isLoggedIn ? `${officer.id} • ${officer.role}` : 'Click to sign in'}
-          </p>
-        </div>
+        {!isCollapsed && (
+          <div className="text-xs flex-1 truncate">
+            <p className="font-bold text-slate-800 dark:text-white truncate">
+              {officer.isLoggedIn ? officer.name : 'Officer Login'}
+            </p>
+            <p className="text-[10px] text-slate-400 font-mono truncate">
+              {officer.isLoggedIn ? `${officer.id} • ${officer.role}` : 'Click to sign in'}
+            </p>
+          </div>
+        )}
       </button>
     </aside>
   );
@@ -1152,7 +1455,10 @@ function MobileNav() {
   ];
 
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 glass-nav border-t border-slate-200/60 dark:border-slate-800/60 flex justify-around p-2 z-30 shadow-lg transition-colors">
+    <nav 
+      aria-label="Mobile Bottom Navigation"
+      className="md:hidden fixed bottom-0 left-0 right-0 glass-nav border-t border-slate-200/60 dark:border-slate-800/60 flex justify-around items-center p-1.5 z-30 shadow-lg transition-colors bg-white/95 dark:bg-slate-950/95 backdrop-blur-md"
+    >
       {navItems.map(item => {
         const Icon = item.icon;
         const isActive = location.pathname === item.path;
@@ -1160,18 +1466,18 @@ function MobileNav() {
           <Link
             key={item.label}
             to={item.path}
-            className={`flex flex-col items-center py-1.5 px-3 rounded-xl transition-all duration-200 ${
+            className={`flex flex-col items-center justify-center min-w-[48px] min-h-[44px] py-1 px-2 rounded-xl transition-all duration-200 ${
               isActive 
                 ? 'text-primary font-bold scale-105' 
                 : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
             <Icon className="w-5 h-5 mb-0.5" />
-            <span className="text-[11px]">{item.label}</span>
+            <span className="text-[10px] leading-tight truncate">{item.label}</span>
           </Link>
         );
       })}
-    </div>
+    </nav>
   );
 }
 
@@ -1226,9 +1532,29 @@ function AppShell({
   setOfficer: (p: OfficerProfile) => void;
 }) {
   const location = useLocation();
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 768 && window.innerWidth < 1024;
+    }
+    return false;
+  });
+
+  // Automatically update collapsed sidebar on tablet resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 768 && window.innerWidth < 1024) {
+        setIsSidebarCollapsed(true);
+      } else if (window.innerWidth >= 1024) {
+        setIsSidebarCollapsed(false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   return (
-    <div className="relative flex flex-col min-h-screen bg-background/80 text-slate-800 transition-colors duration-300">
+    <div className="relative flex flex-col min-h-screen bg-background/80 text-slate-800 transition-colors duration-300 overflow-x-hidden">
       {/* Continuous Fluid Animated Industrial Cyber-Grid Background */}
       <AnimatedBackground />
 
@@ -1239,8 +1565,11 @@ function AppShell({
         onToggleTheme={handleToggleTheme}
         officer={officer}
         onOpenOfficerModal={() => setIsOfficerModalOpen(true)}
+        onToggleMobileDrawer={() => setIsMobileDrawerOpen(prev => !prev)}
+        isSidebarCollapsed={isSidebarCollapsed}
+        onToggleSidebarCollapse={() => setIsSidebarCollapsed(prev => !prev)}
       />
-      <div className="flex flex-1">
+      <div className="flex flex-1 min-w-0">
         <Sidebar 
           onOpenAlerts={() => setIsAlertsOpen(true)} 
           onOpenSettings={() => setIsSettingsOpen(true)} 
@@ -1248,8 +1577,10 @@ function AppShell({
           onToggleTheme={handleToggleTheme}
           officer={officer}
           onOpenOfficerModal={() => setIsOfficerModalOpen(true)}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={() => setIsSidebarCollapsed(prev => !prev)}
         />
-        <main className="flex-1 md:ml-64 pb-24 md:pb-12 w-full">
+        <main className={`flex-1 transition-all duration-300 w-full min-w-0 ${isSidebarCollapsed ? 'md:ml-20' : 'md:ml-64'} pb-24 md:pb-12`}>
           <Suspense fallback={<PageLoader />}>
             <AnimatePresence mode="wait">
               <Routes location={location} key={location.pathname}>
@@ -1268,6 +1599,22 @@ function AppShell({
         </main>
       </div>
       <MobileNav />
+
+      {/* Off-canvas mobile navigation drawer */}
+      <AnimatePresence>
+        {isMobileDrawerOpen && (
+          <MobileDrawer
+            isOpen={isMobileDrawerOpen}
+            onClose={() => setIsMobileDrawerOpen(false)}
+            onOpenAlerts={() => setIsAlertsOpen(true)}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+            currentTheme={currentTheme}
+            onToggleTheme={handleToggleTheme}
+            officer={officer}
+            onOpenOfficerModal={() => setIsOfficerModalOpen(true)}
+          />
+        )}
+      </AnimatePresence>
 
       <OfficerModal
         isOpen={isOfficerModalOpen}

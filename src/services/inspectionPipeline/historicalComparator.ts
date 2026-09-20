@@ -10,14 +10,16 @@ import { getOfficerInspections, type SavedInspectionRecord } from '../../utils/o
 export function compareWithHistoricalAudits(
   assetId: string,
   assetName: string,
-  currentScore: number,
+  currentScore: number | null,
   currentDefectsCount: number,
   currentInspectionId?: string
 ): HistoricalComparisonResult {
-  if (!assetId || !assetName) {
+  if (!assetId || !assetName || currentScore === null) {
     return {
       hasHistoricalData: false,
-      message: 'No historical inspection available: No asset identifier provided.'
+      message: currentScore === null 
+        ? 'Historical trend comparison withheld: Insufficient visual evidence to compute current baseline score.' 
+        : 'No historical inspection available: No asset identifier provided.'
     };
   }
 

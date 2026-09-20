@@ -224,11 +224,11 @@ export default function Dashboard() {
             </p>
           </div>
 
-          <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 w-full md:w-auto shrink-0">
+          <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2.5 sm:gap-3 w-full md:w-auto shrink-0">
             <motion.div whileHover={{ scale: 1.03, y: -2 }} whileTap={{ scale: 0.97 }} className="w-full sm:w-auto">
               <Link 
                 to="/inspect" 
-                className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-extrabold text-sm tracking-wide shadow-lg shadow-cyan-500/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                className="w-full sm:w-auto px-5 sm:px-6 py-3 sm:py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-extrabold text-xs sm:text-sm tracking-wide shadow-lg shadow-cyan-500/30 flex items-center justify-center gap-2 transition-all cursor-pointer min-h-[44px]"
               >
                 <Plus className="w-5 h-5 stroke-[2.5]" /> Start New Inspection
               </Link>
@@ -237,7 +237,7 @@ export default function Dashboard() {
             <motion.div whileHover={{ scale: 1.03, y: -2 }} whileTap={{ scale: 0.97 }} className="w-full sm:w-auto">
               <Link 
                 to="/assets" 
-                className="w-full sm:w-auto px-5 py-3.5 rounded-2xl bg-white/10 hover:bg-white/15 text-white border border-white/20 font-bold text-sm backdrop-blur-md flex items-center justify-center gap-2 transition-all cursor-pointer"
+                className="w-full sm:w-auto px-4 sm:px-5 py-3 sm:py-3.5 rounded-2xl bg-white/10 hover:bg-white/15 text-white border border-white/20 font-bold text-xs sm:text-sm backdrop-blur-md flex items-center justify-center gap-2 transition-all cursor-pointer min-h-[44px]"
               >
                 <Building2 className="w-4 h-4" /> View Assets
               </Link>
@@ -246,7 +246,7 @@ export default function Dashboard() {
             <motion.div whileHover={{ scale: 1.03, y: -2 }} whileTap={{ scale: 0.97 }} className="w-full sm:w-auto">
               <a 
                 href="#inspection-workflow-guide" 
-                className="w-full sm:w-auto px-5 py-3.5 rounded-2xl bg-primary/20 hover:bg-primary/30 text-cyan-200 border border-primary/40 font-bold text-sm backdrop-blur-md flex items-center justify-center gap-2 transition-all cursor-pointer"
+                className="w-full sm:w-auto px-4 sm:px-5 py-3 sm:py-3.5 rounded-2xl bg-primary/20 hover:bg-primary/30 text-cyan-200 border border-primary/40 font-bold text-xs sm:text-sm backdrop-blur-md flex items-center justify-center gap-2 transition-all cursor-pointer min-h-[44px]"
               >
                 <Layers className="w-4 h-4 text-cyan-400" /> Workflow Guide
               </a>
@@ -258,7 +258,7 @@ export default function Dashboard() {
       {/* ==========================================================
           2. FOUR LUMINOUS STAT CARDS WITH ANIMATED WAVE SPARKLINES
       ========================================================== */}
-      <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
         {/* Card 1: Total Assets */}
         <motion.div 
           variants={itemVariants}
@@ -574,8 +574,8 @@ export default function Dashboard() {
             <p className="text-xs text-slate-400 font-medium">Real-time condition breakdown</p>
           </div>
 
-          <div className="relative my-6 flex items-center justify-center">
-            <svg className="w-56 h-56 transform -rotate-90" viewBox="0 0 100 100">
+          <div className="relative my-4 sm:my-6 flex items-center justify-center">
+            <svg className="w-44 h-44 sm:w-56 sm:h-56 transform -rotate-90" viewBox="0 0 100 100">
               <circle
                 cx="50"
                 cy="50"
@@ -704,8 +704,8 @@ export default function Dashboard() {
             </motion.div>
           </div>
 
-          <div className="overflow-x-auto flex-1">
-            <table className="w-full text-left border-collapse">
+          <div className="table-responsive-container overflow-x-auto flex-1">
+            <table className="w-full min-w-[600px] sm:min-w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50/70 dark:bg-slate-800/40 text-slate-400 text-xs font-bold uppercase tracking-wider border-b border-slate-100 dark:border-slate-800">
                   <th className="p-4 pl-6">Asset & Thumbnail</th>

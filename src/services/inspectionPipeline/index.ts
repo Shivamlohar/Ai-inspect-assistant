@@ -15,6 +15,8 @@ import { generateRecommendedSteps } from './recommendationEngine.ts';
 import { retrieveInspectionKnowledge } from './knowledgeRetriever.ts';
 import { validateEvidence } from './evidenceValidator.ts';
 import { classifyVisualInput, type VisionClassificationResult } from './visionClassifier.ts';
+import { analyzeImageForOpticalDefects, type OpticalDefectAnalysisResult } from './opticalDefectAnalyzer.ts';
+import { resolveApplicableStandard } from '../../data/domainRegistry';
 
 export interface PipelineExecutionOptions {
   fileName?: string;
@@ -251,11 +253,21 @@ export async function runInspectionPipeline(
   console.log('[DEFECT DETECTOR] EXECUTING');
 
   // 7. Defect Detection (Only visual evidence, strictly for inspectable assets)
+  let opticalDefectsResult: OpticalDefectAnalysisResult | null = null;
+  if (mediaUrl && (!modelResult?.defects || modelResult.defects.length === 0 || modelResult.defects.every((d: any) => d.id === 'DEF_NOMINAL_1'))) {
+    try {
+      opticalDefectsResult = await analyzeImageForOpticalDefects(mediaUrl, classification.category);
+    } catch (optErr) {
+      console.warn('Optical defect scan notice:', optErr);
+    }
+  }
+
   const defectFindings = detectDefects(
     classification.category,
     eligibility.isEligible,
     modelResult?.defects,
-    userNotes
+    `${fileName} ${userNotes}`,
+    opticalDefectsResult
   );
 
   console.log('[RAG] EXECUTING');
@@ -317,6 +329,33 @@ export async function runInspectionPipeline(
       : 'Static Image Input — Sensor telemetry unavailable.'
   };
 
+  const broadDomain = visualClassification?.broadDomain || modelResult?.broadDomain || classification.category;
+  const standardInfo = resolveApplicableStandard(broadDomain, classification.category, validatedDefects[0]?.type);
+
+  const hasHighDefects = validatedDefects.some(d => d.severity === 'HIGH');
+  const hasMedDefects = validatedDefects.some(d => d.severity === 'MEDIUM');
+
+  let resolvedConditionScore: number | null = healthScore.finalScore;
+  if (resolvedConditionScore !== null) {
+    if (hasHighDefects) {
+      resolvedConditionScore = Math.min(resolvedConditionScore, 48);
+    } else if (hasMedDefects) {
+      resolvedConditionScore = Math.min(Math.max(50, resolvedConditionScore), 72);
+    }
+  }
+
+  const resolvedConditionRating = healthScore.overallCondition || (
+    resolvedConditionScore === null
+      ? 'Insufficient Evidence'
+      : (validatedDefects.length === 0
+        ? 'Condition Appears Acceptable Based on Available Visual Evidence'
+        : (hasHighDefects ? (resolvedConditionScore < 25 ? 'Critical' : 'Poor') : (hasMedDefects ? 'Fair' : (resolvedConditionScore >= 75 ? 'Good' : 'Fair'))))
+  );
+
+  const resolvedSummaryObservation = validatedDefects.length === 0
+    ? 'No visible defects identified in the provided image. Condition appears acceptable based on available visual evidence.'
+    : defectFindings.summaryObservation;
+
   return {
     inspectionId,
     assetId: resolvedAssetId,
@@ -333,14 +372,19 @@ export async function runInspectionPipeline(
     inspectionTimestamp,
     formattedDate,
     defects: validatedDefects,
-    healthScore,
+    healthScore: {
+      ...healthScore,
+      finalScore: resolvedConditionScore
+    },
     recommendedSteps,
     historicalComparison,
     sensorTelemetry,
-    summaryObservation: defectFindings.summaryObservation,
+    summaryObservation: resolvedSummaryObservation,
     engineeringNotice: defectFindings.engineeringNotice,
     technicalContext: ragResult.technicalContextSummary,
     knowledgeSources: ragResult.sources,
+    applicableStandard: standardInfo.standard,
+    standardReason: standardInfo.reason,
     evidenceValidation: {
       isSupported: evidenceCheck.isSupported,
       evidenceChecks: evidenceCheck.evidenceChecks,
@@ -348,10 +392,10 @@ export async function runInspectionPipeline(
     },
     limitationsOfVisualInspection: evidenceCheck.limitations,
     isDemoData: Boolean(isDemoMode),
-    modelUsed: modelResult?.modelUsed || 'Built-in Asset Validation & Inspection Pipeline',
+    modelUsed: modelResult?.modelUsed || (opticalDefectsResult?.hasDefects ? 'Precision Metrology Engine (Local Optical CV)' : 'Built-in Asset Validation & Inspection Pipeline'),
     mediaUrl,
     success: true,
-    safetyFactor: validatedDefects.length === 0 ? '1.50' : '1.15',
+    safetyFactor: validatedDefects.length === 0 ? '1.50' : hasHighDefects ? '1.08' : '1.18',
     reportAvailable: true,
     defectDetectorCalled: true,
     healthScoreEngineCalled: true,
@@ -368,8 +412,9 @@ export async function runInspectionPipeline(
       status: 'SUPPORTED',
       reason: 'Inspection conducted with verified visual evidence.'
     },
-    aiVisualConditionScore: modelResult?.conditionScore ?? healthScore.finalScore,
-    conditionRating: modelResult?.conditionRating ?? (healthScore.finalScore >= 80 ? 'Good' : healthScore.finalScore >= 60 ? 'Fair' : 'Poor'),
+    aiVisualConditionScore: resolvedConditionScore,
+    conditionRating: resolvedConditionRating,
+    overallCondition: resolvedConditionRating as any,
     conditionDisclaimer: 'Visual assessment only — qualified engineer verification required.',
     broadDomain: visualClassification?.broadDomain || modelResult?.broadDomain || 'Industrial / Infrastructure',
     serviceAvailable: isServiceAvail,

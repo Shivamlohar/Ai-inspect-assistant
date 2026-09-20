@@ -106,19 +106,19 @@ export default function AiAnalysis() {
   }, []);
 
   const steps = isOpenAIActive ? [
-    "CLASSIFIER: Image validation & OpenAI multimodal machine classification",
-    "ELIGIBILITY GATE: Supported machine verification & mechanical boundary check",
-    "DEFECT AI: Specialized visual flaw & anomaly detection (GPT-4o Vision)",
-    "EVIDENCE: Optical surface evidence & confidence validation",
-    "SEVERITY & KNOWLEDGE: Severity grading & RAG machine standards retrieval (ISO 17359 / ASME / API)",
-    "REPORT: Defensible 4-factor scoring & auditable machine inspection dossier"
+    "STAGE 1-2: Image intake & optical preprocessing validation",
+    "STAGE 3-4: Multi-domain AI classification across 8 engineering domains",
+    "STAGE 5: Visual defect metrology & surface anomaly detection (GPT-4o Vision)",
+    "STAGE 5: Optical surface evidence & confidence validation",
+    "STAGE 6: Evidence-driven severity scoring & domain standards retrieval (IS 456 / IRC / IEC / ISO)",
+    "STAGE 7: Defensible condition assessment & auditable inspection dossier"
   ] : [
-    "CLASSIFIER: Image quality check & machine classification",
-    "ELIGIBILITY GATE: Supported machine verification & mechanical check",
-    "DEFECT AI: Specialized visual flaw & anomaly detection",
-    "EVIDENCE: Optical surface evidence & confidence validation",
-    "SEVERITY & KNOWLEDGE: Severity grading & machine standards retrieval",
-    "REPORT: Defensible 4-factor scoring & auditable inspection dossier"
+    "STAGE 1-2: Image intake & optical preprocessing validation",
+    "STAGE 3-4: Multi-domain classification across 8 engineering domains",
+    "STAGE 5: Precision optical metrology & surface anomaly detection",
+    "STAGE 5: Visual surface evidence & confidence validation",
+    "STAGE 6: Evidence-driven condition assessment & domain standards retrieval",
+    "STAGE 7: Defensible condition scoring & auditable inspection dossier"
   ];
 
   useEffect(() => {

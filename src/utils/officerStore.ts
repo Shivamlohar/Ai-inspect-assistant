@@ -24,7 +24,7 @@ export interface SavedInspectionRecord {
   assetName: string;
   assetType: string;
   healthScore: number;
-  status: 'Healthy' | 'Attention' | 'At Risk' | 'Critical';
+  status: 'Healthy' | 'Attention' | 'At Risk' | 'Critical' | 'Attention Needed' | 'Insufficient Evidence' | 'Out of Scope (Non-Asset)' | 'Acceptable / Healthy' | string;
   timestamp: number;
   formattedDate: string;
   securityHash: string;

@@ -410,6 +410,14 @@ export function generatePrecisionMetrologyInspection({
     ? 'Precision Metrology Engine (OpenAI Quota Fallback)'
     : 'Precision Metrology Engine (Local Optical CV)';
 
+  let applicableStandard = 'ISO 17359 / ISO 10816';
+  if (domain.includes('Civil')) applicableStandard = 'IS 456 / ACI 318';
+  else if (domain.includes('Transport') || mType.toLowerCase().includes('bridge') || mType.toLowerCase().includes('road')) applicableStandard = 'IRC:SP:40 / AASHTO';
+  else if (domain.includes('Electrical')) applicableStandard = 'IEC 60076 / IEEE C57';
+  else if (domain.includes('HVAC')) applicableStandard = 'ASME B31.3';
+  else if (domain.includes('Renewable') || domain.includes('Energy')) applicableStandard = 'IEC 61400 / IEC 61215';
+  else if (domain.includes('Vehicles')) applicableStandard = 'SAE J1939 / ISO 26262';
+
   return {
     success: true,
     serviceAvailable: true,
@@ -418,13 +426,14 @@ export function generatePrecisionMetrologyInspection({
     inspectionEligible: true,
     inspectionDomain: domain,
     detectedAssetType: mType,
+    applicableStandard,
     assetType: mType,
     machineType: mType,
     assetCategory: mCat,
     machineCategory: mCat,
     confidence: 88,
-    overallCondition: 'Good',
-    conditionScore: 82,
+    overallCondition: defects.some(d => d.severity === 'HIGH') ? 'Poor' : (defects.some(d => d.severity === 'MEDIUM') ? 'Fair' : (defects.length === 0 ? 'Condition Appears Acceptable Based on Available Visual Evidence' : 'Good')),
+    conditionScore: defects.some(d => d.severity === 'HIGH') ? 45 : (defects.some(d => d.severity === 'MEDIUM') ? 68 : (defects.length > 0 ? 76 : 94)),
     defects,
     recommendations: [
       { step: 1, title: 'Surface Cleaning & Passivation', detail: 'Clean oxidized/weathered surfaces per relevant engineering standards and reapply protective coating.' },
@@ -441,10 +450,10 @@ export function generatePrecisionMetrologyInspection({
     isKeyInvalid,
     metrologyReason: reason,
     broadDomain: domain,
-    severity: 'Medium',
+    severity: defects.some(d => d.severity === 'HIGH') ? 'High' : (defects.some(d => d.severity === 'MEDIUM') ? 'Medium' : 'Low'),
     visualEvidence: defects.map(d => `${d.defectType}: ${d.visualEvidence}`).join('; '),
     affectedArea: defects.map(d => d.affectedArea).join(', '),
-    conditionRating: '82/100',
+    conditionRating: `${defects.some(d => d.severity === 'HIGH') ? 45 : (defects.some(d => d.severity === 'MEDIUM') ? 68 : (defects.length > 0 ? 76 : 92))}/100`,
     conditionDisclaimer: 'Visual assessment only — qualified engineer verification required.',
     summaryObservation: defects.map(d => d.visualEvidence).join('; '),
     engineeringAssessment: 'Visual evidence verified via local precision metrology. Physical gauges required for internal stress quantification.',
@@ -498,26 +507,29 @@ You are the First-Stage Visual Classifier for a Multi-Domain Engineering Inspect
 YOUR MANDATE:
 Analyze ONLY the visual content of the provided image to determine if the primary subject belongs to ANY of these 7 SUPPORTED ENGINEERING DOMAINS:
 
-1. INDUSTRIAL MACHINES:
-   Motors, pumps, compressors, generators, gearboxes, fans/blowers, turbines, machine tools, CNC machines, industrial manufacturing machinery.
+1. INDUSTRIAL MACHINERY:
+   Motors, pumps, compressors, generators, gearboxes, fans/blowers, turbines, machine tools, CNC machines, mechanical assemblies, industrial manufacturing machinery.
 
-2. CIVIL INFRASTRUCTURE:
-   Buildings, columns, beams, slabs, walls, bridges, flyovers, roads, highways, tunnels, culverts, foundations, retaining walls, dams, reinforced concrete & masonry.
+2. CIVIL / STRUCTURAL INFRASTRUCTURE:
+   Buildings, columns, beams, slabs, walls, foundations, retaining walls, dams, spillways, reinforced concrete & masonry structures.
 
-3. ELECTRICAL SYSTEMS:
-   Transformers, switchgear, electrical panels, cabling/wiring, busbars, insulators, substations, control panels, distribution boards.
+3. TRANSPORT INFRASTRUCTURE:
+   Bridges, flyovers, roads, highways, asphalt/concrete pavements, railway tracks, tunnels, culverts, airport runways, maritime piers.
 
-4. MECHANICAL COMPONENTS:
-   Pipes, valves, flanges, couplings, bearings, shafts, gears, belts, fasteners, pressure vessels, tanks.
+4. ELECTRICAL INFRASTRUCTURE:
+   Transformers, switchgear, electrical panels, cabling/wiring, busbars, insulators, substations, transmission towers, distribution boards.
 
-5. HVAC & PIPING:
-   HVAC units, ducts, cooling towers, chillers, pipelines, insulation, joints & supports, heat exchangers, boilers, cladding.
+5. WATER / DRAINAGE INFRASTRUCTURE:
+   Stormwater drains, sewers, culverts, water treatment tanks, canals, aqueducts, retention ponds, drainage channels, penstocks, pumping stations.
 
-6. RENEWABLE ENERGY:
-   Solar PV panels, wind turbines, inverters, battery storage (BESS), mounting structures, cabling, junction boxes.
+6. ENERGY INFRASTRUCTURE:
+   Solar PV panels, wind turbines, power generation substations, battery storage (BESS), mounting structures, thermal plant piping, boilers.
 
-7. VEHICLES & TRANSPORTATION:
-   Commercial trucks, buses, construction vehicles, railway coaches, aircraft exterior, drones, ships/marine, tyres, brakes, chassis.
+7. TELECOM / UTILITY INFRASTRUCTURE:
+   Cell towers, microwave masts, utility poles, overhead lines, cable vaults, fiber splice enclosures, street utility cabinets.
+
+8. OTHER RECOGNIZABLE INFRASTRUCTURE:
+   Industrial perimeter security fences, retaining gabions, high-mast yard lighting, gantry cranes, industrial hangars, exterior silos.
 
 STRICT PROHIBITIONS (REJECT IMMEDIATELY):
 - Living people, human faces, portraits, selfies, bodies, biometrics, human health, PPE monitoring, or identity.
@@ -528,16 +540,16 @@ STRICT PROHIBITIONS (REJECT IMMEDIATELY):
 - Invoices / receipts / documents / charts.
 
 CRITICAL RULES:
-1. If the image depicts an asset from ANY of the 7 domains above:
+1. If the image depicts an asset from ANY of the 8 domains above:
    - "eligible": true
-   - Set "inspectionDomain" to one of: "Industrial Machines" | "Civil Infrastructure" | "Electrical Systems" | "Mechanical Components" | "HVAC & Piping" | "Renewable Energy" | "Vehicles & Transportation"
-   - Identify "detectedAssetType" (e.g. "Three-Phase Induction Motor", "Reinforced Concrete Pillar", "11kV Oil Transformer", "High-Pressure Gate Valve", "Insulated Process Duct", "Monocrystalline Solar Panel", "Heavy Hauler Chassis")
+   - Set "inspectionDomain" to one of: "Industrial Machinery" | "Civil / Structural Infrastructure" | "Transport Infrastructure" | "Electrical Infrastructure" | "Water / Drainage Infrastructure" | "Energy Infrastructure" | "Telecom / Utility Infrastructure" | "Other Recognizable Infrastructure"
+   - Identify "detectedAssetType" (e.g. "Three-Phase Induction Motor", "Reinforced Concrete Column", "Prestressed Concrete Bridge Girder", "Oil-Immersed Step-Down Transformer", "Stormwater Concrete Culvert", "Utility Wind Turbine Nacelle", "Telecommunications Lattice Mast")
    - Set "assetCategory" matching the domain
    - Set confidence between 75 and 98
 2. If image is of a person, animal, food, domestic item, or document:
    - "eligible": false
    - "inspectionDomain": "Out of Scope"
-   - "reason": "Subject is out of scope. Multi-domain inspection applies only to engineering assets across the 7 supported domains."
+   - "reason": "Subject is out of scope. Multi-domain inspection applies only to engineering assets across the 8 supported domains."
 
 Respond strictly in valid JSON:
 {
@@ -617,6 +629,8 @@ Respond strictly in valid JSON:
   }
 }
 
+export const classifyAssetMultimodal = classifyAssetDomain;
+
 /**
  * 2. FULL MULTIMODAL MULTI-DOMAIN DEFECT INSPECTION
  * Performs comprehensive flaw detection, evidence assessment, and condition scoring
@@ -644,63 +658,70 @@ export async function analyzeInspectionMultimodal({
 You are an expert Multi-Domain Engineering Visual Inspection & Defect Metrology System powered by OpenAI Vision.
 
 MANDATE & NON-NEGOTIABLE PRINCIPLES:
-1. SCOPE: 7 SUPPORTED ENGINEERING DOMAINS:
-   - Industrial Machines (Motors, pumps, compressors, generators, gearboxes, fans, turbines, machine tools, CNC)
-   - Civil Infrastructure (Buildings, columns, beams, slabs, walls, bridges, flyovers, roads, tunnels, culverts, foundations, retaining walls, dams, masonry)
-   - Electrical Systems (Transformers, switchgear, electrical panels, cabling/wiring, busbars, insulators, substations, control panels)
-   - Mechanical Components (Pipes, valves, flanges, couplings, bearings, shafts, gears, belts, fasteners, pressure vessels, tanks)
-   - HVAC & Piping (HVAC units, ducts, cooling towers, chillers, pipelines, insulation, joints & supports, heat exchangers, boilers)
-   - Renewable Energy (Solar PV panels, wind turbines, inverters, battery storage BESS, mounting structures, junction boxes)
-   - Vehicles & Transportation (Trucks, buses, construction vehicles, railway coaches, aircraft exterior, drones, ships/marine, tyres, brakes, chassis)
+1. SCOPE: 8 SUPPORTED ENGINEERING DOMAINS:
+   - Industrial Machinery (Motors, pumps, compressors, generators, gearboxes, turbines, machine tools, CNC, mechanical drive trains)
+   - Civil / Structural Infrastructure (Buildings, columns, beams, slabs, walls, foundations, retaining walls, dams, reinforced concrete & masonry)
+   - Transport Infrastructure (Bridges, flyovers, roads, highways, asphalt/concrete pavements, railway tracks, tunnels, culverts, airport runways, maritime piers)
+   - Electrical Infrastructure (Transformers, switchgear, electrical panels, cabling/wiring, busbars, insulators, substations, transmission towers)
+   - Water / Drainage Infrastructure (Stormwater drains, sewers, culverts, water treatment tanks, canals, aqueducts, retention ponds, drainage channels, penstocks)
+   - Energy Infrastructure (Solar PV panels, wind turbines, power generation substations, battery storage BESS, mounting structures, boilers)
+   - Telecom / Utility Infrastructure (Cell towers, microwave masts, utility poles, overhead lines, cable vaults, fiber splice enclosures, street cabinets)
+   - Other Recognizable Infrastructure (Industrial fences, retaining gabions, high-mast lighting, gantry cranes, industrial hangars, exterior silos)
    DO NOT analyze people, faces, biometrics, human health, PPE, or identity.
 
-2. STRICTLY NO SENSOR HALLUCINATIONS:
+2. STRICTLY DOMAIN-SPECIFIC ENGINEERING STANDARDS:
+   Under NO circumstances cite machinery standards (such as ISO 17359 or ISO 10816) for civil, transport, or electrical assets!
+   Return an "applicableStandard" field appropriate for the specific domain and asset type:
+   - Civil Concrete & Structural: "IS 456 / ACI 318"
+   - Bridges & Elevated Spans: "IRC:SP:40 / AASHTO"
+   - Roads & Pavements: "IRC:82 / ASTM D6433"
+   - Electrical & Transformers: "IEC 60076 / IEEE C57"
+   - Water & Drainage: "AWWA / IS 3370"
+   - Energy (Wind / Solar): "IEC 61400 / IEC 61215"
+   - Telecom & Utility: "TIA-222"
+   - Industrial Machinery: "ISO 17359 / ISO 10816"
+   - If uncertain or unrecognized: "Standard: Not specified"
+
+3. STRICTLY NO SENSOR HALLUCINATIONS:
    NEVER invent or fabricate operating temperature (°C), bearing vibration (Hz / mm/s), hydraulic/gas pressure (bar / psi), motor current (A), internal concrete void depth, or hidden subsurface failures that cannot be seen directly in this 2D optical photograph.
    Report ONLY what is visually observable on exterior surfaces. Explicitly state that thermal, vibration, ultrasonic, and internal checks require physical instruments.
 
-3. ONLY REPORT VISUALLY SUPPORTED DEFECTS:
-   Report ONLY defects visible in the exterior image frame:
-   - Machine: Surface oxidation, fluid/oil weeping, casing fissures, loose fasteners, belt glazing
-   - Civil: Structural cracks (shear/flexural), concrete spalling, exposed rebar, efflorescence, joint sealant failure
-   - Electrical: Thermal discoloration on lugs, surface tracking on insulators, terminal corrosion
-   - Mechanical: Flange gap irregularity, localized pitting, coupling misalignment
-   - HVAC: Cladding tears, Corrosion Under Insulation (CUI), duct seam gaps
-   - Renewable: Solar glass micro-cracking, wind blade leading-edge erosion, cell discoloration
-   - Transportation: Tyre shoulder wear, tread separation, chassis weld micro-fissure
+4. ONLY REPORT VISUALLY SUPPORTED DEFECTS:
+   Report ONLY defects clearly visible in the exterior image frame:
+   - Industrial Machinery: Surface oxidation, fluid/oil weeping, casing fissures, loose fasteners, belt wear
+   - Civil / Structural: Cracks (shear/flexural/temperature), concrete spalling, exposed rebar, efflorescence, joint delamination
+   - Transport: Pavement fatigue cracking, pothole depressions, bridge expansion joint wear, girder spalls
+   - Electrical: Lug oxidation, insulation flashover tracking, bushing oil seep, terminal corrosion
+   - Water / Drainage: Joint weeping, pipe erosion, sediment accumulation, concrete scouring
+   - Energy: PV module glass fractures, cell micro-cracks, wind blade erosion, flange corrosion
+   - Telecom / Utility: Structural rust, loose bracing, guide wire slack, tower corrosion
 
-4. NOMINAL / HEALTHY ASSETS:
-   If the asset is clean, undamaged, and well-maintained:
-   - "defects": [] (STRICTLY EMPTY ARRAY - ZERO DEFECTS)
-   - "overallCondition": "Good"
-   - "conditionScore": 90-100
-
-5. OUT-OF-SCOPE SUBJECTS (Human, Animal, Food, Landscape, Domestic Room, Document):
-   If the image does not contain an engineering asset:
-   - "eligible": false
-   - "overallCondition": "Out of Scope"
-   - "conditionScore": null
-   - "defects": []
-   - "recommendations": []
-
-6. CONDITION SCORE (0-100):
-   Calculate an AI Visual Condition Score based purely on visible degradation:
-   - 90-100 = Excellent / Good (intact, minor or zero surface wear)
-   - 75-89 = Good (light cosmetic oxidation / weathering, no operational impairment)
-   - 50-74 = Fair (moderate surface corrosion, minor seal weeping, or hairline surface fissure)
-   - 25-49 = Poor (significant defect, active fluid leakage, or concrete spalling)
-   - 0-24 = Critical (casing rupture, severe structural crack, joint failure)
-   - Out of scope: conditionScore: null
+5. REAL EVIDENCE-DRIVEN CONDITION SCORING:
+   - Baseline score is 100.
+   - For each High / Critical defect: deduct 28 to 40 points.
+   - For each Medium defect: deduct 14 to 22 points.
+   - For each Low defect: deduct 5 to 8 points.
+   - SEVERITY CEILING RULES:
+     * If ANY High defect is present: overallCondition MUST be "Poor" or "Critical", and conditionScore MUST NOT exceed 48.
+     * If ANY Medium defect is present (and no High): overallCondition MUST be "Fair", and conditionScore MUST be between 50 and 74.
+     * UNDER NO CIRCUMSTANCES can an asset with visible High or Medium damage be marked "Good".
+   - CLEAN ASSET:
+     * If ZERO defects are present: "overallCondition": "Condition Appears Acceptable Based on Available Visual Evidence", "conditionScore": 90-95.
+     * NEVER declare 100% safe or defect-free from 2D photos.
+   - INSUFFICIENT EVIDENCE:
+     * If image is blurry, extremely dark, out of focus, or prevents reliable inspection: "conditionScore": null, "overallCondition": "Insufficient Evidence".
 
 Context from user/inspector: "${userNotes || userSelectedAsset || 'Engineering visual inspection'}"
 
 Respond strictly in valid JSON matching this exact schema:
 {
-  "inspectionDomain": "Industrial Machines" | "Civil Infrastructure" | "Electrical Systems" | "Mechanical Components" | "HVAC & Piping" | "Renewable Energy" | "Vehicles & Transportation" | "Out of Scope",
+  "inspectionDomain": "Industrial Machinery" | "Civil / Structural Infrastructure" | "Transport Infrastructure" | "Electrical Infrastructure" | "Water / Drainage Infrastructure" | "Energy Infrastructure" | "Telecom / Utility Infrastructure" | "Other Recognizable Infrastructure" | "Out of Scope",
   "detectedAssetType": string,
   "assetCategory": string,
   "confidence": number,
   "eligible": boolean,
-  "overallCondition": "Good" | "Fair" | "Poor" | "Critical" | "Out of Scope",
+  "applicableStandard": string,
+  "overallCondition": "Condition Appears Acceptable Based on Available Visual Evidence" | "Good" | "Fair" | "Poor" | "Critical" | "Insufficient Evidence" | "Out of Scope",
   "conditionScore": number | null,
   "defects": [
     {
@@ -773,13 +794,37 @@ Respond strictly in valid JSON matching this exact schema:
         })
       : [];
 
-    const finalScore = isEligible && typeof parsed.conditionScore === 'number'
+    const hasHighDefect = formattedDefects.some(d => d.severity === 'HIGH');
+    const hasMedDefect = formattedDefects.some(d => d.severity === 'MEDIUM');
+
+    let finalScore = isEligible && typeof parsed.conditionScore === 'number'
       ? Math.max(0, Math.min(100, Math.round(parsed.conditionScore)))
-      : (isEligible ? 85 : null);
+      : (isEligible ? (hasHighDefect ? 38 : hasMedDefect ? 64 : (formattedDefects.length > 0 ? 76 : 94)) : null);
+
+    if (finalScore !== null) {
+      if (hasHighDefect) {
+        finalScore = Math.min(48, finalScore);
+      } else if (hasMedDefect) {
+        finalScore = Math.min(72, Math.max(50, finalScore));
+      }
+    }
+
+    // Determine domain-accurate standard - strictly prevent ISO 17359 on civil/infrastructure assets
+    let applicableStd = String(parsed.applicableStandard || '').trim();
+    const isCivilOrInfrastructure = domain.includes('Civil') || domain.includes('Transport') || domain.includes('Water') || domain.includes('Electrical');
+    if (!applicableStd || (isCivilOrInfrastructure && (applicableStd.includes('17359') || applicableStd.includes('10816')))) {
+      if (domain.includes('Civil')) applicableStd = 'IS 456 / ACI 318';
+      else if (domain.includes('Transport')) applicableStd = 'IRC:SP:40 / AASHTO';
+      else if (domain.includes('Electrical')) applicableStd = 'IEC 60076 / IEEE C57';
+      else if (domain.includes('Water')) applicableStd = 'AWWA / IS 3370';
+      else if (domain.includes('Energy')) applicableStd = 'IEC 61400 / IEC 61215';
+      else if (domain.includes('Telecom')) applicableStd = 'TIA-222';
+      else if (domain.includes('Machinery') || domain.includes('Machine')) applicableStd = 'ISO 17359 / ISO 10816';
+      else applicableStd = 'Standard: Not specified';
+    }
 
     const topSeverity = formattedDefects.length > 0 
-      ? (formattedDefects.some(d => d.severity === 'HIGH') ? 'High'
-        : formattedDefects.some(d => d.severity === 'MEDIUM') ? 'Medium' : 'Low')
+      ? (hasHighDefect ? 'High' : (hasMedDefect ? 'Medium' : 'Low'))
       : (isEligible ? 'Nominal' : 'Informational');
 
     const evidenceSummary = formattedDefects.length > 0
@@ -805,11 +850,15 @@ Respond strictly in valid JSON matching this exact schema:
           'Visual assessment only — certified engineer verification required before operational sign-off.'
         ];
 
-    const overallCond = parsed.overallCondition || (
-      finalScore !== null 
-        ? (finalScore >= 75 ? 'Good' : finalScore >= 50 ? 'Fair' : 'Poor')
-        : (isEligible ? 'Good' : 'Out of Scope')
-    );
+    const overallCond = isEligible
+      ? (hasHighDefect
+          ? (finalScore !== null && finalScore < 25 ? 'Critical' : 'Poor')
+          : (hasMedDefect
+              ? 'Fair'
+              : (formattedDefects.length === 0
+                  ? 'Condition Appears Acceptable Based on Available Visual Evidence'
+                  : (finalScore !== null && finalScore >= 75 ? 'Good' : 'Fair'))))
+      : 'Out of Scope';
 
     return {
       success: true,
@@ -820,6 +869,7 @@ Respond strictly in valid JSON matching this exact schema:
       assetCategory: isEligible ? assetCategory : 'Non-Engineering Subject',
       confidence: conf,
       eligible: isEligible,
+      applicableStandard: applicableStd,
       overallCondition: overallCond,
       conditionScore: finalScore,
       defects: formattedDefects,

@@ -18,7 +18,9 @@ import {
   Wrench, 
   Wind, 
   Sun, 
-  Truck, 
+  Truck,
+  Droplets,
+  Radio, 
   ChevronRight,
   Sparkles
 } from 'lucide-react';
@@ -35,7 +37,9 @@ const DOMAIN_ICONS: Record<string, React.ElementType> = {
   Wrench,
   Wind,
   Sun,
-  Truck
+  Truck,
+  Droplets,
+  Radio
 };
 
 export default function InspectionProcessFlow() {

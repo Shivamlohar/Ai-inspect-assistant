@@ -48,6 +48,8 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error('[VERCEL API /api/inspection/analyze ERROR]:', err);
     return res.status(200).json(generatePrecisionMetrologyInspection({
+      userSelectedAsset: assetName,
+      userNotes,
       reason: 'Precision Metrology Engine Active'
     }));
   }
