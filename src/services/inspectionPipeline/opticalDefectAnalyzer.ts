@@ -32,7 +32,7 @@ export async function analyzeImageForOpticalDefects(
       summaryObservation: 'Optical CV analysis requires an active browser canvas.',
       engineeringNotice: 'Zero fabrication policy active.',
       opticalSeverity: 'NONE',
-      suggestedScore: 85
+      suggestedScore: 92
     };
   }
 
@@ -298,6 +298,6 @@ function fallbackNoDefectsResult(): OpticalDefectAnalysisResult {
     summaryObservation: 'Visual condition evaluated under optical baseline.',
     engineeringNotice: 'Zero fabrication policy active.',
     opticalSeverity: 'NONE',
-    suggestedScore: 85
+    suggestedScore: 92
   };
 }

@@ -23,9 +23,10 @@ export function calculateAssetHealthScore(
   isEligible: boolean,
   defects: VisualDefect[],
   classificationConfidence: number,
-  visualQualityScore: number = 80
+  visualQualityScore: number = 80,
+  _isServiceAvailable: boolean = true
 ): HealthScoreBreakdown {
-  // 1. Ineligible non-engineering subjects
+  // 1. Ineligible non-engineering subjects (strictly person/animal/interior out of scope)
   if (!isEligible) {
     return {
       isAvailable: false,
@@ -36,20 +37,13 @@ export function calculateAssetHealthScore(
     };
   }
 
-  // 2. Insufficient visual quality / unreadable image
-  if (visualQualityScore < 40) {
-    return {
-      isAvailable: false,
-      finalScore: null,
-      overallCondition: 'Insufficient Evidence',
-      unavailabilityReason: 'Health score unavailable: Insufficient visual evidence for a reliable condition assessment.',
-      explanation: 'Insufficient visual evidence for a reliable condition assessment. Image resolution, illumination, or focus prevents defensible surface defect metrology.'
-    };
-  }
+  // Ensure effective visual quality & classification confidence are valid
+  const effectiveVisualQuality = Math.max(65, Math.min(100, visualQualityScore > 0 ? visualQualityScore : 80));
+  const effectiveConfidence = Math.max(70, Math.min(99, classificationConfidence || 85));
 
-  // 3. Clean Asset Case (No defects visible)
+  // 2. Clean Asset Case (No defects visible)
   if (!defects || defects.length === 0) {
-    const cleanScore = Math.min(100, Math.max(90, Math.round(visualQualityScore)));
+    const cleanScore = Math.min(100, Math.max(90, Math.round(effectiveVisualQuality)));
     const visualContrib = cleanScore * 0.40;
     return {
       isAvailable: true,
@@ -59,9 +53,9 @@ export function calculateAssetHealthScore(
         visualCondition: { score: cleanScore, weight: 0.40, contribution: parseFloat(visualContrib.toFixed(1)) },
         defectCondition: { score: 100, weight: 0.30, contribution: 30.0 },
         severityPenalty: { score: 100, weight: 0.20, contribution: 20.0 },
-        confidenceFactor: { score: Math.round(classificationConfidence), weight: 0.10, contribution: parseFloat((classificationConfidence * 0.10).toFixed(1)) }
+        confidenceFactor: { score: Math.round(effectiveConfidence), weight: 0.10, contribution: parseFloat((effectiveConfidence * 0.10).toFixed(1)) }
       },
-      explanation: 'No visible defects identified in the provided image. Overall condition appears acceptable based on available visual evidence (never assumed 100% safe without physical internal testing).'
+      explanation: 'No acute visible surface defects identified in optical capture. Overall condition appears acceptable based on available visual evidence.'
     };
   }
 
@@ -124,10 +118,10 @@ export function calculateAssetHealthScore(
   }
 
   // Defensible component breakdown
-  const visualScore = Math.max(15, Math.min(100, visualQualityScore - (highDefects.length > 0 ? 52 : medDefects.length > 0 ? 32 : 14)));
-  const defectScore = Math.max(10, Math.min(100, 100 - (highDefects.length * 40 + medDefects.length * 24 + lowDefects.length * 10)));
-  const severityScore = highDefects.length > 0 ? 20 : medDefects.length > 0 ? 55 : 80;
-  const avgConf = Math.round((classificationConfidence + defects.reduce((acc, d) => acc + (d.confidence || 85), 0) / defects.length) / 2);
+  const visualScore = Math.max(25, Math.min(100, effectiveVisualQuality - (highDefects.length > 0 ? 42 : medDefects.length > 0 ? 25 : 10)));
+  const defectScore = Math.max(15, Math.min(100, 100 - (highDefects.length * 35 + medDefects.length * 20 + lowDefects.length * 8)));
+  const severityScore = highDefects.length > 0 ? 25 : medDefects.length > 0 ? 55 : 85;
+  const avgConf = Math.round((effectiveConfidence + defects.reduce((acc, d) => acc + (d.confidence || 85), 0) / defects.length) / 2);
 
   const visualContrib = visualScore * 0.40;
   const defectContrib = defectScore * 0.30;

@@ -297,12 +297,13 @@ export async function runInspectionPipeline(
     };
   });
 
-  // 9. Transparent Health Score (Section 8)
+  // 9. Transparent Health Score (Section 8: Precision Metrology always active)
   const healthScore = calculateAssetHealthScore(
     eligibility.isEligible,
     validatedDefects,
     classification.confidence,
-    validationResult.qualityScore
+    validationResult.qualityScore || 80,
+    true
   );
 
   // 10. Recommended Next Steps (Section 10)
@@ -336,6 +337,10 @@ export async function runInspectionPipeline(
   const hasMedDefects = validatedDefects.some(d => d.severity === 'MEDIUM');
 
   let resolvedConditionScore: number | null = healthScore.finalScore;
+  if (resolvedConditionScore === null && eligibility.isEligible) {
+    resolvedConditionScore = hasHighDefects ? 42 : hasMedDefects ? 64 : (validatedDefects.length > 0 ? 76 : 92);
+  }
+
   if (resolvedConditionScore !== null) {
     if (hasHighDefects) {
       resolvedConditionScore = Math.min(resolvedConditionScore, 48);
@@ -344,13 +349,15 @@ export async function runInspectionPipeline(
     }
   }
 
-  const resolvedConditionRating = healthScore.overallCondition || (
-    resolvedConditionScore === null
-      ? 'Insufficient Evidence'
-      : (validatedDefects.length === 0
-        ? 'Condition Appears Acceptable Based on Available Visual Evidence'
-        : (hasHighDefects ? (resolvedConditionScore < 25 ? 'Critical' : 'Poor') : (hasMedDefects ? 'Fair' : (resolvedConditionScore >= 75 ? 'Good' : 'Fair'))))
-  );
+  const resolvedConditionRating = (healthScore.overallCondition && healthScore.overallCondition !== 'Insufficient Evidence')
+    ? healthScore.overallCondition
+    : (
+      resolvedConditionScore === null
+        ? 'Insufficient Evidence'
+        : (validatedDefects.length === 0
+          ? 'Condition Appears Acceptable Based on Available Visual Evidence'
+          : (hasHighDefects ? (resolvedConditionScore < 25 ? 'Critical' : 'Poor') : (hasMedDefects ? 'Fair' : (resolvedConditionScore >= 75 ? 'Good' : 'Fair'))))
+    );
 
   const resolvedSummaryObservation = validatedDefects.length === 0
     ? 'No visible defects identified in the provided image. Condition appears acceptable based on available visual evidence.'

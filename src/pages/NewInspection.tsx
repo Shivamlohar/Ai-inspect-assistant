@@ -48,7 +48,7 @@ export default function NewInspection() {
     if (location.state?.assetName) return location.state.assetName;
     const stored = sessionStorage.getItem('selectedAsset');
     if (stored) return stored;
-    return ''; // Auto-detect from image / video
+    return ''; // Auto-detect from image
   });
   const [selectedLang, setSelectedLang] = useState<InspectionLanguage>('en');
   const [luminance, setLuminance] = useState<number | null>(null);
@@ -465,67 +465,58 @@ export default function NewInspection() {
 
     const isVid = file.type.startsWith('video/');
 
-    if (!isVid) {
-      optimizeImageForInspection(file)
-        .then((optimized) => {
-          // Analyze image luminance to prevent low-light bias
-          const img = new Image();
-          img.onload = () => {
-            const c = document.createElement('canvas');
-            c.width = 160;
-            c.height = Math.max(90, Math.round((160 * (img.height || 90)) / (img.width || 160)));
-            const ctx = c.getContext('2d', { willReadFrequently: true });
-            if (ctx) {
-              ctx.drawImage(img, 0, 0, c.width, c.height);
-              const data = ctx.getImageData(0, 0, c.width, c.height).data;
-              let sum = 0;
-              for (let i = 0; i < data.length; i += 4) {
-                sum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-              }
-              const avg = Math.round(sum / (data.length / 4));
-              setLuminance(avg);
-            }
-          };
-          img.src = optimized.dataUrl;
-
-          setMediaFile({
-            url: optimized.dataUrl,
-            type: 'image',
-            name: secResult.sanitizedName,
-            size: optimized.sizeInMb,
-            securityHash: secResult.securityHash,
-            base64: optimized.dataUrl,
-            mimeType: 'image/jpeg'
-          });
-
-          runAiPreScan(secResult.sanitizedName, optimized.dataUrl);
-        })
-        .catch(() => {
-          const url = URL.createObjectURL(file);
-          const sizeInMb = (file.size / (1024 * 1024)).toFixed(1) + ' MB';
-          setMediaFile({
-            url,
-            type: 'image',
-            name: secResult.sanitizedName,
-            size: sizeInMb,
-            securityHash: secResult.securityHash,
-            mimeType: file.type
-          });
-          runAiPreScan(secResult.sanitizedName, url);
-        });
-    } else {
-      const url = URL.createObjectURL(file);
-      const sizeInMb = (file.size / (1024 * 1024)).toFixed(1) + ' MB';
-      setMediaFile({
-        url,
-        type: 'video',
-        name: secResult.sanitizedName,
-        size: sizeInMb,
-        securityHash: secResult.securityHash,
-        mimeType: file.type
-      });
-      runAiPreScan(secResult.sanitizedName);
+    if (isVid) {
+      setCameraError('Video inspection feature is disabled. Please upload a high-resolution photograph (PNG, JPG, WEBP) for inspection.');
+      return;
     }
+
+    optimizeImageForInspection(file)
+      .then((optimized) => {
+        // Analyze image luminance to prevent low-light bias
+        const img = new Image();
+        img.onload = () => {
+          const c = document.createElement('canvas');
+          c.width = 160;
+          c.height = Math.max(90, Math.round((160 * (img.height || 90)) / (img.width || 160)));
+          const ctx = c.getContext('2d', { willReadFrequently: true });
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, c.width, c.height);
+            const data = ctx.getImageData(0, 0, c.width, c.height).data;
+            let sum = 0;
+            for (let i = 0; i < data.length; i += 4) {
+              sum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+            }
+            const avg = Math.round(sum / (data.length / 4));
+            setLuminance(avg);
+          }
+        };
+        img.src = optimized.dataUrl;
+
+        setMediaFile({
+          url: optimized.dataUrl,
+          type: 'image',
+          name: secResult.sanitizedName,
+          size: optimized.sizeInMb,
+          securityHash: secResult.securityHash,
+          base64: optimized.dataUrl,
+          mimeType: 'image/jpeg'
+        });
+
+        runAiPreScan(secResult.sanitizedName, optimized.dataUrl);
+      })
+      .catch(() => {
+        const url = URL.createObjectURL(file);
+        const sizeInMb = (file.size / (1024 * 1024)).toFixed(1) + ' MB';
+        setMediaFile({
+          url,
+          type: 'image',
+          name: secResult.sanitizedName,
+          size: sizeInMb,
+          securityHash: secResult.securityHash,
+          mimeType: file.type
+        });
+        runAiPreScan(secResult.sanitizedName, url);
+      });
 
     setSecurityNotice('Anti-Malware Sandbox: Clean File • 0 Threat Signatures • Integrity Verified');
     stopCamera();
@@ -538,9 +529,8 @@ export default function NewInspection() {
   };
 
   const handleVideoInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      handleFileSelection(e.target.files[0]);
-    }
+    setCameraError('Video inspection feature is disabled. Please upload a high-resolution photograph (PNG, JPG, WEBP) for inspection.');
+    if (e.target) e.target.value = '';
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -867,11 +857,10 @@ export default function NewInspection() {
   const handleStartInspection = () => {
     stopRecording();
     clearSessionDraft();
-    const hasMedia = Boolean(mediaFile?.base64);
+    const hasMedia = Boolean(mediaFile?.base64 || mediaFile?.url);
 
-    const isVideo = mediaFile?.type === 'video';
     const isCamera = isCameraActive || (mediaFile?.name && mediaFile.name.includes('machine_capture_'));
-    const inputType = isVideo ? 'video' : (isCamera ? 'camera' : 'static_image');
+    const inputType = isCamera ? 'camera' : 'static_image';
 
     const resolvedAssetName = isNonIndustrial 
       ? (nonIndustrialSubject || 'Person / Human (Non-Inspectable)')
@@ -886,7 +875,7 @@ export default function NewInspection() {
       inspectionDomain: resolvedDomain,
       assetCategory: isNonIndustrial ? nonIndustrialSubject : undefined,
       mediaUrl: mediaFile?.url || samplePresets[0].url,
-      mediaType: mediaFile?.type || 'image',
+      mediaType: 'image',
       mediaName: mediaFile?.name || 'asset_scan.jpg',
       inputType,
       description,
@@ -908,6 +897,8 @@ export default function NewInspection() {
     sessionStorage.removeItem('humanVerifications');
     sessionStorage.removeItem('reportDraft');
     sessionStorage.removeItem('geminiResult');
+    sessionStorage.removeItem('videoKeyframes');
+    sessionStorage.removeItem('videoFindings');
 
     sessionStorage.setItem('currentInspection', JSON.stringify(inspectionPayload));
     navigate('/analysis');
@@ -923,7 +914,7 @@ export default function NewInspection() {
         </div>
         <h2 className="text-3xl md:text-4xl font-black text-slate-800 tracking-tight">Start a New Inspection</h2>
         <p className="text-slate-500 text-base md:text-lg">
-          Upload an image or video of any machine, infrastructure, or industrial asset.
+          Upload a high-resolution photograph of any machine, infrastructure, or industrial asset.
         </p>
       </div>
 
@@ -1120,7 +1111,7 @@ export default function NewInspection() {
           </div>
           <div>
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Target Component</span>
-            <h4 className="text-lg font-black text-slate-800">{selectedAsset || 'Auto-detect from image / video'}</h4>
+            <h4 className="text-lg font-black text-slate-800">{selectedAsset || 'Auto-detect from image'}</h4>
           </div>
         </div>
 
@@ -1131,7 +1122,7 @@ export default function NewInspection() {
           onChange={(e) => setSelectedAsset(e.target.value)}
           className="bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold text-sm rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer w-full sm:w-auto"
         >
-          <option value="">🔍 Auto-detect asset & domain from image / video</option>
+          <option value="">🔍 Auto-detect asset & domain from image</option>
           <optgroup label="🏭 1. INDUSTRIAL MACHINES">
             <option value="Industrial Motor M-401 (M-401)">Electric Motor M-401 (M-401)</option>
             <option value="Centrifugal Pump P-204 (P-204)">Centrifugal Pump P-204 (P-204)</option>
@@ -1243,19 +1234,21 @@ export default function NewInspection() {
               </div>
             </button>
 
-            <button 
-              type="button"
-              onClick={() => videoInputRef.current?.click()}
-              className="flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border-2 border-dashed border-slate-200 hover:border-primary hover:bg-primary/5 transition-all group cursor-pointer"
+            <div 
+              className="flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 bg-slate-100/50 dark:bg-slate-900/40 opacity-50 cursor-not-allowed select-none"
+              title="Video inspection feature is disabled"
             >
-              <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-600 group-hover:text-primary group-hover:scale-110 transition-transform">
+              <div className="w-12 h-12 rounded-2xl bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-slate-400">
                 <Video className="w-6 h-6" />
               </div>
               <div className="text-center">
-                <span className="font-extrabold text-slate-800 text-sm block">Upload Video</span>
-                <span className="text-[11px] text-slate-500 font-medium">MP4, MOV (Max 50MB)</span>
+                <div className="flex items-center justify-center gap-1.5">
+                  <span className="font-extrabold text-slate-500 text-sm block">Video Inspection</span>
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-300 dark:bg-slate-700 text-slate-600 dark:text-slate-300 uppercase">Disabled</span>
+                </div>
+                <span className="text-[11px] text-slate-400 font-medium">Image Inspection Active Only</span>
               </div>
-            </button>
+            </div>
 
             <button 
               type="button"
@@ -1333,21 +1326,13 @@ export default function NewInspection() {
                   
                   {/* Media visual thumbnail */}
                   <div className="relative w-full md:w-64 min-h-[160px] max-h-[260px] aspect-video md:aspect-4/3 rounded-xl overflow-hidden bg-slate-950 shrink-0 flex items-center justify-center border border-slate-800">
-                    {mediaFile.type === 'image' ? (
-                      <img 
-                        src={mediaFile.url} 
-                        alt={mediaFile.name} 
-                        loading="lazy"
-                        decoding="async"
-                        className="w-full h-full object-contain"
-                      />
-                    ) : (
-                      <video 
-                        src={mediaFile.url} 
-                        controls 
-                        className="w-full h-full object-contain"
-                      />
-                    )}
+                    <img 
+                      src={mediaFile.url} 
+                      alt={mediaFile.name} 
+                      loading="lazy"
+                      decoding="async"
+                      className="w-full h-full object-contain"
+                    />
                     <span className="absolute top-2 left-2 bg-slate-900/80 backdrop-blur-xs text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase">
                       {mediaFile.type}
                     </span>
@@ -1448,7 +1433,7 @@ export default function NewInspection() {
               </div>
             ) : (
               <div className="text-center py-8 space-y-2">
-                <p className="font-bold text-slate-700 text-sm">Drag & drop asset photo or video here</p>
+                <p className="font-bold text-slate-700 text-sm">Drag & drop asset photo here</p>
                 <p className="text-xs text-slate-400">Files are sandboxed and scanned against malicious code injection</p>
               </div>
             )}

@@ -1,15 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, CheckCircle2, CircleDashed, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Sparkles, CheckCircle2, CircleDashed, ArrowRight } from 'lucide-react';
 import { runInspectionPipeline } from '../services/inspectionPipeline';
 import { analyzeAssetWithOpenAI } from '../services/aiApi';
 
 export default function AiAnalysis() {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(0);
-  const [assetName, setAssetName] = useState('Industrial Machine #M-401');
-  const isOpenAIActive = true;
-  const [statusMessage, setStatusMessage] = useState<string>('Validating image and asset context...');
+  const [assetName, setAssetName] = useState('Engineering Asset');
+  const [statusMessage, setStatusMessage] = useState<string>('Validating media and asset context...');
 
   useEffect(() => {
     let isCancelled = false;
@@ -31,8 +30,8 @@ export default function AiAnalysis() {
         return;
       }
 
-      // Execute comprehensive inspection pipeline (Section 2 - 14)
       try {
+        // IMAGE INSPECTION PIPELINE (Exclusively active)
         setStatusMessage('Evaluating visual scene & asset eligibility gate...');
         const imageBase64 = parsed.imageBase64 || parsed.mediaUrl || '';
         const mimeType = parsed.mimeType || 'image/jpeg';
@@ -43,7 +42,7 @@ export default function AiAnalysis() {
 
         let openAiResult = null;
         try {
-          setStatusMessage('Analyzing machine with Server-Side OpenAI Vision (GPT-4o)...');
+          setStatusMessage('Analyzing image with Server-Side OpenAI Vision (GPT-4o)...');
           openAiResult = await analyzeAssetWithOpenAI(
             '',
             imageBase64,
@@ -77,12 +76,12 @@ export default function AiAnalysis() {
             ...pipelineResult,
             isOpenAI: true,
             openAiPending: false,
-            geminiPending: false,
             pipelineResult
           };
 
           sessionStorage.setItem('currentInspection', JSON.stringify(updatedPayload));
           sessionStorage.setItem('currentInspectionResult', JSON.stringify(pipelineResult));
+          sessionStorage.setItem('currentInspectionFindings', JSON.stringify(pipelineResult.defects || []));
         }
       } catch (pipelineErr) {
         console.error('Inspection pipeline error:', pipelineErr);
@@ -105,21 +104,16 @@ export default function AiAnalysis() {
     };
   }, []);
 
-  const steps = isOpenAIActive ? [
-    "STAGE 1-2: Image intake & optical preprocessing validation",
+  const imageSteps = [
+    "STAGE 1-2: Image intake & optical validation",
     "STAGE 3-4: Multi-domain AI classification across 8 engineering domains",
     "STAGE 5: Visual defect metrology & surface anomaly detection (GPT-4o Vision)",
     "STAGE 5: Optical surface evidence & confidence validation",
-    "STAGE 6: Evidence-driven severity scoring & domain standards retrieval (IS 456 / IRC / IEC / ISO)",
+    "STAGE 6: Evidence-driven severity scoring & domain standards retrieval",
     "STAGE 7: Defensible condition assessment & auditable inspection dossier"
-  ] : [
-    "STAGE 1-2: Image intake & optical preprocessing validation",
-    "STAGE 3-4: Multi-domain classification across 8 engineering domains",
-    "STAGE 5: Precision optical metrology & surface anomaly detection",
-    "STAGE 5: Visual surface evidence & confidence validation",
-    "STAGE 6: Evidence-driven condition assessment & domain standards retrieval",
-    "STAGE 7: Defensible condition scoring & auditable inspection dossier"
   ];
+
+  const steps = imageSteps;
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -132,10 +126,10 @@ export default function AiAnalysis() {
           return prev;
         }
       });
-    }, isOpenAIActive ? 1400 : 1100);
+    }, 1300);
 
     return () => clearInterval(timer);
-  }, [navigate, steps.length, isOpenAIActive]);
+  }, [navigate, steps.length]);
 
   return (
     <div className="min-h-[85vh] flex items-center justify-center p-6 animate-in fade-in duration-300">
@@ -153,15 +147,7 @@ export default function AiAnalysis() {
 
         <div className="text-center mb-8">
           <span className="text-xs font-black uppercase tracking-widest text-ai bg-ai/10 px-3 py-1 rounded-full flex items-center justify-center gap-1.5 w-fit mx-auto">
-            {isOpenAIActive ? (
-              <>
-                <Sparkles className="w-3.5 h-3.5 text-ai" /> Live OpenAI Vision Active (GPT-4o)
-              </>
-            ) : (
-              <>
-                <ShieldCheck className="w-3.5 h-3.5 text-healthy" /> Precision Metrology Engine
-              </>
-            )}
+            <Sparkles className="w-3.5 h-3.5 text-ai" /> Live OpenAI Vision Active (GPT-4o)
           </span>
           <h2 className="text-2xl font-black text-slate-800 mt-2">
             Your asset is being analyzed...

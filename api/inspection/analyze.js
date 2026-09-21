@@ -33,10 +33,16 @@ export default async function handler(req, res) {
     return res.status(405).json({ success: false, error: 'Method Not Allowed' });
   }
 
+  let body = {};
   try {
-    const body = await parseBody(req);
-    const { imageBase64, mimeType = 'image/jpeg', assetName, userNotes } = body;
+    body = await parseBody(req);
+  } catch {
+    body = {};
+  }
 
+  const { imageBase64, mimeType = 'image/jpeg', assetName = '', userNotes = '' } = body || {};
+
+  try {
     const result = await analyzeInspectionMultimodal({
       imageBase64,
       mimeType,
@@ -46,11 +52,11 @@ export default async function handler(req, res) {
 
     return res.status(200).json(result);
   } catch (err) {
-    console.error('[VERCEL API /api/inspection/analyze ERROR]:', err);
+    console.error('[API /api/inspection/analyze ERROR]:', err);
     return res.status(200).json(generatePrecisionMetrologyInspection({
       userSelectedAsset: assetName,
       userNotes,
-      reason: 'Precision Metrology Engine Active'
+      reason: err?.message || 'AI Vision Service Unavailable'
     }));
   }
 }
