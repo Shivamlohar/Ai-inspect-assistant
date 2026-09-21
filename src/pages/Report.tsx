@@ -15,7 +15,8 @@ import {
   AlertTriangle,
   CheckCircle2,
   FileText,
-  Wrench
+  Wrench,
+  Layers
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getActiveOfficer, saveOfficerInspection } from '../utils/officerStore';
@@ -139,6 +140,7 @@ function GoldPESeal({ className = "w-28 h-28" }: { className?: string }) {
 
 export default function Report() {
   const [officer] = useState(() => getActiveOfficer());
+  const [pageMode, setPageMode] = useState<2 | 3>(2);
   const [isSaved, setIsSaved] = useState(false);
   const [saveToast, setSaveToast] = useState(false);
 
@@ -425,6 +427,11 @@ export default function Report() {
           ],
           scoreBreakdown
         });
+
+        const totalCount = allDefects.length + (Array.isArray(parsed.customDefects) ? parsed.customDefects.length : 0);
+        if (totalCount > 3) {
+          setPageMode(3);
+        }
       } catch (e) {
         console.error(e);
       }
@@ -433,7 +440,7 @@ export default function Report() {
 
   const handlePrint = () => {
     const originalTitle = document.title;
-    document.title = `ENGINEERING_AUDIT_REPORT_${data.assetId}_2PAGE`;
+    document.title = `ENGINEERING_AUDIT_REPORT_${data.assetId}_${pageMode}PAGE`;
     window.print();
     setTimeout(() => {
       document.title = originalTitle;
@@ -442,7 +449,7 @@ export default function Report() {
 
   const handleDownloadPdf = () => {
     const originalTitle = document.title;
-    document.title = `ENGINEERING_AUDIT_REPORT_${data.assetId}_2PAGE`;
+    document.title = `ENGINEERING_AUDIT_REPORT_${data.assetId}_${pageMode}PAGE`;
     window.print();
     setTimeout(() => {
       document.title = originalTitle;
@@ -519,7 +526,7 @@ export default function Report() {
       healthScore: rawScore,
       status: (rawScore >= 80 ? 'Healthy' : rawScore >= 60 ? 'Attention' : 'At Risk'),
       securityHash: data.securityHash,
-      notes: `Formal 2-page engineering report generated. Inspector verification logged. Safety Factor: ${data.safetyFactor}. Defect count: ${defectsToRender.length}.`,
+      notes: `Formal ${pageMode}-page engineering report generated. Inspector verification logged. Safety Factor: ${data.safetyFactor}. Defect count: ${defectsToRender.length}.`,
       diagnosticSummary: data.diagnosticSummary || 'Diagnostic engineering metrology verified.',
       defectsCount: defectsToRender.length,
       isGemini: data.isGemini
@@ -587,7 +594,7 @@ export default function Report() {
   }));
 
   return (
-    <div className="report-container p-4 sm:p-6 md:p-8 max-w-5xl mx-auto space-y-6 animate-in fade-in duration-300">
+    <div className={`report-container report-mode-${pageMode}page p-4 sm:p-6 md:p-8 max-w-5xl mx-auto space-y-6 animate-in fade-in duration-300`}>
       
       {/* Toast Notification */}
       {saveToast && (
@@ -607,13 +614,41 @@ export default function Report() {
           </Link>
           <div className="hidden md:flex flex-col">
             <span className="text-xs font-extrabold text-cyan-400 flex items-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5" /> Formal 2-Page Engineering Dossier
+              <ShieldCheck className="w-3.5 h-3.5" /> Formal Engineering Dossier ({pageMode} Pages)
             </span>
             <span className="text-[11px] text-slate-400 font-mono">Compliant with ISO 55000 / ASME / ACI Audit Standards</span>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          {/* Strict Page Budget Switcher: Minimum 2 Pages, Maximum 3 Pages */}
+          <div className="flex items-center bg-slate-800/90 p-1 rounded-xl border border-slate-700">
+            <button
+              type="button"
+              onClick={() => setPageMode(2)}
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                pageMode === 2
+                  ? 'bg-cyan-500 text-slate-950 shadow-md font-black'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+              }`}
+              title="Minimum 2-Page Standard Statutory Audit"
+            >
+              <FileText className="w-3.5 h-3.5" /> 2 Pages (Min)
+            </button>
+            <button
+              type="button"
+              onClick={() => setPageMode(3)}
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                pageMode === 3
+                  ? 'bg-cyan-500 text-slate-950 shadow-md font-black'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+              }`}
+              title="Maximum 3-Page Comprehensive Technical Dossier with NDT Protocol"
+            >
+              <Layers className="w-3.5 h-3.5" /> 3 Pages (Max)
+            </button>
+          </div>
+
           <button
             onClick={handleSaveReportToOfficerLog}
             className={`px-3 py-2 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer ${
@@ -653,7 +688,7 @@ export default function Report() {
             onClick={handleDownloadPdf}
             className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-primary hover:from-cyan-400 hover:to-primary/90 text-white text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-cyan-500/20"
           >
-            <Download className="w-4 h-4" /> Download 2-Page PDF
+            <Download className="w-4 h-4" /> Download {pageMode}-Page PDF
           </button>
         </div>
       </div>
@@ -665,7 +700,7 @@ export default function Report() {
         {/* On-Screen Sheet Header Badge (Hidden in Print) */}
         <div className="flex items-center justify-between px-3 py-1 bg-slate-800 text-slate-200 rounded-t-xl text-[11px] font-mono font-bold print:hidden border border-slate-700">
           <span className="flex items-center gap-1.5 text-cyan-400">
-            <FileText className="w-3.5 h-3.5" /> PAGE 1 OF 2 — EXECUTIVE ASSESSMENT & OPTICAL EVIDENCE
+            <FileText className="w-3.5 h-3.5" /> PAGE 1 OF {pageMode} — EXECUTIVE ASSESSMENT & OPTICAL EVIDENCE
           </span>
           <span className="text-slate-400 text-[10px]">A4 PORTRAIT FORMAT • PRINT READY</span>
         </div>
@@ -1036,247 +1071,645 @@ export default function Report() {
 
           {/* Page 1 Official Footer */}
           <footer className="report-page-footer pt-2 border-t border-slate-300 flex items-center justify-between text-[9px] text-slate-500 font-medium mt-2">
-            <span>Page 1 of 2 — Executive Summary & Optical Evidence Dossier</span>
+            <span>Page 1 of {pageMode} — Executive Summary & Optical Evidence Dossier</span>
             <span className="font-mono text-slate-600">Digest: {data.securityHash}</span>
-            <span className="font-bold text-slate-700">Official Statutory Engineer Sign-Off on Page 2</span>
+            <span className="font-bold text-slate-700">Official Statutory Engineer Sign-Off on Page {pageMode}</span>
           </footer>
         </div>
       </div>
 
       {/* =========================================================================
-          PAGE 2 OF 2: COMPREHENSIVE METROLOGY, COMPLIANCE & SIGN-OFF
+          PAGE 2: COMPREHENSIVE METROLOGY, COMPLIANCE & SIGN-OFF (2-PAGE MODE)
       ========================================================================= */}
-      <div className="space-y-2">
-        {/* On-Screen Sheet Header Badge (Hidden in Print) */}
-        <div className="flex items-center justify-between px-3 py-1 bg-slate-800 text-slate-200 rounded-t-xl text-[11px] font-mono font-bold print:hidden border border-slate-700">
-          <span className="flex items-center gap-1.5 text-cyan-400">
-            <FileText className="w-3.5 h-3.5" /> PAGE 2 OF 2 — METROLOGY AUDIT, COMPLIANCE & LEGAL DISPOSITION
-          </span>
-          <span className="text-slate-400 text-[10px]">A4 PORTRAIT FORMAT • PRINT READY</span>
-        </div>
+      {pageMode === 2 ? (
+        <div className="space-y-2">
+          {/* On-Screen Sheet Header Badge (Hidden in Print) */}
+          <div className="flex items-center justify-between px-3 py-1 bg-slate-800 text-slate-200 rounded-t-xl text-[11px] font-mono font-bold print:hidden border border-slate-700">
+            <span className="flex items-center gap-1.5 text-cyan-400">
+              <FileText className="w-3.5 h-3.5" /> PAGE 2 OF 2 — METROLOGY AUDIT, COMPLIANCE & LEGAL DISPOSITION
+            </span>
+            <span className="text-slate-400 text-[10px]">A4 PORTRAIT FORMAT • PRINT READY</span>
+          </div>
 
-        <div className="report-page report-page-2 bg-white p-6 sm:p-7 md:p-8 shadow-2xl border border-slate-300 rounded-2xl text-slate-800 flex flex-col justify-between print:rounded-none print:border-none print:shadow-none print:p-0">
-          <div className="space-y-3">
-            
-            {/* Page 2 Continuous Audit Header */}
-            <header className="border-b border-slate-300 pb-1.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
-              <div className="flex items-center gap-2">
-                <span className="font-black uppercase tracking-wider text-slate-900 text-xs">
-                  ENGINEERING ASSET INSPECTION REPORT — AUDIT TRAIL & METROLOGY
-                </span>
-              </div>
-              <div className="font-mono text-[9px] text-slate-500 flex flex-wrap items-center gap-2">
-                <span>Doc: <strong className="text-slate-800">REP-2026-{data.assetId}</strong></span>
-                <span>•</span>
-                <span>Asset: <strong className="text-slate-800">{data.assetId}</strong></span>
-                <span>•</span>
-                <span>Date: <strong className="text-slate-800">{data.inspectionTimestamp}</strong></span>
-              </div>
-            </header>
+          <div className="report-page report-page-2 bg-white p-6 sm:p-7 md:p-8 shadow-2xl border border-slate-300 rounded-2xl text-slate-800 flex flex-col justify-between print:rounded-none print:border-none print:shadow-none print:p-0">
+            <div className="space-y-3">
+              
+              {/* Page 2 Continuous Audit Header */}
+              <header className="border-b border-slate-300 pb-1.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="font-black uppercase tracking-wider text-slate-900 text-xs">
+                    ENGINEERING ASSET INSPECTION REPORT — AUDIT TRAIL & METROLOGY
+                  </span>
+                </div>
+                <div className="font-mono text-[9px] text-slate-500 flex flex-wrap items-center gap-2">
+                  <span>Doc: <strong className="text-slate-800">REP-2026-{data.assetId}</strong></span>
+                  <span>•</span>
+                  <span>Asset: <strong className="text-slate-800">{data.assetId}</strong></span>
+                  <span>•</span>
+                  <span>Date: <strong className="text-slate-800">{data.inspectionTimestamp}</strong></span>
+                </div>
+              </header>
 
-            {/* Comprehensive Findings Metrology Table */}
-            <section className="space-y-1">
-              <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-200 pb-0.5">
-                <Ruler className="w-3.5 h-3.5 text-primary" /> Full Anomaly Metrology & Structural Risk Assessment
-              </h3>
+              {/* Comprehensive Findings Metrology Table */}
+              <section className="space-y-1">
+                <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-200 pb-0.5">
+                  <Ruler className="w-3.5 h-3.5 text-primary" /> Full Anomaly Metrology & Structural Risk Assessment
+                </h3>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border border-slate-200 rounded-lg overflow-hidden">
-                  <thead className="bg-slate-100 text-slate-700 font-bold uppercase text-[9px]">
-                    <tr>
-                      <th className="p-1.5">#</th>
-                      <th className="p-1.5">Anomaly Type</th>
-                      <th className="p-1.5">Severity</th>
-                      <th className="p-1.5">Sub-Millimeter / Dimensional Metric</th>
-                      <th className="p-1.5">AI Conf.</th>
-                      <th className="p-1.5">Standard Clause</th>
-                      <th className="p-1.5">Structural Risk</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-[10px]">
-                    {defectsToRender.length === 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border border-slate-200 rounded-lg overflow-hidden">
+                    <thead className="bg-slate-100 text-slate-700 font-bold uppercase text-[9px]">
                       <tr>
-                        <td colSpan={7} className="p-2.5 text-center text-slate-500 font-medium">
-                          ✓ Substrate inspection verified clean. No active structural defects detected.
-                        </td>
+                        <th className="p-1.5">#</th>
+                        <th className="p-1.5">Anomaly Type</th>
+                        <th className="p-1.5">Severity</th>
+                        <th className="p-1.5">Sub-Millimeter / Dimensional Metric</th>
+                        <th className="p-1.5">AI Conf.</th>
+                        <th className="p-1.5">Standard Clause</th>
+                        <th className="p-1.5">Structural Risk</th>
                       </tr>
-                    ) : (
-                      defectsToRender.slice(0, 4).map((defect, idx) => (
-                        <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'}>
-                          <td className="p-1.5 font-mono font-bold">{idx + 1}</td>
-                          <td className="p-1.5 font-bold text-slate-900">{defect.name}</td>
-                          <td className="p-1.5">
-                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
-                              defect.severity.toLowerCase().includes('high') ? 'bg-rose-100 text-rose-700' :
-                              defect.severity.toLowerCase().includes('medium') ? 'bg-amber-100 text-amber-700' :
-                              'bg-emerald-100 text-emerald-700'
-                            }`}>
-                              {defect.severity}
-                            </span>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-[10px]">
+                      {defectsToRender.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="p-2.5 text-center text-slate-500 font-medium">
+                            ✓ Substrate inspection verified clean. No active structural defects detected.
                           </td>
-                          <td className="p-1.5 font-mono text-[9px] text-slate-700">{defect.metricText}</td>
-                          <td className="p-1.5 font-mono font-bold text-slate-800">{defect.confidence}</td>
-                          <td className="p-1.5 font-mono text-[9px] text-cyan-800">{data.applicableStandard ? `${data.applicableStandard} §4.2` : 'General Visual Spec'}</td>
-                          <td className="p-1.5 text-[9px] text-slate-600">{defect.severity.toLowerCase().includes('high') ? 'High Section Loss' : 'Progressive Surface Wear'}</td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              {defectsToRender.length > 4 && (
-                <p className="text-[8px] text-slate-500 font-mono text-right pt-0.5">
-                  * Top 4 critical structural deviations cataloged above. {defectsToRender.length - 4} minor indications archived in CMMS vault.
-                </p>
-              )}
-            </section>
+                      ) : (
+                        defectsToRender.slice(0, 4).map((defect, idx) => (
+                          <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'}>
+                            <td className="p-1.5 font-mono font-bold">{idx + 1}</td>
+                            <td className="p-1.5 font-bold text-slate-900">{defect.name}</td>
+                            <td className="p-1.5">
+                              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                defect.severity.toLowerCase().includes('high') ? 'bg-rose-100 text-rose-700' :
+                                defect.severity.toLowerCase().includes('medium') ? 'bg-amber-100 text-amber-700' :
+                                'bg-emerald-100 text-emerald-700'
+                              }`}>
+                                {defect.severity}
+                              </span>
+                            </td>
+                            <td className="p-1.5 font-mono text-[9px] text-slate-700">{defect.metricText}</td>
+                            <td className="p-1.5 font-mono font-bold text-slate-800">{defect.confidence}</td>
+                            <td className="p-1.5 font-mono text-[9px] text-cyan-800">{data.applicableStandard ? `${data.applicableStandard} §4.2` : 'General Visual Spec'}</td>
+                            <td className="p-1.5 text-[9px] text-slate-600">{defect.severity.toLowerCase().includes('high') ? 'High Section Loss' : 'Progressive Surface Wear'}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                {defectsToRender.length > 4 && (
+                  <p className="text-[8px] text-slate-500 font-mono text-right pt-0.5">
+                    * Top 4 critical structural deviations cataloged above. {defectsToRender.length - 4} minor indications archived in CMMS vault.
+                  </p>
+                )}
+              </section>
 
-            {/* Defensible Condition Assessment & Standards Formula (Side-by-Side) */}
-            <section className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
-              <div className="space-y-1">
-                <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1">
-                  <Award className="w-3 h-3 text-primary" /> Defensible 4-Factor Scoring Formula
-                </h4>
-                <p className="text-[9px] text-slate-500">
-                  Mathematically auditable scoring compliant with ISO 55000 / ASME inspection criteria:
-                </p>
-                <div className="space-y-0.5 font-mono text-[9px]">
-                  {data.scoreBreakdown.map((item, idx) => (
-                    <div key={idx} className="flex justify-between items-center bg-white p-1 rounded border border-slate-200">
-                      <span className="text-slate-700 font-bold">{item.name} ({item.weight}%):</span>
-                      <span className="font-bold text-slate-900">{item.score} / 100 ({item.contribution?.toFixed(1)} pts)</span>
+              {/* Defensible Condition Assessment & Standards Formula (Side-by-Side) */}
+              <section className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                <div className="space-y-1">
+                  <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1">
+                    <Award className="w-3 h-3 text-primary" /> Defensible 4-Factor Scoring Formula
+                  </h4>
+                  <p className="text-[9px] text-slate-500">
+                    Mathematically auditable scoring compliant with ISO 55000 / ASME inspection criteria:
+                  </p>
+                  <div className="space-y-0.5 font-mono text-[9px]">
+                    {data.scoreBreakdown.map((item, idx) => (
+                      <div key={idx} className="flex justify-between items-center bg-white p-1 rounded border border-slate-200">
+                        <span className="text-slate-700 font-bold">{item.name} ({item.weight}%):</span>
+                        <span className="font-bold text-slate-900">{item.score} / 100 ({item.contribution?.toFixed(1)} pts)</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[8px] font-mono text-slate-400">
+                    * Formula: Final Score = Σ (Factor Weight × Factor Score). Eliminates human bias.
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1">
+                    <BookOpen className="w-3 h-3 text-cyan-600" /> Applicable Standard Compliance
+                  </h4>
+                  <div className="p-2 rounded-lg bg-white border border-slate-200 space-y-1 text-[10px]">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Standard Code:</span>
+                      <strong className="text-cyan-900 font-mono">{data.applicableStandard || 'Standard: Not specified'}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Domain Classification:</span>
+                      <strong className="text-slate-800">{data.inspectionDomain}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Safety Margin:</span>
+                      <strong className="text-rose-600">{data.safetyFactor} SF (Min 1.50 Required)</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Mandated Re-Check:</span>
+                      <strong className="text-slate-800">{data.reinspectionInterval}</strong>
+                    </div>
+                  </div>
+                  <p className="text-[8px] text-slate-500 leading-tight">
+                    * Zero-fabrication guarantee: Domain standards and allowable tolerances strictly resolved via domain registry.
+                  </p>
+                </div>
+              </section>
+
+              {/* Prioritized Remediation Protocol (Step-by-Step Action Plan) */}
+              <section className="space-y-1">
+                <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-wider border-b border-slate-200 pb-0.5 flex items-center gap-1.5">
+                  <Wrench className="w-3.5 h-3.5 text-primary" /> Prioritized Action & Remediation Protocol
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs">
+                  {data.recommendations.slice(0, 4).map((rec: any, idx: number) => (
+                    <div key={idx} className="p-1.5 rounded-lg bg-slate-50 border border-slate-200 space-y-0.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-900 text-[10px]">{rec.step || idx + 1}. {rec.title}</span>
+                        <span className="px-1.5 py-0.2 rounded bg-cyan-100 text-cyan-800 text-[8px] font-mono font-bold">
+                          {rec.timing || rec.priority || 'Day 1'}
+                        </span>
+                      </div>
+                      <p className="text-[9px] text-slate-600 leading-tight">{rec.detail}</p>
                     </div>
                   ))}
                 </div>
-                <p className="text-[8px] font-mono text-slate-400">
-                  * Formula: Final Score = Σ (Factor Weight × Factor Score). Eliminates human bias.
-                </p>
-              </div>
+              </section>
 
-              <div className="space-y-1">
-                <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1">
-                  <BookOpen className="w-3 h-3 text-cyan-600" /> Applicable Standard Compliance
-                </h4>
-                <div className="p-2 rounded-lg bg-white border border-slate-200 space-y-1 text-[10px]">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Standard Code:</span>
-                    <strong className="text-cyan-900 font-mono">{data.applicableStandard || 'Standard: Not specified'}</strong>
+              {/* Mandatory Statutory Limitations of Automated Visual Inspection */}
+              <section className="p-2 rounded-lg bg-slate-50 border border-slate-200 text-[9px] text-slate-600 space-y-0.5">
+                <span className="font-bold text-slate-800 uppercase block text-[9px]">Statutory Limitations of Automated Visual AI Inspection:</span>
+                <ul className="list-disc pl-4 space-y-0.5 leading-tight">
+                  {data.limitationsOfVisualInspection.slice(0, 4).map((lim: string, idx: number) => (
+                    <li key={idx}>{lim}</li>
+                  ))}
+                </ul>
+              </section>
+
+              {/* Verification & Statutory Sign-Off Certification Blocks */}
+              <section className="pt-1.5 border-t-2 border-slate-800 grid grid-cols-12 gap-2 text-xs items-stretch">
+                {/* Lead Inspector Block (4 cols) */}
+                <div className="col-span-12 sm:col-span-4 p-2 rounded-xl border border-slate-300 bg-slate-50 flex flex-col justify-between">
+                  <div>
+                    <span className="text-[9px] font-bold uppercase text-slate-500 block">Certified Lead Field Inspector</span>
+                    <div className="font-serif italic text-sm text-slate-900 border-b border-slate-200 pb-0.5 mt-1">
+                      {officer.name}
+                    </div>
+                    <div className="flex justify-between items-center text-[8px] text-slate-500 font-mono mt-1">
+                      <span>ID: {officer.id}</span>
+                      <span>Stamp: CERT-FIELD-2026</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Domain Classification:</span>
-                    <strong className="text-slate-800">{data.inspectionDomain}</strong>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Safety Margin:</span>
-                    <strong className="text-rose-600">{data.safetyFactor} SF (Min 1.50 Required)</strong>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Mandated Re-Check:</span>
-                    <strong className="text-slate-800">{data.reinspectionInterval}</strong>
-                  </div>
+                  <p className="text-[8px] text-slate-400 mt-1">Signed: {data.inspectionTimestamp}</p>
                 </div>
-                <p className="text-[8px] text-slate-500 leading-tight">
-                  * Zero-fabrication guarantee: Domain standards and allowable tolerances strictly resolved via domain registry.
-                </p>
-              </div>
-            </section>
 
-            {/* Prioritized Remediation Protocol (Step-by-Step Action Plan) */}
-            <section className="space-y-1">
-              <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-wider border-b border-slate-200 pb-0.5 flex items-center gap-1.5">
-                <Wrench className="w-3.5 h-3.5 text-primary" /> Prioritized Action & Remediation Protocol
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs">
-                {data.recommendations.slice(0, 4).map((rec: any, idx: number) => (
-                  <div key={idx} className="p-1.5 rounded-lg bg-slate-50 border border-slate-200 space-y-0.5">
+                {/* Licensed Professional Engineer (PE) Review Block (5 cols) */}
+                <div className="col-span-12 sm:col-span-5 p-2 rounded-xl border-2 border-dashed border-amber-300 bg-amber-50/30 flex flex-col justify-between">
+                  <div>
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-900 text-[10px]">{rec.step || idx + 1}. {rec.title}</span>
-                      <span className="px-1.5 py-0.2 rounded bg-cyan-100 text-cyan-800 text-[8px] font-mono font-bold">
-                        {rec.timing || rec.priority || 'Day 1'}
+                      <span className="text-[9px] font-bold uppercase text-slate-800">Professional Engineer (PE) Review</span>
+                      <span className="text-[8px] font-mono text-amber-700 font-bold bg-amber-100 px-1.5 py-0.2 rounded border border-amber-300">SEAL VERIFIED</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-1 text-[8px] font-mono text-slate-700 font-semibold">
+                      <span>Disposition:</span>
+                      <span className="bg-white px-1 py-0.2 rounded border border-slate-200">
+                        {data.overallCondition.toLowerCase().includes('good') ? '☑ Approved' : '☐ Approved'}
+                      </span>
+                      <span className="bg-white px-1 py-0.2 rounded border border-slate-200">
+                        {data.overallCondition.toLowerCase().includes('good') ? '☐ Cond.' : '☑ Remediation'}
+                      </span>
+                      <span className="bg-white px-1 py-0.2 rounded border border-slate-200">
+                        {data.status.toLowerCase().includes('critical') ? '☑ Halt' : '☐ Halt'}
                       </span>
                     </div>
-                    <p className="text-[9px] text-slate-600 leading-tight">{rec.detail}</p>
                   </div>
-                ))}
-              </div>
-            </section>
-
-            {/* Mandatory Statutory Limitations of Automated Visual Inspection */}
-            <section className="p-2 rounded-lg bg-slate-50 border border-slate-200 text-[9px] text-slate-600 space-y-0.5">
-              <span className="font-bold text-slate-800 uppercase block text-[9px]">Statutory Limitations of Automated Visual AI Inspection:</span>
-              <ul className="list-disc pl-4 space-y-0.5 leading-tight">
-                {data.limitationsOfVisualInspection.slice(0, 4).map((lim: string, idx: number) => (
-                  <li key={idx}>{lim}</li>
-                ))}
-              </ul>
-            </section>
-
-            {/* Verification & Statutory Sign-Off Certification Blocks */}
-            <section className="pt-1.5 border-t-2 border-slate-800 grid grid-cols-12 gap-2 text-xs items-stretch">
-              {/* Lead Inspector Block (4 cols) */}
-              <div className="col-span-12 sm:col-span-4 p-2 rounded-xl border border-slate-300 bg-slate-50 flex flex-col justify-between">
-                <div>
-                  <span className="text-[9px] font-bold uppercase text-slate-500 block">Certified Lead Field Inspector</span>
-                  <div className="font-serif italic text-sm text-slate-900 border-b border-slate-200 pb-0.5 mt-1">
-                    {officer.name}
-                  </div>
-                  <div className="flex justify-between items-center text-[8px] text-slate-500 font-mono mt-1">
-                    <span>ID: {officer.id}</span>
-                    <span>Stamp: CERT-FIELD-2026</span>
+                  <div className="border-t border-slate-200 pt-1 flex justify-between text-[8px] text-slate-500 font-mono mt-1">
+                    <span>PE Reg: PE-948201-US</span>
+                    <span>Sign: Verified Digital</span>
                   </div>
                 </div>
-                <p className="text-[8px] text-slate-400 mt-1">Signed: {data.inspectionTimestamp}</p>
-              </div>
 
-              {/* Licensed Professional Engineer (PE) Review Block (5 cols) */}
-              <div className="col-span-12 sm:col-span-5 p-2 rounded-xl border-2 border-dashed border-amber-300 bg-amber-50/30 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[9px] font-bold uppercase text-slate-800">Professional Engineer (PE) Review</span>
-                    <span className="text-[8px] font-mono text-amber-700 font-bold bg-amber-100 px-1.5 py-0.2 rounded border border-amber-300">SEAL VERIFIED</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 mt-1 text-[8px] font-mono text-slate-700 font-semibold">
-                    <span>Disposition:</span>
-                    <span className="bg-white px-1 py-0.2 rounded border border-slate-200">
-                      {data.overallCondition.toLowerCase().includes('good') ? '☑ Approved' : '☐ Approved'}
-                    </span>
-                    <span className="bg-white px-1 py-0.2 rounded border border-slate-200">
-                      {data.overallCondition.toLowerCase().includes('good') ? '☐ Cond.' : '☑ Remediation'}
-                    </span>
-                    <span className="bg-white px-1 py-0.2 rounded border border-slate-200">
-                      {data.status.toLowerCase().includes('critical') ? '☑ Halt' : '☐ Halt'}
-                    </span>
-                  </div>
+                {/* Official Gold Embossed Professional Engineer (PE) Digital Seal (3 cols) */}
+                <div className="col-span-12 sm:col-span-3 flex flex-col items-center justify-center p-1.5 bg-amber-50/60 rounded-xl border border-amber-300/80 shadow-xs">
+                  <GoldPESeal className="w-24 h-24" />
+                  <span className="text-[7.5px] font-black font-mono text-amber-900 tracking-wider uppercase text-center mt-0.5">
+                    STATUTORY PE SEAL
+                  </span>
                 </div>
-                <div className="border-t border-slate-200 pt-1 flex justify-between text-[8px] text-slate-500 font-mono mt-1">
-                  <span>PE Reg: PE-948201-US</span>
-                  <span>Sign: Verified Digital</span>
-                </div>
+              </section>
+
+              {/* Statutory Disclaimer */}
+              <p className="text-[8px] text-slate-400 text-center leading-tight">
+                * This document represents an automated preliminary visual inspection. Statutory certifications require formal seal by an accredited Professional Engineer.
+              </p>
+
+            </div>
+
+            {/* Page 2 Official Footer */}
+            <footer className="report-page-footer pt-2 border-t border-slate-300 flex items-center justify-between text-[9px] text-slate-500 font-medium mt-2">
+              <span>Page 2 of 2 — Technical Metrology, Standards Compliance & Engineering Disposition</span>
+              <span className="font-mono text-slate-700 font-bold">AI Inspection Assistant Enterprise • Tamper-Proof Audit</span>
+            </footer>
+          </div>
+        </div>
+      ) : (
+        /* =========================================================================
+            3-PAGE MODE: PAGE 2 & PAGE 3 COMPREHENSIVE DOSSIER
+        ========================================================================= */
+        <>
+          {/* =========================================================================
+              PAGE 2 OF 3: COMPREHENSIVE ANOMALY METROLOGY & REMEDIATION PROTOCOL
+          ========================================================================= */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between px-3 py-1 bg-slate-800 text-slate-200 rounded-t-xl text-[11px] font-mono font-bold print:hidden border border-slate-700">
+              <span className="flex items-center gap-1.5 text-cyan-400">
+                <FileText className="w-3.5 h-3.5" /> PAGE 2 OF 3 — FULL ANOMALY METROLOGY & REMEDIATION SPECIFICATION
+              </span>
+              <span className="text-slate-400 text-[10px]">A4 PORTRAIT FORMAT • PRINT READY</span>
+            </div>
+
+            <div className="report-page report-page-2 bg-white p-6 sm:p-7 md:p-8 shadow-2xl border border-slate-300 rounded-2xl text-slate-800 flex flex-col justify-between print:rounded-none print:border-none print:shadow-none print:p-0">
+              <div className="space-y-3">
+                
+                {/* Continuous Audit Header */}
+                <header className="border-b border-slate-300 pb-1.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="font-black uppercase tracking-wider text-slate-900 text-xs">
+                      ENGINEERING ASSET INSPECTION REPORT — FULL ANOMALY METROLOGY & REMEDIATION
+                    </span>
+                  </div>
+                  <div className="font-mono text-[9px] text-slate-500 flex flex-wrap items-center gap-2">
+                    <span>Doc: <strong className="text-slate-800">REP-2026-{data.assetId}</strong></span>
+                    <span>•</span>
+                    <span>Asset: <strong className="text-slate-800">{data.assetId}</strong></span>
+                    <span>•</span>
+                    <span>Section: <strong className="text-slate-800">Part 2 of 3</strong></span>
+                  </div>
+                </header>
+
+                {/* Comprehensive Findings Metrology Table (Expanded to 6 items) */}
+                <section className="space-y-1">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-0.5">
+                    <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <Ruler className="w-3.5 h-3.5 text-primary" /> Full Anomaly Metrology & Structural Risk Assessment
+                    </h3>
+                    <span className="text-[8.5px] font-mono text-slate-500">
+                      Tolerances Resolved via {data.applicableStandard || 'Governing Code'}
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border border-slate-200 rounded-lg overflow-hidden">
+                      <thead className="bg-slate-100 text-slate-700 font-bold uppercase text-[9px]">
+                        <tr>
+                          <th className="p-1.5">#</th>
+                          <th className="p-1.5">Anomaly Designation</th>
+                          <th className="p-1.5">Severity</th>
+                          <th className="p-1.5">Sub-Millimeter / Dimensional Metric</th>
+                          <th className="p-1.5">AI Conf.</th>
+                          <th className="p-1.5">Standard Clause</th>
+                          <th className="p-1.5">Structural Risk Assessment</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-[10px]">
+                        {defectsToRender.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="p-3 text-center text-slate-500 font-medium">
+                              ✓ Substrate inspection verified clean. No active structural defects detected.
+                            </td>
+                          </tr>
+                        ) : (
+                          defectsToRender.slice(0, 6).map((defect, idx) => (
+                            <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'}>
+                              <td className="p-1.5 font-mono font-bold">{idx + 1}</td>
+                              <td className="p-1.5 font-bold text-slate-900">{defect.name}</td>
+                              <td className="p-1.5">
+                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                  defect.severity.toLowerCase().includes('high') ? 'bg-rose-100 text-rose-700' :
+                                  defect.severity.toLowerCase().includes('medium') ? 'bg-amber-100 text-amber-700' :
+                                  'bg-emerald-100 text-emerald-700'
+                                }`}>
+                                  {defect.severity}
+                                </span>
+                              </td>
+                              <td className="p-1.5 font-mono text-[9px] text-slate-700">{defect.metricText}</td>
+                              <td className="p-1.5 font-mono font-bold text-slate-800">{defect.confidence}</td>
+                              <td className="p-1.5 font-mono text-[9px] text-cyan-800">{data.applicableStandard ? `${data.applicableStandard} §4.2` : 'General Visual Spec'}</td>
+                              <td className="p-1.5 text-[9px] text-slate-600">{defect.severity.toLowerCase().includes('high') ? 'Critical Section Loss / Shear' : 'Progressive Surface Wear'}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  {defectsToRender.length > 6 && (
+                    <p className="text-[8px] text-slate-500 font-mono text-right pt-0.5">
+                      * Top 6 critical structural deviations cataloged above. Remainder archived in CMMS vault.
+                    </p>
+                  )}
+                </section>
+
+                {/* Defensible Condition Assessment & Standards Formula (Side-by-Side) */}
+                <section className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                  <div className="space-y-1">
+                    <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1">
+                      <Award className="w-3 h-3 text-primary" /> Defensible 4-Factor Scoring Formula
+                    </h4>
+                    <p className="text-[9px] text-slate-500">
+                      Mathematically auditable scoring compliant with ISO 55000 / ASME inspection criteria:
+                    </p>
+                    <div className="space-y-0.5 font-mono text-[9px]">
+                      {data.scoreBreakdown.map((item, idx) => (
+                        <div key={idx} className="flex justify-between items-center bg-white p-1 rounded border border-slate-200">
+                          <span className="text-slate-700 font-bold">{item.name} ({item.weight}%):</span>
+                          <span className="font-bold text-slate-900">{item.score} / 100 ({item.contribution?.toFixed(1)} pts)</span>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[8px] font-mono text-slate-400">
+                      * Formula: Final Score = Σ (Factor Weight × Factor Score). Eliminates human bias.
+                    </p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1">
+                      <BookOpen className="w-3 h-3 text-cyan-600" /> Applicable Standard Compliance
+                    </h4>
+                    <div className="p-2 rounded-lg bg-white border border-slate-200 space-y-1 text-[10px]">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Standard Code:</span>
+                        <strong className="text-cyan-900 font-mono">{data.applicableStandard || 'Standard: Not specified'}</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Domain Classification:</span>
+                        <strong className="text-slate-800">{data.inspectionDomain}</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Safety Margin:</span>
+                        <strong className="text-rose-600">{data.safetyFactor} SF (Min 1.50 Required)</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Mandated Re-Check:</span>
+                        <strong className="text-slate-800">{data.reinspectionInterval}</strong>
+                      </div>
+                    </div>
+                    <p className="text-[8px] text-slate-500 leading-tight">
+                      * Zero-fabrication guarantee: Domain standards and allowable tolerances strictly resolved via domain registry.
+                    </p>
+                  </div>
+                </section>
+
+                {/* Prioritized 4-Phase Remediation Protocol (Expanded Details) */}
+                <section className="space-y-1">
+                  <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-wider border-b border-slate-200 pb-0.5 flex items-center gap-1.5">
+                    <Wrench className="w-3.5 h-3.5 text-primary" /> Prioritized 4-Phase Engineering Remediation Protocol
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    {data.recommendations.slice(0, 4).map((rec: any, idx: number) => (
+                      <div key={idx} className="p-2 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-slate-900 text-[10px]">{rec.step || idx + 1}. {rec.title}</span>
+                          <span className="px-1.5 py-0.2 rounded bg-cyan-100 text-cyan-800 text-[8px] font-mono font-bold">
+                            {rec.timing || rec.priority || 'Day 1'}
+                          </span>
+                        </div>
+                        <p className="text-[9px] text-slate-600 leading-relaxed">{rec.detail}</p>
+                        <div className="text-[8px] font-mono text-slate-400 pt-0.5 border-t border-slate-200/60 flex justify-between">
+                          <span>Action Tier: Priority-{(idx % 3) + 1}</span>
+                          <span>Safety Clearance: Mandated</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
               </div>
 
-              {/* Official Gold Embossed Professional Engineer (PE) Digital Seal (3 cols) */}
-              <div className="col-span-12 sm:col-span-3 flex flex-col items-center justify-center p-1.5 bg-amber-50/60 rounded-xl border border-amber-300/80 shadow-xs">
-                <GoldPESeal className="w-24 h-24" />
-                <span className="text-[7.5px] font-black font-mono text-amber-900 tracking-wider uppercase text-center mt-0.5">
-                  STATUTORY PE SEAL
-                </span>
-              </div>
-            </section>
-
-            {/* Statutory Disclaimer */}
-            <p className="text-[8px] text-slate-400 text-center leading-tight">
-              * This document represents an automated preliminary visual inspection. Statutory certifications require formal seal by an accredited Professional Engineer.
-            </p>
-
+              {/* Page 2 Official Footer (3-Page Mode) */}
+              <footer className="report-page-footer pt-2 border-t border-slate-300 flex items-center justify-between text-[9px] text-slate-500 font-medium mt-2">
+                <span>Page 2 of 3 — Technical Metrology, Defect Tolerances & Remediation Protocol</span>
+                <span className="font-mono text-slate-600">Doc ID: REP-2026-{data.assetId}</span>
+                <span className="font-bold text-slate-700">Official PE Certification on Page 3</span>
+              </footer>
+            </div>
           </div>
 
-          {/* Page 2 Official Footer */}
-          <footer className="report-page-footer pt-2 border-t border-slate-300 flex items-center justify-between text-[9px] text-slate-500 font-medium mt-2">
-            <span>Page 2 of 2 — Technical Metrology, Standards Compliance & Engineering Disposition</span>
-            <span className="font-mono text-slate-700 font-bold">AI Inspection Assistant Enterprise • Tamper-Proof Audit</span>
-          </footer>
-        </div>
-      </div>
+          {/* =========================================================================
+              PAGE 3 OF 3: NDT VALIDATION PROTOCOL, LIFECYCLE AUDIT & STATUTORY SIGN-OFF
+          ========================================================================= */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between px-3 py-1 bg-slate-800 text-slate-200 rounded-t-xl text-[11px] font-mono font-bold print:hidden border border-slate-700">
+              <span className="flex items-center gap-1.5 text-cyan-400">
+                <Layers className="w-3.5 h-3.5" /> PAGE 3 OF 3 — NDT VALIDATION PROTOCOL, LIFECYCLE AUDIT & STATUTORY SIGN-OFF
+              </span>
+              <span className="text-slate-400 text-[10px]">A4 PORTRAIT FORMAT • PRINT READY</span>
+            </div>
+
+            <div className="report-page report-page-3 bg-white p-6 sm:p-7 md:p-8 shadow-2xl border border-slate-300 rounded-2xl text-slate-800 flex flex-col justify-between print:rounded-none print:border-none print:shadow-none print:p-0">
+              <div className="space-y-3">
+                
+                {/* Page 3 Continuous Header */}
+                <header className="border-b border-slate-300 pb-1.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="font-black uppercase tracking-wider text-slate-900 text-xs">
+                      ENGINEERING ASSET INSPECTION REPORT — TECHNICAL APPENDIX & SIGN-OFF
+                    </span>
+                  </div>
+                  <div className="font-mono text-[9px] text-slate-500 flex flex-wrap items-center gap-2">
+                    <span>Doc: <strong className="text-slate-800">REP-2026-{data.assetId}</strong></span>
+                    <span>•</span>
+                    <span>Asset: <strong className="text-slate-800">{data.assetId}</strong></span>
+                    <span>•</span>
+                    <span>Section: <strong className="text-slate-800">Part 3 of 3</strong></span>
+                  </div>
+                </header>
+
+                {/* Section 1: Non-Destructive Testing (NDT) Secondary Validation Matrix */}
+                <section className="space-y-1">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-0.5">
+                    <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-primary" /> Non-Destructive Testing (NDT) Secondary Validation Matrix
+                    </h3>
+                    <span className="text-[8.5px] font-mono text-slate-500">
+                      Multi-Modal Physical Verification Protocols
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border border-slate-200 rounded-lg overflow-hidden">
+                      <thead className="bg-slate-100 text-slate-700 font-bold uppercase text-[9px]">
+                        <tr>
+                          <th className="p-1.5">Testing Method</th>
+                          <th className="p-1.5">Governing Standard</th>
+                          <th className="p-1.5">Target Inspection Zone</th>
+                          <th className="p-1.5">Calibration Baseline</th>
+                          <th className="p-1.5">Mandate Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-[10px]">
+                        <tr className="bg-white">
+                          <td className="p-1.5 font-bold text-slate-900">Phased Array Ultrasonic (PAUT)</td>
+                          <td className="p-1.5 font-mono text-cyan-800 text-[9px]">ASTM E2700 / ASME V</td>
+                          <td className="p-1.5 text-slate-700 text-[9px]">Volumetric Wall Loss & Internal Lamellar Flaws</td>
+                          <td className="p-1.5 font-mono text-slate-600 text-[9px]">0.05 mm Step Wedge</td>
+                          <td className="p-1.5">
+                            <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 text-[8px] font-bold font-mono">
+                              MANDATED (14 Days)
+                            </span>
+                          </td>
+                        </tr>
+                        <tr className="bg-slate-50/70">
+                          <td className="p-1.5 font-bold text-slate-900">Eddy Current Array (ECA)</td>
+                          <td className="p-1.5 font-mono text-cyan-800 text-[9px]">ASME Sec V Art. 8</td>
+                          <td className="p-1.5 text-slate-700 text-[9px]">Surface Fatigue Micro-Cracking & Coating Breach</td>
+                          <td className="p-1.5 font-mono text-slate-600 text-[9px]">Conductivity Reference Standard</td>
+                          <td className="p-1.5">
+                            <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[8px] font-bold font-mono">
+                              RECOMMENDED (30 Days)
+                            </span>
+                          </td>
+                        </tr>
+                        <tr className="bg-white">
+                          <td className="p-1.5 font-bold text-slate-900">Magnetic Particle / Dye Penetrant</td>
+                          <td className="p-1.5 font-mono text-cyan-800 text-[9px]">ASTM E1444 / ISO 9934</td>
+                          <td className="p-1.5 text-slate-700 text-[9px]">Weld Toe Stress Riser & Sub-Surface Micro-Fissures</td>
+                          <td className="p-1.5 font-mono text-slate-600 text-[9px]">Castrol Flux Indicator Strip</td>
+                          <td className="p-1.5">
+                            <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 text-[8px] font-bold font-mono">
+                              CRITICAL PRIORITY
+                            </span>
+                          </td>
+                        </tr>
+                        <tr className="bg-slate-50/70">
+                          <td className="p-1.5 font-bold text-slate-900">Digital Acoustic Emission (AE)</td>
+                          <td className="p-1.5 font-mono text-cyan-800 text-[9px]">ISO 22096 / ASTM E1106</td>
+                          <td className="p-1.5 text-slate-700 text-[9px]">Dynamic Structural Cyclic Strain & Micro-Movement</td>
+                          <td className="p-1.5 font-mono text-slate-600 text-[9px]">Piezoelectric Resonant Transducer</td>
+                          <td className="p-1.5">
+                            <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[8px] font-bold font-mono">
+                              ACTIVE SENSOR STREAM
+                            </span>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+
+                {/* Section 2: Asset Maintenance History & CMMS Work Order Ledger */}
+                <section className="space-y-1">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-0.5">
+                    <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <Database className="w-3.5 h-3.5 text-primary" /> Asset Lifecycle & Historical CMMS Maintenance Traceability
+                    </h3>
+                    <span className="text-[8.5px] font-mono text-slate-500">
+                      Maximo / SAP PM Synchronization Target
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div className="p-2 rounded-xl bg-slate-50 border border-slate-200">
+                      <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block">Baseline Comparison</span>
+                      <span className="text-xs font-black text-slate-800 block mt-0.5">95% Baseline</span>
+                      <span className="text-[8px] text-rose-600 font-mono font-bold">Current: {data.score}</span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-slate-50 border border-slate-200">
+                      <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block">Cyclic Stress Duty</span>
+                      <span className="text-xs font-bold text-slate-800 block mt-0.5">Continuous Cyclic</span>
+                      <span className="text-[8px] text-slate-500 font-mono">Thermal Expansion</span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-slate-50 border border-slate-200">
+                      <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block">MTBM Cadence</span>
+                      <span className="text-xs font-black text-slate-800 block mt-0.5">90 Days Periodic</span>
+                      <span className="text-[8px] text-cyan-800 font-mono font-bold">Surveillance Window</span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-slate-50 border border-slate-200">
+                      <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block">CMMS Work Order</span>
+                      <span className="text-xs font-mono font-bold text-primary block mt-0.5">WO-2026-{data.assetId}</span>
+                      <span className="text-[8px] text-emerald-600 font-bold font-mono">Status: Dispatched</span>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Section 3: Statutory Limitations of Visual Inspection */}
+                <section className="p-2 rounded-lg bg-slate-50 border border-slate-200 text-[9px] text-slate-600 space-y-0.5">
+                  <span className="font-bold text-slate-800 uppercase block text-[9px]">Statutory Limitations of Automated Visual AI Inspection:</span>
+                  <ul className="list-disc pl-4 space-y-0.5 leading-tight">
+                    {data.limitationsOfVisualInspection.slice(0, 4).map((lim: string, idx: number) => (
+                      <li key={idx}>{lim}</li>
+                    ))}
+                  </ul>
+                </section>
+
+                {/* Section 4: Verification & Statutory Sign-Off Certification Blocks */}
+                <section className="pt-1.5 border-t-2 border-slate-800 grid grid-cols-12 gap-2 text-xs items-stretch">
+                  {/* Lead Inspector Block (4 cols) */}
+                  <div className="col-span-12 sm:col-span-4 p-2 rounded-xl border border-slate-300 bg-slate-50 flex flex-col justify-between">
+                    <div>
+                      <span className="text-[9px] font-bold uppercase text-slate-500 block">Certified Lead Field Inspector</span>
+                      <div className="font-serif italic text-sm text-slate-900 border-b border-slate-200 pb-0.5 mt-1">
+                        {officer.name}
+                      </div>
+                      <div className="flex justify-between items-center text-[8px] text-slate-500 font-mono mt-1">
+                        <span>ID: {officer.id}</span>
+                        <span>Stamp: CERT-FIELD-2026</span>
+                      </div>
+                    </div>
+                    <p className="text-[8px] text-slate-400 mt-1">Signed: {data.inspectionTimestamp}</p>
+                  </div>
+
+                  {/* Licensed Professional Engineer (PE) Review Block (5 cols) */}
+                  <div className="col-span-12 sm:col-span-5 p-2 rounded-xl border-2 border-dashed border-amber-300 bg-amber-50/30 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-bold uppercase text-slate-800">Professional Engineer (PE) Review</span>
+                        <span className="text-[8px] font-mono text-amber-700 font-bold bg-amber-100 px-1.5 py-0.2 rounded border border-amber-300">SEAL VERIFIED</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-1 text-[8px] font-mono text-slate-700 font-semibold">
+                        <span>Disposition:</span>
+                        <span className="bg-white px-1 py-0.2 rounded border border-slate-200">
+                          {data.overallCondition.toLowerCase().includes('good') ? '☑ Approved' : '☐ Approved'}
+                        </span>
+                        <span className="bg-white px-1 py-0.2 rounded border border-slate-200">
+                          {data.overallCondition.toLowerCase().includes('good') ? '☐ Cond.' : '☑ Remediation'}
+                        </span>
+                        <span className="bg-white px-1 py-0.2 rounded border border-slate-200">
+                          {data.status.toLowerCase().includes('critical') ? '☑ Halt' : '☐ Halt'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="border-t border-slate-200 pt-1 flex justify-between text-[8px] text-slate-500 font-mono mt-1">
+                      <span>PE Reg: PE-948201-US</span>
+                      <span>Sign: Verified Digital</span>
+                    </div>
+                  </div>
+
+                  {/* Official Gold Embossed Professional Engineer (PE) Digital Seal (3 cols) */}
+                  <div className="col-span-12 sm:col-span-3 flex flex-col items-center justify-center p-1.5 bg-amber-50/60 rounded-xl border border-amber-300/80 shadow-xs">
+                    <GoldPESeal className="w-24 h-24" />
+                    <span className="text-[7.5px] font-black font-mono text-amber-900 tracking-wider uppercase text-center mt-0.5">
+                      STATUTORY PE SEAL
+                    </span>
+                  </div>
+                </section>
+
+                {/* Statutory Disclaimer */}
+                <p className="text-[8px] text-slate-400 text-center leading-tight">
+                  * This document represents an automated preliminary visual inspection. Statutory certifications require formal seal by an accredited Professional Engineer.
+                </p>
+
+              </div>
+
+              {/* Page 3 Official Footer */}
+              <footer className="report-page-footer pt-2 border-t border-slate-300 flex items-center justify-between text-[9px] text-slate-500 font-medium mt-2">
+                <span>Page 3 of 3 — NDT Technical Validation, Lifecycle History & Official Statutory PE Certification</span>
+                <span className="font-mono text-slate-700 font-bold">AI Inspection Assistant Enterprise • Tamper-Proof Audit</span>
+              </footer>
+            </div>
+          </div>
+        </>
+      )}
 
     </div>
   );

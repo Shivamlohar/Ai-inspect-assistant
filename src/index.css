@@ -1257,20 +1257,57 @@ video {
     break-inside: avoid !important;
   }
 
-  .report-page-1 {
+  /* Strict 2-Page Mode Print Constraints */
+  .report-mode-2page .report-page-1 {
     page-break-after: always !important;
     break-after: page !important;
     page-break-before: avoid !important;
     break-before: avoid !important;
   }
 
-  .report-page-2 {
+  .report-mode-2page .report-page-2 {
     page-break-before: avoid !important;
     break-before: avoid !important;
     page-break-after: avoid !important;
     break-after: avoid !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
+  }
+
+  .report-mode-2page .report-page-3 {
+    display: none !important;
+  }
+
+  /* Strict 3-Page Mode Print Constraints */
+  .report-mode-3page .report-page-1 {
+    page-break-after: always !important;
+    break-after: page !important;
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+  }
+
+  .report-mode-3page .report-page-2 {
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .report-mode-3page .report-page-3 {
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Fallback defaults */
+  .report-page-1 {
+    page-break-after: always !important;
+    break-after: page !important;
   }
 
   .report-page-footer {
