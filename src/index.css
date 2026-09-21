@@ -1195,6 +1195,7 @@ video {
     padding: 0 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    color-adjust: exact !important;
     width: 100% !important;
     height: auto !important;
   }
@@ -1255,6 +1256,7 @@ video {
     overflow: hidden !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
+    -webkit-column-break-inside: avoid !important;
   }
 
   /* Strict 2-Page Mode Print Constraints */
@@ -1316,5 +1318,74 @@ video {
     border-top: 1px solid #cbd5e1 !important;
     font-size: 8pt !important;
   }
+}
+
+/* ==========================================================
+   MACOS & CROSS-BROWSER INTERACTION & RENDER OPTIMIZATIONS
+   Optimized for Safari, Chrome, Firefox, and Edge on macOS / Windows
+   ========================================================== */
+
+/* Universal high-precision text rendering */
+html, body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Cross-browser range slider styling for Safari, Chrome, and Firefox */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background-color: transparent;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #0ea5e9;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(14, 165, 233, 0.6);
+  border: 2px solid #ffffff;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #0ea5e9;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(14, 165, 233, 0.6);
+  border: 2px solid #ffffff;
+}
+
+/* Clean macOS & modern browser scrollbars */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.35);
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.65);
+  border-radius: 9999px;
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.35) transparent;
 }
 

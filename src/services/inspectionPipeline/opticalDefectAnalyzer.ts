@@ -39,7 +39,9 @@ export async function analyzeImageForOpticalDefects(
   return new Promise<OpticalDefectAnalysisResult>((resolve) => {
     try {
       const img = new Image();
-      img.crossOrigin = 'anonymous';
+      if (!imageSource.startsWith('data:') && !imageSource.startsWith('blob:')) {
+        img.crossOrigin = 'anonymous';
+      }
 
       img.onload = () => {
         try {

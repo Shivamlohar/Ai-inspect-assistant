@@ -94,14 +94,14 @@ function GoldPESeal({ className = "w-28 h-28" }: { className?: string }) {
 
         {/* Circular Curved Text Upper */}
         <text fill="#854d0e" fontSize="10.5" fontWeight="900" letterSpacing="2.5" textAnchor="middle">
-          <textPath href="#textPathUpper" startOffset="50%">
+          <textPath href="#textPathUpper" xlinkHref="#textPathUpper" startOffset="50%">
             PROFESSIONAL ENGINEER
           </textPath>
         </text>
 
         {/* Circular Curved Text Lower */}
         <text fill="#854d0e" fontSize="9" fontWeight="900" letterSpacing="2" textAnchor="middle">
-          <textPath href="#textPathLower" startOffset="50%">
+          <textPath href="#textPathLower" xlinkHref="#textPathLower" startOffset="50%">
             ★ STATUTORY AUDIT SEAL ★
           </textPath>
         </text>

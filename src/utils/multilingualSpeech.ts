@@ -113,6 +113,9 @@ export function speakInspectionVoice(
       utterance.onerror = onEnd;
     }
 
+    if (window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+    }
     window.speechSynthesis.speak(utterance);
     return true;
   } catch (err) {
