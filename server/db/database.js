@@ -171,7 +171,10 @@ export const inspectionDb = {
     return { ...inspection, defects, trace };
   },
   getByAssetId: (assetId) => {
-    return db.prepare('SELECT * FROM inspections WHERE asset_id = ? ORDER BY inspection_date DESC').all(assetId);
+    if (!assetId) return [];
+    const asset = assetDb.getById(assetId);
+    const targetId = asset ? asset.asset_id : assetId;
+    return db.prepare('SELECT * FROM inspections WHERE asset_id = ? ORDER BY inspection_date DESC').all(targetId);
   }
 };
 

@@ -146,10 +146,30 @@ export async function handleApiRequest(req, res, inputPath) {
   }
 
   // 4. KNOWLEDGE SEARCH & RAG (Section 5)
-  if (reqPath === '/api/knowledge/search' && req.method === 'POST') {
+  if (reqPath === '/api/knowledge/search') {
     try {
-      const body = await readJsonBody(req);
-      const { assetCategory = 'General', defectType = '', queryText = '', topK = 3 } = body;
+      let assetCategory = 'General';
+      let defectType = '';
+      let queryText = '';
+      let topK = 3;
+
+      if (req.method === 'POST') {
+        const body = await readJsonBody(req);
+        assetCategory = body.assetCategory || body.category || 'General';
+        defectType = body.defectType || '';
+        queryText = body.queryText || body.query || '';
+        topK = body.topK || 3;
+      } else if (req.method === 'GET') {
+        const parsedUrl = new URL(req.url, 'http://localhost:10000');
+        assetCategory = parsedUrl.searchParams.get('category') || parsedUrl.searchParams.get('assetCategory') || 'General';
+        defectType = parsedUrl.searchParams.get('defectType') || '';
+        queryText = parsedUrl.searchParams.get('query') || parsedUrl.searchParams.get('queryText') || parsedUrl.searchParams.get('q') || '';
+        topK = parseInt(parsedUrl.searchParams.get('topK') || '3', 10);
+      } else {
+        sendJson(res, 405, { success: false, error: 'Method Not Allowed' });
+        return true;
+      }
+
       const result = queryKnowledgeBase(assetCategory, defectType, queryText, topK);
       sendJson(res, 200, { success: true, ...result });
     } catch (err) {
@@ -207,7 +227,7 @@ export async function handleApiRequest(req, res, inputPath) {
         mimeType,
         reqHeaders: req.headers
       });
-      sendJson(res, result.serviceAvailable === false ? 503 : 200, result);
+      sendJson(res, 200, result);
       return true;
     } catch (err) {
       sendJson(res, 400, { success: false, error: err.message });
@@ -233,7 +253,7 @@ export async function handleApiRequest(req, res, inputPath) {
     return true;
   }
 
-  if (reqPath === '/api/inspection/analyze' && req.method === 'POST') {
+  if ((reqPath === '/api/inspection/record' || reqPath === '/api/inspection/save') && req.method === 'POST') {
     try {
       const payload = await readJsonBody(req);
       const inspectionId = payload.inspectionId || ('INSP-' + Date.now());
@@ -254,11 +274,18 @@ export async function handleApiRequest(req, res, inputPath) {
       );
 
       // Ensure asset exists in DB before inserting foreign-keyed inspection record
-      const resolvedAssetId = payload.assetId || (isEligible ? 'MACH-M401' : 'NON-ASSET-01');
-      const existingAsset = assetDb.getById(resolvedAssetId);
-      if (!existingAsset) {
+      const rawAssetId = payload.assetId || (isEligible ? 'MACH-M401' : 'NON-ASSET-01');
+      const existingAsset = assetDb.getById(rawAssetId);
+      let targetAssetId = rawAssetId;
+
+      if (existingAsset) {
+        // Use the canonical asset_id referenced by the foreign key constraint
+        targetAssetId = existingAsset.asset_id;
+      } else {
+        targetAssetId = rawAssetId;
         assetDb.create({
-          asset_id: resolvedAssetId,
+          id: 'ast-' + Date.now(),
+          asset_id: targetAssetId,
           asset_type: payload.detectedCategory || (isEligible ? 'Industrial Machinery' : 'Non-Inspectable Subject'),
           name: payload.assetName || (isEligible ? 'Asset Inspection' : 'Non-Inspectable Subject'),
           location: isEligible ? 'Field Site' : 'Out of Scope',
@@ -269,8 +296,8 @@ export async function handleApiRequest(req, res, inputPath) {
       // Persist inspection to SQLite with strict zero-fabrication gating
       inspectionDb.create({
         id: inspectionId,
-        asset_id: resolvedAssetId,
-        asset_name: payload.assetName || (isEligible ? 'Asset Inspection' : 'Non-Inspectable Subject'),
+        asset_id: targetAssetId,
+        asset_name: payload.assetName || existingAsset?.name || (isEligible ? 'Asset Inspection' : 'Non-Inspectable Subject'),
         inspection_date: payload.inspectionTimestamp || new Date().toISOString(),
         input_type: payload.inputType || 'static_image',
         image_url: payload.mediaUrl?.slice(0, 500) || null,
