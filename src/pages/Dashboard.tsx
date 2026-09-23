@@ -209,6 +209,14 @@ export default function Dashboard() {
                 <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
                 FIELD OPS MODE ACTIVE
               </span>
+              <Link
+                to="/organization"
+                title="Inspectra Free Pilot Active • Click to view usage telemetry"
+                className="inline-flex items-center gap-1.5 text-[11px] font-extrabold tracking-widest uppercase bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full border border-emerald-500/30 hover:bg-emerald-500/30 transition cursor-pointer"
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                FREE PILOT PROGRAM
+              </Link>
               <span className="text-xs text-slate-400 font-mono hidden sm:inline">
                 • {officer.id} • {officer.department}
               </span>

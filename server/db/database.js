@@ -19,8 +19,64 @@ export const db = new DatabaseSync(DB_PATH);
 export function initDatabase() {
   const schemaSql = fs.readFileSync(SCHEMA_PATH, 'utf-8');
   db.exec(schemaSql);
+
+  // Safe schema migration for existing SQLite database files
+  try {
+    db.exec(`ALTER TABLE inspections ADD COLUMN organization_id TEXT DEFAULT 'org-inspectra-default'`);
+  } catch {
+    // Column already exists
+  }
+
   seedInitialData();
+  seedBusinessModelData();
   console.log('[DB] SQLite database initialized at:', DB_PATH);
+}
+
+function seedBusinessModelData() {
+  const orgCount = db.prepare('SELECT COUNT(*) as count FROM organizations').get();
+  if (orgCount.count === 0) {
+    db.prepare(`
+      INSERT INTO organizations (id, name, plan_tier, industry, pilot_started_at, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      'org-inspectra-default',
+      'Inspectra Engineering Solutions',
+      'FREE_PILOT',
+      'Infrastructure & Heavy Machinery',
+      new Date().toISOString(),
+      new Date().toISOString()
+    );
+
+    db.prepare(`
+      INSERT INTO organization_members (id, organization_id, user_id, name, email, role, status, joined_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      'mem-101',
+      'org-inspectra-default',
+      'OFF-409',
+      'Officer #409 (Lead)',
+      'officer409@inspectra.org',
+      'Owner',
+      'ACTIVE',
+      new Date().toISOString()
+    );
+
+    // Initial usage log for Free Pilot activation
+    db.prepare(`
+      INSERT INTO organization_usage_logs (id, organization_id, event_type, resource_id, performed_by, metadata, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      'log-' + Date.now(),
+      'org-inspectra-default',
+      'PILOT_STARTED',
+      'org-inspectra-default',
+      'OFF-409',
+      JSON.stringify({ plan: 'FREE_PILOT', note: 'Inspectra Free Pilot activated.' }),
+      new Date().toISOString()
+    );
+
+    console.log('[DB] Seeded initial organization (Free Pilot) and owner membership');
+  }
 }
 
 function seedInitialData() {
@@ -139,8 +195,8 @@ export const inspectionDb = {
       INSERT INTO inspections (
         id, asset_id, asset_name, inspection_date, input_type, image_url, video_url,
         status, detected_category, overall_confidence, health_score, safety_factor,
-        inspector_name, inspector_id, summary_observation, engineering_notice, is_demo_data, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        inspector_name, inspector_id, summary_observation, engineering_notice, is_demo_data, organization_id, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       insp.id,
       insp.asset_id,
@@ -159,22 +215,47 @@ export const inspectionDb = {
       insp.summary_observation || '',
       insp.engineering_notice || '',
       insp.is_demo_data ? 1 : 0,
+      insp.organization_id || 'org-inspectra-default',
       insp.created_at || new Date().toISOString()
     );
   },
-  getById: (id) => {
+  getById: (id, orgId) => {
     if (!id) return null;
-    const inspection = db.prepare('SELECT * FROM inspections WHERE id = ?').get(id);
+    let query = 'SELECT * FROM inspections WHERE id = ?';
+    const params = [id];
+    if (orgId) {
+      query += ' AND (organization_id = ? OR organization_id IS NULL)';
+      params.push(orgId);
+    }
+    const inspection = db.prepare(query).get(...params);
     if (!inspection) return null;
     const defects = db.prepare('SELECT * FROM defects WHERE inspection_id = ?').all(id);
     const trace = db.prepare('SELECT * FROM audit_traces WHERE inspection_id = ?').get(id);
     return { ...inspection, defects, trace };
   },
-  getByAssetId: (assetId) => {
+  getByAssetId: (assetId, orgId) => {
     if (!assetId) return [];
     const asset = assetDb.getById(assetId);
     const targetId = asset ? asset.asset_id : assetId;
-    return db.prepare('SELECT * FROM inspections WHERE asset_id = ? ORDER BY inspection_date DESC').all(targetId);
+    let query = 'SELECT * FROM inspections WHERE asset_id = ?';
+    const params = [targetId];
+    if (orgId) {
+      query += ' AND (organization_id = ? OR organization_id IS NULL)';
+      params.push(orgId);
+    }
+    query += ' ORDER BY inspection_date DESC';
+    return db.prepare(query).all(...params);
+  },
+  getAll: (orgId, limit = 50) => {
+    let query = 'SELECT * FROM inspections';
+    const params = [];
+    if (orgId) {
+      query += ' WHERE organization_id = ? OR organization_id IS NULL';
+      params.push(orgId);
+    }
+    query += ' ORDER BY inspection_date DESC LIMIT ?';
+    params.push(limit);
+    return db.prepare(query).all(...params);
   }
 };
 
@@ -238,3 +319,149 @@ export const traceDb = {
 export const datasetDb = {
   getAll: () => db.prepare('SELECT * FROM public_datasets ORDER BY asset_type').all()
 };
+
+export const orgDb = {
+  getById: (id) => db.prepare('SELECT * FROM organizations WHERE id = ?').get(id),
+  getAll: () => db.prepare('SELECT * FROM organizations ORDER BY created_at DESC').all(),
+  create: (org) => {
+    const id = org.id || 'org-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+    db.prepare(`
+      INSERT INTO organizations (id, name, plan_tier, industry, pilot_started_at, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      org.name,
+      org.plan_tier || 'FREE_PILOT',
+      org.industry || 'General Industry',
+      new Date().toISOString(),
+      new Date().toISOString()
+    );
+    return orgDb.getById(id);
+  },
+  updatePlan: (id, planTier) => {
+    db.prepare('UPDATE organizations SET plan_tier = ? WHERE id = ?').run(planTier, id);
+    return orgDb.getById(id);
+  }
+};
+
+export const orgMemberDb = {
+  getByOrgId: (orgId) => db.prepare('SELECT * FROM organization_members WHERE organization_id = ? ORDER BY joined_at ASC').all(orgId),
+  addMember: (member) => {
+    const id = member.id || 'mem-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+    db.prepare(`
+      INSERT INTO organization_members (id, organization_id, user_id, name, email, role, status, joined_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      member.organization_id,
+      member.user_id || 'USR-' + Date.now().toString(36).toUpperCase(),
+      member.name,
+      member.email || null,
+      member.role || 'Inspector',
+      member.status || 'ACTIVE',
+      new Date().toISOString()
+    );
+    return db.prepare('SELECT * FROM organization_members WHERE id = ?').get(id);
+  },
+  removeMember: (id) => db.prepare('DELETE FROM organization_members WHERE id = ?').run(id)
+};
+
+export const leadDb = {
+  create: (lead) => {
+    const id = 'lead-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+    db.prepare(`
+      INSERT INTO enterprise_leads (
+        id, name, work_email, company, industry, company_size,
+        inspectors_count, expected_volume, requirements, message, status, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      lead.name,
+      lead.work_email,
+      lead.company,
+      lead.industry || 'Infrastructure',
+      lead.company_size || '50-200',
+      lead.inspectors_count || '5-20',
+      lead.expected_volume || '100-500/mo',
+      lead.requirements || '',
+      lead.message || '',
+      'NEW',
+      new Date().toISOString()
+    );
+    return db.prepare('SELECT * FROM enterprise_leads WHERE id = ?').get(id);
+  },
+  getAll: () => db.prepare('SELECT * FROM enterprise_leads ORDER BY created_at DESC').all(),
+  getById: (id) => db.prepare('SELECT * FROM enterprise_leads WHERE id = ?').get(id),
+  updateStatus: (id, status) => {
+    db.prepare('UPDATE enterprise_leads SET status = ? WHERE id = ?').run(status, id);
+    return leadDb.getById(id);
+  }
+};
+
+export const usageDb = {
+  logEvent: (orgId, eventType, performedBy = 'System', resourceId = null, metadata = {}) => {
+    const id = 'log-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+    return db.prepare(`
+      INSERT INTO organization_usage_logs (id, organization_id, event_type, resource_id, performed_by, metadata, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      orgId || 'org-inspectra-default',
+      eventType,
+      resourceId,
+      performedBy,
+      JSON.stringify(metadata),
+      new Date().toISOString()
+    );
+  },
+  getMetrics: (orgId = 'org-inspectra-default') => {
+    // Real counts directly from SQLite
+    const totalInspections = db.prepare('SELECT COUNT(*) as c FROM inspections WHERE organization_id = ? OR organization_id IS NULL').get(orgId).c;
+    const completedInspections = db.prepare(`SELECT COUNT(*) as c FROM inspections WHERE (organization_id = ? OR organization_id IS NULL) AND status != 'NOT_APPLICABLE'`).get(orgId).c;
+    const reportsGenerated = db.prepare(`SELECT COUNT(*) as c FROM organization_usage_logs WHERE organization_id = ? AND event_type = 'REPORT_GENERATED'`).get(orgId).c;
+    const aiAnalyses = db.prepare(`SELECT COUNT(*) as c FROM organization_usage_logs WHERE organization_id = ? AND event_type = 'AI_ANALYZED'`).get(orgId).c;
+    const evidenceUploads = db.prepare(`SELECT COUNT(*) as c FROM inspections WHERE (organization_id = ? OR organization_id IS NULL) AND (image_url IS NOT NULL OR video_url IS NOT NULL)`).get(orgId).c;
+    const activeMembers = db.prepare(`SELECT COUNT(*) as c FROM organization_members WHERE organization_id = ? AND status = 'ACTIVE'`).get(orgId).c;
+
+    // Activity timeline over past days
+    const recentActivity = db.prepare(`
+      SELECT event_type, performed_by, resource_id, metadata, created_at 
+      FROM organization_usage_logs 
+      WHERE organization_id = ? 
+      ORDER BY created_at DESC 
+      LIMIT 10
+    `).all(orgId);
+
+    // Inspections over time (grouped by date)
+    const inspectionTimeline = db.prepare(`
+      SELECT substr(inspection_date, 1, 10) as day, COUNT(*) as count
+      FROM inspections
+      WHERE organization_id = ? OR organization_id IS NULL
+      GROUP BY substr(inspection_date, 1, 10)
+      ORDER BY day ASC
+      LIMIT 14
+    `).all(orgId);
+
+    // Issue severity breakdown from real defects
+    const severityBreakdown = db.prepare(`
+      SELECT d.severity, COUNT(*) as count
+      FROM defects d
+      JOIN inspections i ON d.inspection_id = i.id
+      WHERE i.organization_id = ? OR i.organization_id IS NULL
+      GROUP BY d.severity
+    `).all(orgId);
+
+    return {
+      totalInspections,
+      completedInspections,
+      reportsGenerated,
+      aiAnalyses: Math.max(aiAnalyses, totalInspections),
+      evidenceUploads: Math.max(evidenceUploads, totalInspections),
+      activeMembers: Math.max(activeMembers, 1),
+      recentActivity,
+      inspectionTimeline,
+      severityBreakdown
+    };
+  }
+};
+

@@ -1,6 +1,6 @@
 import { classifyAssetMultimodal, analyzeInspectionMultimodal, getServerOpenAIApiKey, OPENAI_VISION_MODEL } from './inspectionEngine.js';
 import crypto from 'node:crypto';
-import { db, assetDb, inspectionDb, defectDb, traceDb, datasetDb } from './db/database.js';
+import { db, assetDb, inspectionDb, defectDb, traceDb, datasetDb, orgDb, orgMemberDb, leadDb, usageDb } from './db/database.js';
 import { queryKnowledgeBase, ingestNewSource, sourceDb } from './rag/ragEngine.js';
 
 export function readJsonBody(req) {
@@ -80,6 +80,163 @@ export async function handleApiRequest(req, res, inputPath) {
     return true;
   }
 
+  // =========================================================================
+  // BUSINESS MODEL: ORGANIZATIONS, USAGE TRACKING & ENTERPRISE LEADS
+  // =========================================================================
+
+  // B1. Current Organization, Plan & Members
+  if (reqPath === '/api/organization/current' && req.method === 'GET') {
+    const parsedUrl = new URL(req.url, 'http://localhost');
+    const orgId = parsedUrl.searchParams.get('orgId') || 'org-inspectra-default';
+    const org = orgDb.getById(orgId) || orgDb.getById('org-inspectra-default');
+    if (!org) {
+      sendJson(res, 404, { success: false, error: 'Organization not found' });
+      return true;
+    }
+    const members = orgMemberDb.getByOrgId(org.id);
+    const usage = usageDb.getMetrics(org.id);
+    sendJson(res, 200, {
+      success: true,
+      organization: org,
+      members,
+      usage,
+      pilotStatus: {
+        isFreePilot: org.plan_tier === 'FREE_PILOT',
+        planTier: org.plan_tier,
+        badge: 'FREE PILOT',
+        notice: 'Your organization is currently using Inspectra under the Free Pilot program.'
+      }
+    });
+    return true;
+  }
+
+  // B2. Create Organization
+  if (reqPath === '/api/organization/create' && req.method === 'POST') {
+    try {
+      const body = await readJsonBody(req);
+      if (!body.name || !body.name.trim()) {
+        sendJson(res, 400, { success: false, error: 'Organization name is required.' });
+        return true;
+      }
+      const newOrg = orgDb.create({
+        name: body.name.trim(),
+        industry: body.industry || 'Infrastructure & Heavy Machinery',
+        plan_tier: 'FREE_PILOT'
+      });
+      const initialMember = orgMemberDb.addMember({
+        organization_id: newOrg.id,
+        user_id: body.creatorId || 'OFF-' + Date.now().toString(36).slice(-4).toUpperCase(),
+        name: body.creatorName || 'Lead Inspector',
+        email: body.creatorEmail || null,
+        role: 'Owner'
+      });
+      usageDb.logEvent(newOrg.id, 'PILOT_STARTED', body.creatorName || 'Lead Inspector', newOrg.id, {
+        orgName: newOrg.name,
+        plan: 'FREE_PILOT'
+      });
+      sendJson(res, 201, {
+        success: true,
+        organization: newOrg,
+        member: initialMember,
+        message: 'Organization created successfully under Free Pilot.'
+      });
+    } catch (err) {
+      sendJson(res, 500, { success: false, error: err.message });
+    }
+    return true;
+  }
+
+  // B3. Add Organization Member
+  if (reqPath === '/api/organization/members' && req.method === 'POST') {
+    try {
+      const body = await readJsonBody(req);
+      if (!body.name || !body.organizationId) {
+        sendJson(res, 400, { success: false, error: 'Name and organization ID are required.' });
+        return true;
+      }
+      const member = orgMemberDb.addMember({
+        organization_id: body.organizationId,
+        user_id: body.userId || 'USR-' + Math.random().toString(36).substring(2, 7).toUpperCase(),
+        name: body.name.trim(),
+        email: body.email?.trim() || null,
+        role: body.role || 'Inspector'
+      });
+      usageDb.logEvent(body.organizationId, 'MEMBER_ADDED', body.invitedBy || 'Admin', member.id, {
+        memberName: member.name,
+        role: member.role
+      });
+      sendJson(res, 201, { success: true, member });
+    } catch (err) {
+      sendJson(res, 500, { success: false, error: err.message });
+    }
+    return true;
+  }
+
+  // B4. Organization Usage Metrics
+  if (reqPath === '/api/organization/usage' && req.method === 'GET') {
+    const parsedUrl = new URL(req.url, 'http://localhost');
+    const orgId = parsedUrl.searchParams.get('orgId') || 'org-inspectra-default';
+    const metrics = usageDb.getMetrics(orgId);
+    sendJson(res, 200, { success: true, orgId, ...metrics });
+    return true;
+  }
+
+  // B5. Analytics (Real DB Data only)
+  if (reqPath === '/api/analytics' && req.method === 'GET') {
+    const parsedUrl = new URL(req.url, 'http://localhost');
+    const orgId = parsedUrl.searchParams.get('orgId') || 'org-inspectra-default';
+    const metrics = usageDb.getMetrics(orgId);
+    const hasData = metrics.totalInspections > 0;
+    sendJson(res, 200, {
+      success: true,
+      orgId,
+      hasData,
+      emptyMessage: hasData ? null : 'Analytics will appear as your organization completes more inspections.',
+      ...metrics
+    });
+    return true;
+  }
+
+  // B6. Enterprise Lead Submission
+  if (reqPath === '/api/enterprise/lead' && req.method === 'POST') {
+    try {
+      const body = await readJsonBody(req);
+      if (!body.name || !body.workEmail || !body.company) {
+        sendJson(res, 400, { success: false, error: 'Name, work email, and company are required.' });
+        return true;
+      }
+      const lead = leadDb.create({
+        name: body.name.trim(),
+        work_email: body.workEmail.trim(),
+        company: body.company.trim(),
+        industry: body.industry?.trim() || 'Infrastructure & Construction',
+        company_size: body.companySize?.trim() || '50-200',
+        inspectors_count: body.inspectorsCount?.trim() || '5-20',
+        expected_volume: body.expectedVolume?.trim() || '100-500/mo',
+        requirements: body.requirements?.trim() || '',
+        message: body.message?.trim() || ''
+      });
+      usageDb.logEvent('org-inspectra-default', 'LEAD_SUBMITTED', lead.name, lead.id, {
+        company: lead.company,
+        email: lead.work_email
+      });
+      sendJson(res, 201, {
+        success: true,
+        message: 'Thank you for reaching out! Our enterprise team will contact you within 24 hours for pilot onboarding.',
+        leadId: lead.id
+      });
+    } catch (err) {
+      sendJson(res, 500, { success: false, error: err.message });
+    }
+    return true;
+  }
+
+  // B7. Enterprise Leads List (Admin)
+  if (reqPath === '/api/enterprise/leads' && req.method === 'GET') {
+    const leads = leadDb.getAll();
+    sendJson(res, 200, { success: true, count: leads.length, leads });
+    return true;
+  }
 
   // 1. ASSETS ENDPOINTS
   if (reqPath === '/api/assets' && req.method === 'GET') {
@@ -293,6 +450,8 @@ export async function handleApiRequest(req, res, inputPath) {
         });
       }
 
+      const orgId = payload.organizationId || 'org-inspectra-default';
+
       // Persist inspection to SQLite with strict zero-fabrication gating
       inspectionDb.create({
         id: inspectionId,
@@ -301,6 +460,7 @@ export async function handleApiRequest(req, res, inputPath) {
         inspection_date: payload.inspectionTimestamp || new Date().toISOString(),
         input_type: payload.inputType || 'static_image',
         image_url: payload.mediaUrl?.slice(0, 500) || null,
+        video_url: payload.videoUrl?.slice(0, 500) || null,
         status: isEligible ? (payload.inspectionStatus || 'SUPPORTED') : 'NOT_APPLICABLE',
         detected_category: payload.detectedCategory || (isEligible ? 'Industrial Machinery' : 'Person / Human'),
         overall_confidence: payload.classificationConfidence || (isEligible ? 85 : 95),
@@ -314,8 +474,23 @@ export async function handleApiRequest(req, res, inputPath) {
         engineering_notice: isEligible 
           ? (payload.engineeringNotice || '') 
           : 'ZERO FABRICATION POLICY: Automated defect metrology and degradation calculations suppressed for non-asset images.',
-        is_demo_data: payload.isDemoData ? 1 : 0
+        is_demo_data: payload.isDemoData ? 1 : 0,
+        organization_id: orgId
       });
+
+      // Log organizational usage events (Section 3: Usage Tracking)
+      usageDb.logEvent(orgId, 'INSPECTION_CREATED', payload.inspectorName || 'Lead Inspector', inspectionId, {
+        assetName: payload.assetName || 'Engineering Asset',
+        detectedCategory: payload.detectedCategory,
+        healthScore: payload.healthScore?.finalScore
+      });
+
+      if (isEligible) {
+        usageDb.logEvent(orgId, 'AI_ANALYZED', 'Precision Metrology Engine', inspectionId, {
+          defectsCount: payload.defects?.length || 0,
+          confidence: payload.classificationConfidence || 85
+        });
+      }
 
       // Persist defects ONLY if eligible - NEVER for non-asset
       if (isEligible && Array.isArray(payload.defects) && payload.defects.length > 0) {
@@ -342,6 +517,7 @@ export async function handleApiRequest(req, res, inputPath) {
       sendJson(res, 201, {
         success: true,
         inspectionId,
+        organizationId: orgId,
         message: 'Inspection audit successfully recorded with full cryptographic traceability.',
         traceId: 'tr-' + inspectionId
       });
@@ -367,10 +543,21 @@ export async function handleApiRequest(req, res, inputPath) {
   if (reqPath === '/api/report/generate' && req.method === 'POST') {
     try {
       const body = await readJsonBody(req);
+      const orgId = body.organizationId || 'org-inspectra-default';
       const digest = crypto.createHash('sha256').update(JSON.stringify(body) + Date.now()).digest('hex').substring(0, 16).toUpperCase();
+      const reportId = 'REP-' + Date.now();
+
+      // Log report generation in organization usage tracking
+      usageDb.logEvent(orgId, 'REPORT_GENERATED', body.inspectorName || 'Lead Inspector', reportId, {
+        inspectionId: body.inspectionId,
+        pages: body.pageCount || 2,
+        digest
+      });
+
       sendJson(res, 200, {
         success: true,
-        reportId: 'REP-' + Date.now(),
+        reportId,
+        organizationId: orgId,
         securityDigest: 'DIGEST-' + digest,
         generatedAt: new Date().toISOString(),
         complianceStandard: 'ISO 17359 / IRC Engineering Inspection Digest'

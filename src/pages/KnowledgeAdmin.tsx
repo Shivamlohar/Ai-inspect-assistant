@@ -11,7 +11,8 @@ import {
   RefreshCw, 
   CheckCircle2, 
   Sparkles,
-  Info
+  Info,
+  Building2
 } from 'lucide-react';
 
 interface KnowledgeSource {
@@ -42,9 +43,10 @@ interface PublicDataset {
 }
 
 export default function KnowledgeAdmin() {
-  const [activeTab, setActiveTab] = useState<'sources' | 'ingest' | 'test_rag' | 'datasets'>('sources');
+  const [activeTab, setActiveTab] = useState<'sources' | 'ingest' | 'test_rag' | 'datasets' | 'leads'>('sources');
   const [sources, setSources] = useState<KnowledgeSource[]>([]);
   const [datasets, setDatasets] = useState<PublicDataset[]>([]);
+  const [leads, setLeads] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchFilter, setSearchFilter] = useState('');
   
@@ -69,9 +71,10 @@ export default function KnowledgeAdmin() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [srcRes, dsRes] = await Promise.all([
+      const [srcRes, dsRes, leadRes] = await Promise.all([
         fetch('/api/knowledge/sources'),
-        fetch('/api/datasets')
+        fetch('/api/datasets'),
+        fetch('/api/enterprise/leads')
       ]);
 
       if (srcRes.ok) {
@@ -81,6 +84,10 @@ export default function KnowledgeAdmin() {
       if (dsRes.ok) {
         const dsData = await dsRes.json();
         setDatasets(dsData.datasets || []);
+      }
+      if (leadRes.ok) {
+        const leadData = await leadRes.json();
+        setLeads(leadData.leads || []);
       }
     } catch (e) {
       console.warn('Could not fetch from backend API, using fallback data:', e);
@@ -359,6 +366,18 @@ export default function KnowledgeAdmin() {
         >
           <Database className="w-4 h-4" />
           <span>Public Datasets Registry</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('leads')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+            activeTab === 'leads'
+              ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+          }`}
+        >
+          <Building2 className="w-4 h-4" />
+          <span>Enterprise Leads ({leads.length})</span>
         </button>
       </div>
 
@@ -777,6 +796,83 @@ export default function KnowledgeAdmin() {
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* TAB 5: Enterprise Sales Leads */}
+      {activeTab === 'leads' && (
+        <div className="space-y-4">
+          <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 shadow-xl space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400">
+                  <Building2 className="w-5 h-5" />
+                </span>
+                <h3 className="text-lg font-black text-white">
+                  Corporate Sales Leads & Custom Pilot Inquiries
+                </h3>
+              </div>
+              <span className="text-xs font-mono bg-purple-500/20 text-purple-300 px-3 py-1 rounded-full border border-purple-500/30">
+                {leads.length} Total Received
+              </span>
+            </div>
+            <p className="text-xs text-slate-400">
+              Corporate inquiries submitted via the "Contact Sales" & "Request Demo" modals across Inspectra.
+            </p>
+          </div>
+
+          {leads.length === 0 ? (
+            <div className="p-12 text-center rounded-3xl bg-slate-900/60 border border-slate-800 space-y-2 text-slate-400">
+              <Building2 className="w-8 h-8 mx-auto opacity-50 text-purple-400" />
+              <p className="text-sm font-bold">No Enterprise Leads Submitted Yet</p>
+              <p className="text-xs">Leads submitted via the Pricing and Organization pages will appear here in real time.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-3xl border border-slate-800 bg-slate-900/80 shadow-md">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-800 bg-slate-800/50 text-slate-400 uppercase tracking-wider font-bold">
+                    <th className="p-4">Contact & Company</th>
+                    <th className="p-4">Industry & Size</th>
+                    <th className="p-4">Inspectors & Volume</th>
+                    <th className="p-4">Requirements & Message</th>
+                    <th className="p-4">Date & Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {leads.map((l: any) => (
+                    <tr key={l.id} className="hover:bg-slate-800/30 transition">
+                      <td className="p-4">
+                        <p className="font-bold text-white text-sm">{l.name}</p>
+                        <p className="text-cyan-400 font-mono text-[11px]">{l.work_email}</p>
+                        <p className="text-slate-400 text-xs mt-0.5">{l.company}</p>
+                      </td>
+                      <td className="p-4">
+                        <p className="font-semibold text-slate-200">{l.industry}</p>
+                        <p className="text-slate-400 text-[11px]">{l.company_size} employees</p>
+                      </td>
+                      <td className="p-4">
+                        <p className="font-mono text-slate-200">{l.inspectors_count} inspectors</p>
+                        <p className="text-purple-400 font-mono text-[11px]">{l.expected_volume}</p>
+                      </td>
+                      <td className="p-4 max-w-xs">
+                        <p className="text-slate-300 line-clamp-2">{l.requirements || 'No specific requirements'}</p>
+                        {l.message && <p className="text-slate-500 italic text-[11px] mt-1 line-clamp-1">"{l.message}"</p>}
+                      </td>
+                      <td className="p-4 whitespace-nowrap">
+                        <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          {l.status || 'NEW'}
+                        </span>
+                        <p className="text-slate-500 text-[10px] font-mono mt-1">
+                          {new Date(l.created_at).toLocaleDateString()}
+                        </p>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 

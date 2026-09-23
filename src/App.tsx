@@ -29,7 +29,10 @@ import {
   BookOpen,
   Menu,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  BarChart3,
+  Tag,
+  Users
 } from 'lucide-react';
 import type { ThemeMode } from './utils/theme';
 import { getStoredTheme, applyTheme } from './utils/theme';
@@ -45,6 +48,9 @@ const Assets = lazy(() => import('./pages/Assets'));
 const SystemCheck = lazy(() => import('./pages/SystemCheck'));
 const AssetHistory = lazy(() => import('./pages/AssetHistory'));
 const KnowledgeAdmin = lazy(() => import('./pages/KnowledgeAdmin'));
+const Pricing = lazy(() => import('./pages/Pricing'));
+const Organization = lazy(() => import('./pages/Organization'));
+const Analytics = lazy(() => import('./pages/Analytics'));
 
 function PageLoader() {
   return (
@@ -927,6 +933,16 @@ function TopNav({
 
         {/* Top Nav Right Action Cluster (Desktop / Tablet) */}
         <div className="hidden md:flex items-center gap-2 lg:gap-3 shrink-0">
+          {/* FREE PILOT STATUS BADGE */}
+          <Link
+            to="/organization"
+            title="Inspectra Free Pilot Program • Click to view usage and team"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 text-xs font-black transition cursor-pointer shrink-0"
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+            <span className="tracking-wider">FREE PILOT</span>
+          </Link>
+
           {/* Live AI Engine Telemetry & Connectivity Badge */}
           <div className={`hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-colors ${
             !isOnline 
@@ -1128,11 +1144,14 @@ function MobileDrawer({
 
   const navItems = [
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
-    { path: '/system-check', icon: Activity, label: 'System Check & Sensors' },
-    { path: '/assets', icon: Building2, label: 'Assets Registry' },
-    { path: '/history', icon: History, label: 'Asset History & Audits' },
     { path: '/inspect', icon: Camera, label: 'New Inspection' },
     { path: '/report', icon: FileText, label: 'Reports & Export' },
+    { path: '/analytics', icon: BarChart3, label: 'Analytics' },
+    { path: '/organization', icon: Users, label: 'Organization & Team' },
+    { path: '/pricing', icon: Tag, label: 'Pricing Plans' },
+    { path: '/assets', icon: Building2, label: 'Assets Registry' },
+    { path: '/history', icon: History, label: 'Asset History & Audits' },
+    { path: '/system-check', icon: Activity, label: 'System Check' },
     { path: '/knowledge-admin', icon: BookOpen, label: 'Knowledge Base' },
   ];
 
@@ -1321,11 +1340,14 @@ function Sidebar({
   
   const navItems = [
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
-    { path: '/system-check', icon: Activity, label: 'System Check' },
-    { path: '/assets', icon: Building2, label: 'Assets' },
-    { path: '/history', icon: History, label: 'Asset History' },
     { path: '/inspect', icon: Camera, label: 'Inspections' },
     { path: '/report', icon: FileText, label: 'Reports' },
+    { path: '/analytics', icon: BarChart3, label: 'Analytics' },
+    { path: '/organization', icon: Users, label: 'Organization' },
+    { path: '/pricing', icon: Tag, label: 'Pricing' },
+    { path: '/assets', icon: Building2, label: 'Assets' },
+    { path: '/history', icon: History, label: 'Asset History' },
+    { path: '/system-check', icon: Activity, label: 'System Check' },
     { path: '/knowledge-admin', icon: BookOpen, label: 'Knowledge Base' },
   ];
 
@@ -1447,11 +1469,11 @@ function MobileNav() {
   const location = useLocation();
   const navItems = [
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
-    { path: '/system-check', icon: Activity, label: 'Diagnostics' },
     { path: '/inspect', icon: Camera, label: 'Inspect' },
-    { path: '/assets', icon: Building2, label: 'Assets' },
-    { path: '/knowledge-admin', icon: BookOpen, label: 'Knowledge' },
     { path: '/report', icon: FileText, label: 'Reports' },
+    { path: '/analytics', icon: BarChart3, label: 'Analytics' },
+    { path: '/organization', icon: Users, label: 'Team' },
+    { path: '/pricing', icon: Tag, label: 'Pricing' },
   ];
 
   return (
@@ -1585,6 +1607,9 @@ function AppShell({
             <AnimatePresence mode="wait">
               <Routes location={location} key={location.pathname}>
                 <Route path="/" element={<PageTransition><Dashboard /></PageTransition>} />
+                <Route path="/pricing" element={<PageTransition><Pricing /></PageTransition>} />
+                <Route path="/organization" element={<PageTransition><Organization /></PageTransition>} />
+                <Route path="/analytics" element={<PageTransition><Analytics /></PageTransition>} />
                 <Route path="/system-check" element={<PageTransition><SystemCheck /></PageTransition>} />
                 <Route path="/assets" element={<PageTransition><Assets /></PageTransition>} />
                 <Route path="/history" element={<PageTransition><AssetHistory /></PageTransition>} />

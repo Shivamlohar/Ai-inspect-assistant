@@ -1,4 +1,4 @@
-﻿-- AI-Powered Real-Time Asset Inspection Assistant
+-- AI-Powered Real-Time Asset Inspection Assistant
 -- Relational Schema for SQLite (node:sqlite)
 
 CREATE TABLE IF NOT EXISTS users (
@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS inspections (
   summary_observation TEXT,
   engineering_notice TEXT,
   is_demo_data INTEGER DEFAULT 0,
+  organization_id TEXT DEFAULT 'org-inspectra-default',
   created_at TEXT NOT NULL,
   FOREIGN KEY (asset_id) REFERENCES assets(asset_id)
 );
@@ -138,4 +139,55 @@ CREATE TABLE IF NOT EXISTS audit_traces (
   final_recommendation TEXT NOT NULL,
   timestamp TEXT NOT NULL,
   FOREIGN KEY (inspection_id) REFERENCES inspections(id)
+);
+
+-- =========================================================================
+-- Business Model: Free Pilot, Organizations, Usage Tracking & Enterprise Leads
+-- =========================================================================
+
+CREATE TABLE IF NOT EXISTS organizations (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  plan_tier TEXT DEFAULT 'FREE_PILOT', -- 'FREE_PILOT', 'STARTER', 'PROFESSIONAL', 'ENTERPRISE'
+  industry TEXT,
+  pilot_started_at TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS organization_members (
+  id TEXT PRIMARY KEY,
+  organization_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  email TEXT,
+  role TEXT NOT NULL, -- 'Owner', 'Admin', 'Lead Inspector', 'Field Engineer'
+  status TEXT DEFAULT 'ACTIVE',
+  joined_at TEXT NOT NULL,
+  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS enterprise_leads (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  work_email TEXT NOT NULL,
+  company TEXT NOT NULL,
+  industry TEXT NOT NULL,
+  company_size TEXT NOT NULL,
+  inspectors_count TEXT NOT NULL,
+  expected_volume TEXT NOT NULL,
+  requirements TEXT,
+  message TEXT,
+  status TEXT DEFAULT 'NEW', -- 'NEW', 'CONTACTED', 'PILOT_SCHEDULED', 'DEMO_COMPLETED'
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS organization_usage_logs (
+  id TEXT PRIMARY KEY,
+  organization_id TEXT NOT NULL,
+  event_type TEXT NOT NULL, -- 'INSPECTION_CREATED', 'AI_ANALYZED', 'REPORT_GENERATED', 'EVIDENCE_UPLOADED', 'MEMBER_ADDED'
+  resource_id TEXT,
+  performed_by TEXT,
+  metadata TEXT, -- JSON
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
 );
