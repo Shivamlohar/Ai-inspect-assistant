@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+﻿import { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { 
   Camera, 
@@ -132,7 +132,7 @@ export default function NewInspection() {
       size: '0.9 MB',
       category: 'Industrial Machinery',
       asset: 'Industrial Motor M-401 (M-401)',
-      note: 'Thermal signature nominal (54°C). Drive bearing harmonic vibration within ISO 10816 limits.'
+      note: 'Thermal signature nominal (54Â°C). Drive bearing harmonic vibration within ISO 10816 limits.'
     },
     {
       name: 'Centrifugal Pump P-204',
@@ -165,7 +165,7 @@ export default function NewInspection() {
       size: '0.9 MB',
       category: 'Industrial Machinery',
       asset: 'Air Compressor C-305 (C-305)',
-      note: 'Air dryer dew point -40°C verified. Discharge temperature stable at 76°C under full load.'
+      note: 'Air dryer dew point -40Â°C verified. Discharge temperature stable at 76Â°C under full load.'
     },
     {
       name: 'Concrete Pillar CP-021',
@@ -209,7 +209,7 @@ export default function NewInspection() {
       size: '0.9 MB',
       category: 'Electrical Switchgear',
       asset: 'Electrical Panel EP-052 (EP-052)',
-      note: 'Infrared thermography scan reveals thermal Delta-T < 2.8°C across all MCC busbars.'
+      note: 'Infrared thermography scan reveals thermal Delta-T < 2.8Â°C across all MCC busbars.'
     },
     {
       name: 'Transformer TR-009',
@@ -386,7 +386,7 @@ export default function NewInspection() {
           confidence: 'Offline Metrology Active',
           measurements: 'Evidence-based inspection ready'
         });
-        setSecurityNotice('ℹ️ Cloud AI Vision requires server OPENAI_API_KEY in deployment environment. Precision metrology engine active.');
+        setSecurityNotice('â„¹ï¸ Cloud AI Vision requires server OPENAI_API_KEY in deployment environment. Precision metrology engine active.');
         return;
       }
 
@@ -518,7 +518,7 @@ export default function NewInspection() {
         runAiPreScan(secResult.sanitizedName, url);
       });
 
-    setSecurityNotice('Anti-Malware Sandbox: Clean File • 0 Threat Signatures • Integrity Verified');
+    setSecurityNotice('Anti-Malware Sandbox: Clean File â€¢ 0 Threat Signatures â€¢ Integrity Verified');
     stopCamera();
   };
 
@@ -640,7 +640,7 @@ export default function NewInspection() {
           base64: dataUrl,
           mimeType: 'image/jpeg'
         });
-        setSecurityNotice('Hardware Capture: Verified Secure Frame (Locked 16:9 Aspect • Jitter Filter Active)');
+        setSecurityNotice('Hardware Capture: Verified Secure Frame (Locked 16:9 Aspect â€¢ Jitter Filter Active)');
         runAiPreScan(fileName);
       }
     }
@@ -698,7 +698,7 @@ export default function NewInspection() {
     if (!SpeechRecognition) {
       setMicError(
         selectedLang === 'hi'
-          ? 'इस ब्राउज़र में स्पीच रिकग्निशन समर्थित नहीं है। कृपया Google Chrome, Edge, या Safari का उपयोग करें, या नीचे त्वरित नोट्स पर क्लिक करें।'
+          ? 'à¤‡à¤¸ à¤¬à¥à¤°à¤¾à¤‰à¤œà¤¼à¤° à¤®à¥‡à¤‚ à¤¸à¥à¤ªà¥€à¤š à¤°à¤¿à¤•à¤—à¥à¤¨à¤¿à¤¶à¤¨ à¤¸à¤®à¤°à¥à¤¥à¤¿à¤¤ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆà¥¤ à¤•à¥ƒà¤ªà¤¯à¤¾ Google Chrome, Edge, à¤¯à¤¾ Safari à¤•à¤¾ à¤‰à¤ªà¤¯à¥‹à¤— à¤•à¤°à¥‡à¤‚, à¤¯à¤¾ à¤¨à¥€à¤šà¥‡ à¤¤à¥à¤µà¤°à¤¿à¤¤ à¤¨à¥‹à¤Ÿà¥à¤¸ à¤ªà¤° à¤•à¥à¤²à¤¿à¤• à¤•à¤°à¥‡à¤‚à¥¤'
           : 'Speech recognition is not natively supported in this browser. Please use Chrome, Edge, or Safari, or click the quick observation tags below.'
       );
       return;
@@ -717,10 +717,10 @@ export default function NewInspection() {
       const isDenied = err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError';
       const msg = isDenied
         ? (selectedLang === 'hi'
-            ? 'माइक्रोफ़ोन अनुमति अस्वीकृत है। ब्राउज़र एड्रेस बार में लॉक/आइकॉन पर क्लिक करके माइक्रोफ़ोन को Allow करें।'
+            ? 'à¤®à¤¾à¤‡à¤•à¥à¤°à¥‹à¤«à¤¼à¥‹à¤¨ à¤…à¤¨à¥à¤®à¤¤à¤¿ à¤…à¤¸à¥à¤µà¥€à¤•à¥ƒà¤¤ à¤¹à¥ˆà¥¤ à¤¬à¥à¤°à¤¾à¤‰à¤œà¤¼à¤° à¤à¤¡à¥à¤°à¥‡à¤¸ à¤¬à¤¾à¤° à¤®à¥‡à¤‚ à¤²à¥‰à¤•/à¤†à¤‡à¤•à¥‰à¤¨ à¤ªà¤° à¤•à¥à¤²à¤¿à¤• à¤•à¤°à¤•à¥‡ à¤®à¤¾à¤‡à¤•à¥à¤°à¥‹à¤«à¤¼à¥‹à¤¨ à¤•à¥‹ Allow à¤•à¤°à¥‡à¤‚à¥¤'
             : 'Microphone access denied. Please click the lock or site settings icon in your browser URL bar, set "Microphone" to Allow, and try again.')
         : (selectedLang === 'hi'
-            ? `माइक्रोफ़ोन त्रुटि: ${err.message || 'ऑडियो हार्डवेयर उपलब्ध नहीं है'}`
+            ? `à¤®à¤¾à¤‡à¤•à¥à¤°à¥‹à¤«à¤¼à¥‹à¤¨ à¤¤à¥à¤°à¥à¤Ÿà¤¿: ${err.message || 'à¤‘à¤¡à¤¿à¤¯à¥‹ à¤¹à¤¾à¤°à¥à¤¡à¤µà¥‡à¤¯à¤° à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆ'}`
             : `Microphone device error: ${err.message || 'Audio device not accessible'}`);
       setMicError(msg);
       return;
@@ -800,13 +800,13 @@ export default function NewInspection() {
         if (event.error === 'not-allowed') {
           setMicError(
             selectedLang === 'hi'
-              ? 'माइक्रोफ़ोन अनुमति ब्राउज़र द्वारा ब्लॉक कर दी गई है। कृपया साइट सेटिंग्स में अनुमति दें।'
+              ? 'à¤®à¤¾à¤‡à¤•à¥à¤°à¥‹à¤«à¤¼à¥‹à¤¨ à¤…à¤¨à¥à¤®à¤¤à¤¿ à¤¬à¥à¤°à¤¾à¤‰à¤œà¤¼à¤° à¤¦à¥à¤µà¤¾à¤°à¤¾ à¤¬à¥à¤²à¥‰à¤• à¤•à¤° à¤¦à¥€ à¤—à¤ˆ à¤¹à¥ˆà¥¤ à¤•à¥ƒà¤ªà¤¯à¤¾ à¤¸à¤¾à¤‡à¤Ÿ à¤¸à¥‡à¤Ÿà¤¿à¤‚à¤—à¥à¤¸ à¤®à¥‡à¤‚ à¤…à¤¨à¥à¤®à¤¤à¤¿ à¤¦à¥‡à¤‚à¥¤'
               : 'Microphone permission blocked. Please allow microphone access in browser site settings.'
           );
         } else if (event.error === 'network') {
           setMicError(
             selectedLang === 'hi'
-              ? 'नेटवर्क त्रुटि: स्पीच सर्विस से संपर्क नहीं हो पाया। इंटरनेट कनेक्शन जांचें।'
+              ? 'à¤¨à¥‡à¤Ÿà¤µà¤°à¥à¤• à¤¤à¥à¤°à¥à¤Ÿà¤¿: à¤¸à¥à¤ªà¥€à¤š à¤¸à¤°à¥à¤µà¤¿à¤¸ à¤¸à¥‡ à¤¸à¤‚à¤ªà¤°à¥à¤• à¤¨à¤¹à¥€à¤‚ à¤¹à¥‹ à¤ªà¤¾à¤¯à¤¾à¥¤ à¤‡à¤‚à¤Ÿà¤°à¤¨à¥‡à¤Ÿ à¤•à¤¨à¥‡à¤•à¥à¤¶à¤¨ à¤œà¤¾à¤‚à¤šà¥‡à¤‚à¥¤'
               : 'Network error: speech service could not be reached. Check your internet connection.'
           );
         } else if (event.error !== 'aborted') {
@@ -830,12 +830,12 @@ export default function NewInspection() {
   // Quick observation chips
   const quickObservationTags = selectedLang === 'hi'
     ? [
-        { label: '+ सतह पर दरार (Crack)', text: 'सतह पर स्पष्ट दरार (Surface Crack) दिखाई दे रही है।' },
-        { label: '+ जंग / संक्षारण (Corrosion)', text: 'धातु आवरण पर गंभीर जंग और संक्षारण (Corrosion/Oxidation) मौजूद है।' },
-        { label: '+ कंपन / आवाज़ (Vibration)', text: 'उपकरण में असामान्य कंपन और बेयरिंग ध्वनि रिकॉर्ड की गई।' },
-        { label: '+ तेल / रिसाव (Fluid Leak)', text: 'सील और फ्लैंज के पास द्रव/तेल रिसाव (Fluid/Oil Leakage) देखा गया।' },
-        { label: '+ वेल्ड जोड़ क्षति (Weld Defect)', text: 'संरचनात्मक वेल्ड सीम में विखंडन और दरार उपस्थित है।' },
-        { label: '+ सामान्य स्थिति (Healthy)', text: 'उपकरण का दृश्य निरीक्षण संतोषजनक, सभी घटक सामान्य सीमा में हैं।' }
+        { label: '+ à¤¸à¤¤à¤¹ à¤ªà¤° à¤¦à¤°à¤¾à¤° (Crack)', text: 'à¤¸à¤¤à¤¹ à¤ªà¤° à¤¸à¥à¤ªà¤·à¥à¤Ÿ à¤¦à¤°à¤¾à¤° (Surface Crack) à¤¦à¤¿à¤–à¤¾à¤ˆ à¤¦à¥‡ à¤°à¤¹à¥€ à¤¹à¥ˆà¥¤' },
+        { label: '+ à¤œà¤‚à¤— / à¤¸à¤‚à¤•à¥à¤·à¤¾à¤°à¤£ (Corrosion)', text: 'à¤§à¤¾à¤¤à¥ à¤†à¤µà¤°à¤£ à¤ªà¤° à¤—à¤‚à¤­à¥€à¤° à¤œà¤‚à¤— à¤”à¤° à¤¸à¤‚à¤•à¥à¤·à¤¾à¤°à¤£ (Corrosion/Oxidation) à¤®à¥Œà¤œà¥‚à¤¦ à¤¹à¥ˆà¥¤' },
+        { label: '+ à¤•à¤‚à¤ªà¤¨ / à¤†à¤µà¤¾à¤œà¤¼ (Vibration)', text: 'à¤‰à¤ªà¤•à¤°à¤£ à¤®à¥‡à¤‚ à¤…à¤¸à¤¾à¤®à¤¾à¤¨à¥à¤¯ à¤•à¤‚à¤ªà¤¨ à¤”à¤° à¤¬à¥‡à¤¯à¤°à¤¿à¤‚à¤— à¤§à¥à¤µà¤¨à¤¿ à¤°à¤¿à¤•à¥‰à¤°à¥à¤¡ à¤•à¥€ à¤—à¤ˆà¥¤' },
+        { label: '+ à¤¤à¥‡à¤² / à¤°à¤¿à¤¸à¤¾à¤µ (Fluid Leak)', text: 'à¤¸à¥€à¤² à¤”à¤° à¤«à¥à¤²à¥ˆà¤‚à¤œ à¤•à¥‡ à¤ªà¤¾à¤¸ à¤¦à¥à¤°à¤µ/à¤¤à¥‡à¤² à¤°à¤¿à¤¸à¤¾à¤µ (Fluid/Oil Leakage) à¤¦à¥‡à¤–à¤¾ à¤—à¤¯à¤¾à¥¤' },
+        { label: '+ à¤µà¥‡à¤²à¥à¤¡ à¤œà¥‹à¤¡à¤¼ à¤•à¥à¤·à¤¤à¤¿ (Weld Defect)', text: 'à¤¸à¤‚à¤°à¤šà¤¨à¤¾à¤¤à¥à¤®à¤• à¤µà¥‡à¤²à¥à¤¡ à¤¸à¥€à¤® à¤®à¥‡à¤‚ à¤µà¤¿à¤–à¤‚à¤¡à¤¨ à¤”à¤° à¤¦à¤°à¤¾à¤° à¤‰à¤ªà¤¸à¥à¤¥à¤¿à¤¤ à¤¹à¥ˆà¥¤' },
+        { label: '+ à¤¸à¤¾à¤®à¤¾à¤¨à¥à¤¯ à¤¸à¥à¤¥à¤¿à¤¤à¤¿ (Healthy)', text: 'à¤‰à¤ªà¤•à¤°à¤£ à¤•à¤¾ à¤¦à¥ƒà¤¶à¥à¤¯ à¤¨à¤¿à¤°à¥€à¤•à¥à¤·à¤£ à¤¸à¤‚à¤¤à¥‹à¤·à¤œà¤¨à¤•, à¤¸à¤­à¥€ à¤˜à¤Ÿà¤• à¤¸à¤¾à¤®à¤¾à¤¨à¥à¤¯ à¤¸à¥€à¤®à¤¾ à¤®à¥‡à¤‚ à¤¹à¥ˆà¤‚à¥¤' }
       ]
     : [
         { label: '+ Surface Crack', text: 'Visible hairline fracture and surface cracking observed on the component.' },
@@ -850,7 +850,7 @@ export default function NewInspection() {
     setDescription(prev => {
       const trimmed = prev.trim();
       if (!trimmed) return tagText;
-      return `${trimmed}\n• ${tagText}`;
+      return `${trimmed}\nâ€¢ ${tagText}`;
     });
   };
 
@@ -910,7 +910,7 @@ export default function NewInspection() {
       {/* Page Title */}
       <div className="text-center space-y-2 mb-4">
         <div className="inline-flex items-center gap-2 bg-healthy/10 border border-healthy/20 text-healthy px-3.5 py-1 rounded-full text-xs font-black uppercase tracking-wider">
-          <ShieldCheck className="w-3.5 h-3.5" /> High-Accuracy AI Diagnostic Engine • Anti-Malware Protected
+          <ShieldCheck className="w-3.5 h-3.5" /> High-Accuracy AI Diagnostic Engine â€¢ Anti-Malware Protected
         </div>
         <h2 className="text-3xl md:text-4xl font-black text-slate-800 tracking-tight">Start a New Inspection</h2>
         <p className="text-slate-500 text-base md:text-lg">
@@ -996,7 +996,7 @@ export default function NewInspection() {
               <RotateCcw className="w-5 h-5" />
             </div>
             <div>
-              <p className="font-extrabold text-slate-800 text-sm flex items-center gap-2">
+              <p className="font-extrabold text-slate-800 dark:text-white text-sm flex items-center gap-2">
                 Unsaved Inspection Draft Recovered
                 <span className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded-full uppercase font-black">F5 Protected</span>
               </p>
@@ -1071,10 +1071,10 @@ export default function NewInspection() {
             <Sun className="w-4 h-4 shrink-0" />
             <span>
               {luminance < 45 
-                ? `⚠️ Low-Light Warning (${luminance}/255 Lux): Under-lit scene detected. Increase ambient lighting to prevent false crack/defect classifications.`
+                ? `âš ï¸ Low-Light Warning (${luminance}/255 Lux): Under-lit scene detected. Increase ambient lighting to prevent false crack/defect classifications.`
                 : luminance > 220 
-                ? `⚠️ Glare Alert (${luminance}/255 Lux): Specular reflections detected. Angle lens away from direct light.`
-                : `✅ Optimal Illumination (${luminance}/255 Lux): Surface illumination certified for sub-millimeter metrology.`}
+                ? `âš ï¸ Glare Alert (${luminance}/255 Lux): Specular reflections detected. Angle lens away from direct light.`
+                : `âœ… Optimal Illumination (${luminance}/255 Lux): Surface illumination certified for sub-millimeter metrology.`}
             </span>
           </div>
           <span className="text-[10px] uppercase font-black px-2.5 py-0.5 rounded-full bg-white/90 shadow-xs shrink-0">
@@ -1084,19 +1084,19 @@ export default function NewInspection() {
       )}
 
       {/* Live AI Engine Status Banner */}
-      <div className="p-4 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs bg-gradient-to-r from-primary/5 via-cyan-500/5 to-white border-primary/20">
+      <div className="p-4 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs bg-gradient-to-r from-primary/10 via-cyan-500/5 to-primary/5 dark:from-primary/15 dark:via-cyan-500/10 dark:to-slate-900/0 border-primary/20 dark:border-primary/30 dark:bg-slate-900/80">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary/10 text-primary">
             <Sparkles className="w-5 h-5" />
           </div>
           <div>
-            <p className="font-extrabold text-slate-800 text-sm flex items-center gap-2">
+            <p className="font-extrabold text-slate-800 dark:text-white text-sm flex items-center gap-2">
               <span>Multimodal AI Vision & Precision Metrology Engine</span>
               <span className="text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider bg-healthy/10 text-healthy border border-healthy/20">
-                ⚡ READY & ACTIVE
+                âš¡ READY & ACTIVE
               </span>
             </p>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               Automated high-resolution defect detection, crack segmentation, and quantitative corrosion metrology are active.
             </p>
           </div>
@@ -1107,7 +1107,7 @@ export default function NewInspection() {
       <div className="card p-5 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white shadow-xs">
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-bold text-xl">
-            ⚙️
+            âš™ï¸
           </div>
           <div>
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Target Component</span>
@@ -1122,8 +1122,8 @@ export default function NewInspection() {
           onChange={(e) => setSelectedAsset(e.target.value)}
           className="bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold text-sm rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer w-full sm:w-auto"
         >
-          <option value="">🔍 Auto-detect asset & domain from image</option>
-          <optgroup label="🏭 1. INDUSTRIAL MACHINES">
+          <option value="">ðŸ” Auto-detect asset & domain from image</option>
+          <optgroup label="ðŸ­ 1. INDUSTRIAL MACHINES">
             <option value="Industrial Motor M-401 (M-401)">Electric Motor M-401 (M-401)</option>
             <option value="Centrifugal Pump P-204 (P-204)">Centrifugal Pump P-204 (P-204)</option>
             <option value="Gearbox G-118 (G-118)">Gearbox G-118 (G-118)</option>
@@ -1131,7 +1131,7 @@ export default function NewInspection() {
             <option value="Gas Turbine GT-10 (GT-10)">Gas Turbine GT-10 (GT-10)</option>
             <option value="Industrial Generator GEN-04 (GEN-04)">Industrial Generator GEN-04 (GEN-04)</option>
           </optgroup>
-          <optgroup label="🏗️ 2. CIVIL INFRASTRUCTURE">
+          <optgroup label="ðŸ—ï¸ 2. CIVIL INFRASTRUCTURE">
             <option value="Concrete Pillar CP-021 (CP-021)">Concrete Pillar CP-021 (CP-021)</option>
             <option value="Steel Beam SB-114 (SB-114)">Steel Beam SB-114 (SB-114)</option>
             <option value="Structural Joint SJ-087 (SJ-087)">Structural Joint SJ-087 (SJ-087)</option>
@@ -1139,32 +1139,32 @@ export default function NewInspection() {
             <option value="Concrete Wall & Slab CS-04 (CS-04)">Concrete Wall & Slab CS-04 (CS-04)</option>
             <option value="Structural Foundation Footing (FT-01)">Structural Foundation Footing (FT-01)</option>
           </optgroup>
-          <optgroup label="⚡ 3. ELECTRICAL SYSTEMS">
+          <optgroup label="âš¡ 3. ELECTRICAL SYSTEMS">
             <option value="Electrical Panel EP-052 (EP-052)">Electrical Panel EP-052 (EP-052)</option>
             <option value="Transformer TR-009 (TR-009)">Transformer TR-009 (TR-009)</option>
             <option value="High-Voltage Switchgear SW-20 (SW-20)">High-Voltage Switchgear SW-20 (SW-20)</option>
             <option value="Industrial Circuit Breaker CB-12 (CB-12)">Industrial Circuit Breaker CB-12 (CB-12)</option>
             <option value="Solar Inverter Unit SI-40 (SI-40)">Solar Inverter Unit SI-40 (SI-40)</option>
           </optgroup>
-          <optgroup label="⚙️ 4. MECHANICAL COMPONENTS">
+          <optgroup label="âš™ï¸ 4. MECHANICAL COMPONENTS">
             <option value="Heavy Bearing Assembly BRG-80 (BRG-80)">Heavy Bearing Assembly BRG-80 (BRG-80)</option>
             <option value="Drive Belt & Pulley System DP-14 (DP-14)">Drive Belt & Pulley System DP-14 (DP-14)</option>
             <option value="Flexible Shaft Coupling FC-09 (FC-09)">Flexible Shaft Coupling FC-09 (FC-09)</option>
             <option value="Rotating Drive Shaft DS-22 (DS-22)">Rotating Drive Shaft DS-22 (DS-22)</option>
           </optgroup>
-          <optgroup label="❄️ 5. HVAC & PIPING">
+          <optgroup label="â„ï¸ 5. HVAC & PIPING">
             <option value="Storage Tank ST-301 (ST-301)">Storage Tank ST-301 (ST-301)</option>
             <option value="High-Pressure Pipeline PL-201 (PL-201)">High-Pressure Pipeline PL-201 (PL-201)</option>
             <option value="Pressure Vessel PV-102 (PV-102)">Pressure Vessel PV-102 (PV-102)</option>
             <option value="Industrial Water Chiller CH-88 (CH-88)">Industrial Water Chiller CH-88 (CH-88)</option>
             <option value="Cooling Tower Heat Exchanger CT-03 (CT-03)">Cooling Tower Heat Exchanger CT-03 (CT-03)</option>
           </optgroup>
-          <optgroup label="☀️ 6. RENEWABLE ENERGY">
+          <optgroup label="â˜€ï¸ 6. RENEWABLE ENERGY">
             <option value="Wind Turbine Blade & Nacelle WT-401 (WT-401)">Wind Turbine Blade & Nacelle WT-401 (WT-401)</option>
             <option value="Solar PV Array Panel SPV-120 (SPV-120)">Solar PV Array Panel SPV-120 (SPV-120)</option>
             <option value="Battery Energy Storage Rack BESS-01 (BESS-01)">Battery Energy Storage Rack BESS-01 (BESS-01)</option>
           </optgroup>
-          <optgroup label="🚛 7. VEHICLES & TRANSPORTATION">
+          <optgroup label="ðŸš› 7. VEHICLES & TRANSPORTATION">
             <option value="Fleet Diesel Engine VDE-55 (VDE-55)">Fleet Diesel Engine VDE-55 (VDE-55)</option>
             <option value="Transport Vehicle Undercarriage UC-10 (UC-10)">Transport Vehicle Undercarriage UC-10 (UC-10)</option>
             <option value="Railway Bogie & Suspension RB-44 (RB-44)">Railway Bogie & Suspension RB-44 (RB-44)</option>
@@ -1288,7 +1288,7 @@ export default function NewInspection() {
                 </div>
 
                 <div className="absolute bottom-2 left-2 right-2 text-center bg-slate-900/80 backdrop-blur-xs text-slate-300 text-[10px] py-1 rounded-md">
-                  <span>Aspect-Ratio Synchronized • Zero Mobile Landmark Coordinate Drift</span>
+                  <span>Aspect-Ratio Synchronized â€¢ Zero Mobile Landmark Coordinate Drift</span>
                 </div>
               </div>
 
@@ -1355,7 +1355,7 @@ export default function NewInspection() {
                     {/* Security Confirmation Badge */}
                     <div className="flex items-center gap-1.5 text-[11px] font-bold text-healthy bg-healthy/10 border border-healthy/20 px-2.5 py-1 rounded-md w-fit">
                       <ShieldCheck className="w-3.5 h-3.5" />
-                      <span>{securityNotice || 'Anti-Malware: 0 Threat Signatures • Integrity Verified'}</span>
+                      <span>{securityNotice || 'Anti-Malware: 0 Threat Signatures â€¢ Integrity Verified'}</span>
                     </div>
 
                     <div className="flex items-center gap-2 pt-1">
@@ -1390,7 +1390,7 @@ export default function NewInspection() {
                     <div className="space-y-1.5 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="bg-ai text-white text-[11px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
-                          <Sparkles className="w-3.5 h-3.5" /> AI Detection • {aiDetectionResult.confidence}
+                          <Sparkles className="w-3.5 h-3.5" /> AI Detection â€¢ {aiDetectionResult.confidence}
                         </span>
                         <span className="text-xs font-bold text-slate-600">Identified:</span>
                       </div>
@@ -1498,12 +1498,12 @@ export default function NewInspection() {
                       } as any);
                       setSelectedAsset(preset.asset);
                       setDescription(preset.note);
-                      setSecurityNotice('🔶 Demo Dataset: Sandboxed File');
+                      setSecurityNotice('ðŸ”¶ Demo Dataset: Sandboxed File');
                       setAiDetectionResult({
-                        category: `${preset.domainName} • ${preset.category}`,
+                        category: `${preset.domainName} â€¢ ${preset.category}`,
                         description: `Demo baseline loaded: ${preset.name}.`,
                         defects: ['Visual defect detection ready'],
-                        confidence: '🔶 Pre-configured Demo Mode',
+                        confidence: 'ðŸ”¶ Pre-configured Demo Mode',
                         measurements: 'Pre-calibrated demonstration baseline'
                       });
                     }}
@@ -1650,13 +1650,13 @@ export default function NewInspection() {
               <div className="space-y-0.5">
                 <p className={`font-black text-base ${isRecording ? 'text-critical' : 'text-slate-700 dark:text-slate-200'}`}>
                   {isRecording 
-                    ? `🔴 Recording... (${recordingSeconds}s) • Tap to Stop` 
+                    ? `ðŸ”´ Recording... (${recordingSeconds}s) â€¢ Tap to Stop` 
                     : 'Tap to Start Speaking'}
                 </p>
                 <p className="text-xs text-slate-400 font-medium">
                   {isRecording 
-                    ? `Speech converted live in ${selectedLang === 'hi' ? 'हिंदी (Hindi)' : 'English (US)'}`
-                    : 'Voice automatically transcribed to inspector notes • Continuous mode'}
+                    ? `Speech converted live in ${selectedLang === 'hi' ? 'à¤¹à¤¿à¤‚à¤¦à¥€ (Hindi)' : 'English (US)'}`
+                    : 'Voice automatically transcribed to inspector notes â€¢ Continuous mode'}
                 </p>
               </div>
             </div>
@@ -1666,7 +1666,7 @@ export default function NewInspection() {
               <div className="flex items-center justify-between text-xs font-bold text-slate-400 uppercase tracking-wider">
                 <span className="flex items-center gap-1.5">
                   <Volume2 className="w-3.5 h-3.5 text-primary" />
-                  {selectedLang === 'hi' ? 'त्वरित निरीक्षण नोट्स (1-टैप प्रविष्टि)' : 'Quick Observation Presets (1-Tap Add)'}
+                  {selectedLang === 'hi' ? 'à¤¤à¥à¤µà¤°à¤¿à¤¤ à¤¨à¤¿à¤°à¥€à¤•à¥à¤·à¤£ à¤¨à¥‹à¤Ÿà¥à¤¸ (1-à¤Ÿà¥ˆà¤ª à¤ªà¥à¤°à¤µà¤¿à¤·à¥à¤Ÿà¤¿)' : 'Quick Observation Presets (1-Tap Add)'}
                 </span>
                 <span className="text-[10px] text-slate-400 font-normal">Click any tag to append</span>
               </div>
@@ -1702,7 +1702,7 @@ export default function NewInspection() {
                 className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-slate-800 font-medium text-base min-h-[110px] focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all resize-none"
                 placeholder={
                   selectedLang === 'hi'
-                    ? 'उदाहरण: बाईं तरफ स्पष्ट दरार दिखाई दे रही है। मोटर शाफ्ट पर जंग भी मौजूद है...'
+                    ? 'à¤‰à¤¦à¤¾à¤¹à¤°à¤£: à¤¬à¤¾à¤ˆà¤‚ à¤¤à¤°à¤« à¤¸à¥à¤ªà¤·à¥à¤Ÿ à¤¦à¤°à¤¾à¤° à¤¦à¤¿à¤–à¤¾à¤ˆ à¤¦à¥‡ à¤°à¤¹à¥€ à¤¹à¥ˆà¥¤ à¤®à¥‹à¤Ÿà¤° à¤¶à¤¾à¤«à¥à¤Ÿ à¤ªà¤° à¤œà¤‚à¤— à¤­à¥€ à¤®à¥Œà¤œà¥‚à¤¦ à¤¹à¥ˆ...'
                     : 'Example: Crack visible on the left housing. Bearings show noticeable vibration and surface rust...'
                 }
                 value={description}
@@ -1798,3 +1798,6 @@ export default function NewInspection() {
     </div>
   );
 }
+
+
+
